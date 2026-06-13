@@ -23,12 +23,11 @@
       padding: 2.5rem 3rem;
       box-shadow: 0 2px 8px rgba(0,0,0,.1);
       text-align: center;
+      width: 100%;
+      max-width: 380px;
     }
 
-    h1 {
-      font-size: 1.6rem;
-      margin-bottom: .5rem;
-    }
+    h1 { font-size: 1.6rem; margin-bottom: .5rem; }
 
     p {
       color: #666;
@@ -36,25 +35,37 @@
       font-size: .95rem;
     }
 
+    .btn-group { display: flex; flex-direction: column; gap: .75rem; }
+
     a.btn {
-      display: inline-block;
-      background: #2563eb;
-      color: white;
+      display: block;
       text-decoration: none;
-      padding: .7rem 1.8rem;
+      padding: .75rem 1.8rem;
       border-radius: 7px;
       font-size: 1rem;
       transition: background .15s;
     }
 
-    a.btn:hover { background: #1d4ed8; }
+    a.btn-primary { background: #2563eb; color: white; }
+    a.btn-primary:hover { background: #1d4ed8; }
+
+    a.btn-secondary { background: #e5e7eb; color: #1a1a1a; }
+    a.btn-secondary:hover { background: #d1d5db; }
+
+    a.btn-ghost { color: #2563eb; font-size: .9rem; }
+    a.btn-ghost:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Accueil</h1>
-    <p>Cliquez sur le bouton pour accéder à la page de test.</p>
-    <a class="btn" href="test.html">Aller aux tests →</a>
+    <p>Bienvenue ! Connectez-vous ou créez un compte pour continuer.</p>
+
+    <div class="btn-group">
+      <a class="btn btn-primary" href="connexion.html">Se connecter</a>
+      <a class="btn btn-secondary" href="inscription.html">Créer un compte</a>
+      <a class="btn btn-ghost" href="test.html">Accès rapide aux tests →</a>
+    </div>
   </div>
 </body>
 </html>
