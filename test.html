@@ -124,17 +124,17 @@
     <a class="retour" href="index.html">← Retour à l'accueil</a>
   </div>
 
-  <script type="module">
-    import { createClient } from 'https://unpkg.com/@supabase/supabase-client@2.43.4/dist/module/index.js'
+  <script src="https://unpkg.com/@supabase/supabase-client@2.43.4/dist/umd/supabase.js"></script>
 
-    // Configuration de ton projet
+  <script>
+    // Configuration de ton projet avec tes vrais identifiants
     const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
     const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
     
-    // Initialisation propre
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    // Initialisation standard globale de Supabase
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 
-    // 1. Fonction pour charger les données
+    // 1. Fonction pour récupérer et afficher les données de ta table 'clique'
     async function chargerDonnees() {
       const { data, error } = await supabase
         .from('clique')
@@ -158,7 +158,7 @@
       })
     }
 
-    // 2. Fonction pour envoyer le formulaire
+    // 2. Fonction pour envoyer une nouvelle ligne dans ta table 'clique'
     const form = document.getElementById('formulaire-ajout')
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -174,11 +174,11 @@
         alert("Erreur lors de l'envoi : " + error.message)
       } else {
         champNom.value = ''
-        chargerDonnees() 
+        chargerDonnees() // Recharge automatiquement le tableau après l'ajout !
       }
     })
 
-    // Charger les données dès le départ
+    // Charger les données dès l'ouverture de la page
     chargerDonnees()
   </script>
 
