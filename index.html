@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Accueil</title>
+  <title>Page de test</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -11,50 +11,250 @@
       font-family: system-ui, sans-serif;
       background: #f5f5f5;
       color: #1a1a1a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 1.5rem;
     }
 
     .card {
       background: white;
-      border-radius: 10px;
-      padding: 2.5rem 3rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,.1);
-      text-align: center;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
     }
 
-    h1 {
-      font-size: 1.6rem;
-      margin-bottom: .5rem;
-    }
-
-    p {
-      color: #666;
-      margin-bottom: 2rem;
-      font-size: .95rem;
-    }
-
-    a.btn {
-      display: inline-block;
-      background: #2563eb;
-      color: white;
-      text-decoration: none;
-      padding: .7rem 1.8rem;
-      border-radius: 7px;
+    .card h2 {
       font-size: 1rem;
-      transition: background .15s;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: .05em;
     }
 
-    a.btn:hover { background: #1d4ed8; }
+    input[type="text"],
+    input[type="email"],
+    select,
+    textarea {
+      width: 100%;
+      padding: .6rem .8rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: .95rem;
+      margin-bottom: .75rem;
+      background: #fafafa;
+    }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    .btn-row { display: flex; gap: .75rem; flex-wrap: wrap; }
+
+    button {
+      padding: .55rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      font-size: .9rem;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-secondary { background: #e5e7eb; color: #1a1a1a; }
+    .btn-danger { background: #dc2626; color: white; }
+
+    .tags { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+    .tag {
+      padding: .3rem .75rem;
+      border-radius: 999px;
+      font-size: .8rem;
+      font-weight: 500;
+    }
+
+    .tag-blue { background: #dbeafe; color: #1d4ed8; }
+    .tag-green { background: #dcfce7; color: #15803d; }
+    .tag-red { background: #fee2e2; color: #b91c1c; }
+    .tag-yellow { background: #fef9c3; color: #a16207; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th { text-align: left; padding: .5rem .75rem; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; }
+    td { padding: .5rem .75rem; border-bottom: 1px solid #f1f5f9; }
+    tr:last-child td { border-bottom: none; }
+
+    #log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: monospace;
+      font-size: .85rem;
+      padding: 1rem;
+      border-radius: 6px;
+      min-height: 60px;
+      white-space: pre-wrap;
+    }
+
+    .bdd-form { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    .bdd-form input { flex: 1; margin-bottom: 0; }
+    .status-ok { color: #15803d; font-size: .85rem; margin-top: .5rem; }
+    .status-err { color: #b91c1c; font-size: .85rem; margin-top: .5rem; }
   </style>
 </head>
 <body>
+
+  <h1>Page de test</h1>
+
   <div class="card">
-    <h1>Accueil</h1>
-    <p>Cliquez sur le bouton pour accéder à la page de test.</p>
-    <a class="btn" href="test.html">Aller aux tests →</a>
+    <h2>Formulaire</h2>
+    <input type="text" id="nom" placeholder="Nom">
+    <input type="email" id="email" placeholder="Email">
+    <select id="role">
+      <option value="">-- Rôle --</option>
+      <option>Admin</option>
+      <option>Utilisateur</option>
+      <option>Invité</option>
+    </select>
+    <textarea id="message" placeholder="Message…"></textarea>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="logForm()">Envoyer</button>
+      <button class="btn-secondary" onclick="resetForm()">Réinitialiser</button>
+    </div>
   </div>
+
+  <div class="card">
+    <h2>Boutons</h2>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="log('Primaire cliqué')">Primaire</button>
+      <button class="btn-secondary" onclick="log('Secondaire cliqué')">Secondaire</button>
+      <button class="btn-danger" onclick="log('Danger cliqué')">Danger</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Tags</h2>
+    <div class="tags">
+      <span class="tag tag-blue">Info</span>
+      <span class="tag tag-green">Succès</span>
+      <span class="tag tag-red">Erreur</span>
+      <span class="tag tag-yellow">Avertissement</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Tableau</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Nom</th><th>Statut</th><th>Score</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>001</td><td>Alice</td><td><span class="tag tag-green">Actif</span></td><td>92</td></tr>
+        <tr><td>002</td><td>Bob</td><td><span class="tag tag-yellow">En attente</span></td><td>74</td></tr>
+        <tr><td>003</td><td>Carol</td><td><span class="tag tag-red">Inactif</span></td><td>58</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Base de données (table "clique")</h2>
+    <div class="bdd-form">
+      <input type="text" id="bdd-champ" placeholder="Entrez un nom…">
+      <button class="btn-primary" onclick="bddAjouter()">Ajouter</button>
+      <button class="btn-secondary" onclick="bddCharger()">Rafraîchir</button>
+    </div>
+    <div id="bdd-status"></div>
+    <table id="bdd-table" style="margin-top:.75rem">
+      <thead>
+        <tr><th>ID</th><th>Nom</th></tr>
+      </thead>
+      <tbody id="bdd-tbody">
+        <tr><td colspan="2" style="color:#999">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Console</h2>
+    <div id="log">En attente…</div>
+    <br>
+    <button class="btn-secondary" onclick="clearLog()">Effacer</button>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+    const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
+    const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    const statusEl = document.getElementById('bdd-status')
+    const tbody    = document.getElementById('bdd-tbody')
+
+    async function bddCharger() {
+      statusEl.textContent = ''
+      const { data, error } = await db.from('clique').select('*').order('id', { ascending: true })
+      if (error) {
+        statusEl.className = 'status-err'
+        statusEl.textContent = 'Erreur : ' + error.message
+        return
+      }
+      tbody.innerHTML = data.length === 0
+        ? '<tr><td colspan="2" style="color:#999">Aucune donnée</td></tr>'
+        : data.map(r => `<tr><td>${r.id}</td><td>${r.nom ?? ''}</td></tr>`).join('')
+    }
+
+    async function bddAjouter() {
+      const champ = document.getElementById('bdd-champ')
+      const val = champ.value.trim()
+      if (!val) return
+      statusEl.textContent = ''
+      const { error } = await db.from('clique').insert([{ nom: val }])
+      if (error) {
+        statusEl.className = 'status-err'
+        statusEl.textContent = 'Erreur : ' + error.message
+      } else {
+        champ.value = ''
+        statusEl.className = 'status-ok'
+        statusEl.textContent = '✓ Ajouté avec succès'
+        bddCharger()
+      }
+    }
+
+    window.bddCharger = bddCharger
+    window.bddAjouter = bddAjouter
+
+    bddCharger()
+  </script>
+
+  <script>
+    const logEl = document.getElementById('log')
+
+    function log(msg) {
+      const t = new Date().toLocaleTimeString('fr-FR')
+      logEl.textContent += `\n[${t}] ${msg}`
+      logEl.scrollTop = logEl.scrollHeight
+    }
+
+    function logForm() {
+      const nom     = document.getElementById('nom').value
+      const email   = document.getElementById('email').value
+      const role    = document.getElementById('role').value
+      const message = document.getElementById('message').value
+      log(`Formulaire → nom="${nom}", email="${email}", role="${role}", message="${message}"`)
+    }
+
+    function resetForm() {
+      ['nom','email','message'].forEach(id => document.getElementById(id).value = '')
+      document.getElementById('role').selectedIndex = 0
+      log('Formulaire réinitialisé')
+    }
+
+    function clearLog() {
+      logEl.textContent = 'En attente…'
+    }
+
+    log('Page chargée')
+  </script>
+
 </body>
 </html>
