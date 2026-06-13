@@ -124,12 +124,15 @@
     <a class="retour" href="index.html">← Retour à l'accueil</a>
   </div>
 
-  <script type="module">
-    import { createClient } from 'https://unpkg.com/@supabase/supabase-client@2?v=1'
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2"></script>
 
+  <script>
+    // Configuration Supabase
     const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
     const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz' 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    
+    // Avec cette méthode, on initialise le client comme ceci :
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 
     // 1. Fonction pour charger les données
     async function chargerDonnees() {
@@ -147,12 +150,9 @@
       tbody.innerHTML = ''
 
       data.forEach(item => {
-        // Sécurité : si la colonne ne s'appelle pas "nom", on essaie d'autres variantes courantes
-        const valeurAffichee = item.nom || item.donnee || item.texte || "Colonne 'nom' introuvable"
-        
         const ligne = `<tr>
           <td>${item.id}</td>
-          <td>${valeurAffichee}</td>
+          <td>${item.nom || "Donnée vide"}</td>
         </tr>`
         tbody.innerHTML += ligne
       })
@@ -166,7 +166,6 @@
       const champNom = document.getElementById('champ-nom')
       const nomSaisi = champNom.value
 
-      // ATTENTION : Si ta colonne dans Supabase ne s'appelle pas 'nom', change le mot juste en dessous avant les deux points
       const { error } = await supabase
         .from('clique')
         .insert([{ nom: nomSaisi }]) 
