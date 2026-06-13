@@ -25,7 +25,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,.1);
       text-align: center;
       width: 100%;
-      max-width: 500px; /* On élargit un peu pour le tableau */
+      max-width: 500px;
     }
 
     h1 {
@@ -39,7 +39,6 @@
       font-size: .95rem;
     }
 
-    /* Style du formulaire */
     form {
       display: flex;
       gap: 10px;
@@ -72,7 +71,6 @@
 
     button.btn:hover { background: #1d4ed8; }
 
-    /* Style du tableau dynamique */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -108,7 +106,7 @@
     <p>Ajoutez des données pour voir le tableau s'agrandir.</p>
 
     <form id="formulaire-ajout">
-      <input type="text" id="champ-nom" placeholder="Entrez un nom" required>
+      <input type="text" id="champ-nom" placeholder="Entrez une donnée" required>
       <button type="submit" class="btn">Ajouter</button>
     </form>
 
@@ -116,7 +114,7 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Nom</th>
+          <th>Donnée</th>
         </tr>
       </thead>
       <tbody id="contenu-tableau">
@@ -129,37 +127,35 @@
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-client'
 
-    // Configuration Supabase (Remplace avec tes clés)
+    // Configuration Supabase automatique avec ton Project ID
     const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
-    const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
+    const SUPABASE_KEY = 'METS_TA_CLE_PUBLISHABLE_ICI' 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-    // 1. Fonction pour charger les données de la BDD
+    // 1. Fonction pour charger les données de la table "clique"
     async function chargerDonnees() {
       const { data, error } = await supabase
-        .from('utilisateurs')
+        .from('clique') // <--- On cible ta table "clique"
         .select('*')
         .order('id', { ascending: true })
 
       if (error) {
-        console.error("Erreur lors de la récupération :", error)
+        console.error("Erreur de récupération :", error)
         return
       }
 
       const tbody = document.getElementById('contenu-tableau')
-      tbody.innerHTML = '' // On vide le tableau
+      tbody.innerHTML = ''
 
-      // Le tableau s'agrandit ici selon le nombre de données reçues
-      data.forEach(user => {
+      data.forEach(item => {
         const ligne = `<tr>
-          <td>${user.id}</td>
-          <td>${user.nom}</td>
-        </tr>`
+          <td>${item.id}</td>
+          <td>${item.nom}</td> </tr>`
         tbody.innerHTML += ligne
       })
     }
 
-    // 2. Fonction pour envoyer le formulaire à la BDD
+    // 2. Fonction pour envoyer le formulaire à la table "clique"
     const form = document.getElementById('formulaire-ajout')
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -168,20 +164,12 @@
       const nomSaisi = champNom.value
 
       const { error } = await supabase
-        .from('utilisateurs')
-        .insert([{ nom: nomSaisi }])
+        .from('clique') // <--- On insère dans ta table "clique"
+        .insert([{ nom: nomSaisi }]) // Remplacer 'nom' si ta colonne a un autre nom
 
       if (error) {
         alert("Erreur : " + error.message)
       } else {
-        champNom.value = '' // On vide le champ
-        chargerDonnees()    // On rafraîchit le tableau directement !
+        champNom.value = ''
+        chargerDonnees() // Rafraîchissement automatique
       }
-    })
-
-    // Charger les données dès qu'on arrive sur la page
-    chargerDonnees()
-  </script>
-
-</body>
-</html>
