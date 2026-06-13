@@ -118,7 +118,7 @@
         </tr>
       </thead>
       <tbody id="contenu-tableau">
-        </tbody>
+      </tbody>
     </table>
 
     <a class="retour" href="index.html">← Retour à l'accueil</a>
@@ -127,15 +127,14 @@
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-client'
 
-    // Configuration Supabase automatique avec ton Project ID
     const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
     const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz' 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-    // 1. Fonction pour charger les données de la table "clique"
+    // 1. Fonction pour charger les données
     async function chargerDonnees() {
       const { data, error } = await supabase
-        .from('clique') // <--- On cible ta table "clique"
+        .from('clique')
         .select('*')
         .order('id', { ascending: true })
 
@@ -148,14 +147,18 @@
       tbody.innerHTML = ''
 
       data.forEach(item => {
+        // Sécurité : si la colonne ne s'appelle pas "nom", on essaie d'autres variantes courantes
+        const valeurAffichee = item.nom || item.donnee || item.texte || "Colonne 'nom' introuvable"
+        
         const ligne = `<tr>
           <td>${item.id}</td>
-          <td>${item.nom}</td> </tr>`
+          <td>${valeurAffichee}</td>
+        </tr>`
         tbody.innerHTML += ligne
       })
     }
 
-    // 2. Fonction pour envoyer le formulaire à la table "clique"
+    // 2. Fonction pour envoyer le formulaire
     const form = document.getElementById('formulaire-ajout')
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -163,13 +166,22 @@
       const champNom = document.getElementById('champ-nom')
       const nomSaisi = champNom.value
 
+      // ATTENTION : Si ta colonne dans Supabase ne s'appelle pas 'nom', change le mot juste en dessous avant les deux points
       const { error } = await supabase
-        .from('clique') // <--- On insère dans ta table "clique"
-        .insert([{ nom: nomSaisi }]) // Remplacer 'nom' si ta colonne a un autre nom
+        .from('clique')
+        .insert([{ nom: nomSaisi }]) 
 
       if (error) {
-        alert("Erreur : " + error.message)
+        alert("Erreur lors de l'envoi : " + error.message)
       } else {
         champNom.value = ''
-        chargerDonnees() // Rafraîchissement automatique
+        chargerDonnees() 
       }
+    })
+
+    // Charger les données dès le départ
+    chargerDonnees()
+  </script>
+
+</body>
+</html>
