@@ -50,15 +50,14 @@
   import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
 
   ;(async () => {
-    await appliquerTheme()
-    document.body.style.visibility = ''
+  await appliquerTheme()
+  await chargerHeader('')
+  await chargerFooter('')
+  document.body.style.visibility = ''  // ← après le header/footer
 
-    chargerHeader('')
-    chargerFooter('')
-
-    const connecte = !!localStorage.getItem('username')
-    document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
-  })()
+  const connecte = !!localStorage.getItem('username')
+  document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
+})()
 </script>
 </body>
 </html>
