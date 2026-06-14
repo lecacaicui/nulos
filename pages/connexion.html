@@ -25,31 +25,25 @@
   <div id="footer-placeholder"></div>
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    import { chargerHeader, chargerFooter } from '../script/header.js'
+    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    appliquerTheme()
     chargerHeader('../')
     chargerFooter('../')
-
     const db  = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
     const msg = document.getElementById('msg')
     const btn = document.getElementById('btn')
-
     function afficherMsg(texte, type) { msg.textContent = texte; msg.className = 'msg ' + type }
-
     let tentativesEchouees = 0
-
 window.connecter = async function() {
   const username = document.getElementById('username').value.trim()
   const password = document.getElementById('password').value
   if (!username || !password) return afficherMsg('Veuillez remplir tous les champs.', 'err')
-
   if (tentativesEchouees >= 3) {
     return afficherMsg('Trop de tentatives. Réessayez dans quelques instants.', 'err')
   }
-
   btn.disabled = true; btn.textContent = 'Connexion en cours…'
   const { data, error } = await db.auth.signInWithPassword({ email: username + '@gmail.com', password })
   btn.disabled = false; btn.textContent = 'Se connecter'
-
   if (error) {
     tentativesEchouees++
     if (tentativesEchouees >= 3) {
@@ -60,7 +54,6 @@ window.connecter = async function() {
     }
     return
   }
-
   tentativesEchouees = 0
   const { data: profil } = await db.from('profils').select('niveau').eq('user_id', data.user.id).single()
   localStorage.setItem('niveau', profil?.niveau ?? 'commun')
