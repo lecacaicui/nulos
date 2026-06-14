@@ -8,22 +8,40 @@
 </head>
 <body>
   <div id="header-placeholder"></div>
-  <main class="centered">
-    <div class="card card-sm">
-      <h1>Accueil</h1>
-      <p>Bienvenue ! Connectez-vous ou créez un compte pour continuer.</p>
-      <div class="btn-group">
-        <a class="btn btn-primary" href="pages/connexion.html">Se connecter</a>
-        <a class="btn btn-secondary" href="pages/inscription.html">Créer un compte</a>
+
+  <main>
+    <!-- Visiteur non connecté -->
+    <div class="centered" id="vue-deconnecte" style="display:none">
+      <div class="card card-sm">
+        <h1>Accueil</h1>
+        <p>Bienvenue ! Connectez-vous ou créez un compte pour continuer.</p>
+        <div class="btn-group">
+          <a class="btn btn-primary" href="pages/connexion.html">Se connecter</a>
+          <a class="btn btn-secondary" href="pages/inscription.html">Créer un compte</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Utilisateur connecté (ex-hub.html) -->
+    <div class="placeholder-page" id="vue-connecte" style="display:none">
+      <div class="placeholder">
+        <div class="icon">🚧</div>
+        <h2>Aucune fonctionnalité pour l'instant</h2>
+        <p>Les fonctionnalités seront ajoutées prochainement.</p>
       </div>
     </div>
   </main>
+
   <div id="footer-placeholder"></div>
+
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
     appliquerTheme()
     chargerHeader('')
     chargerFooter('')
+
+    const connecte = !!localStorage.getItem('username')
+    document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
   </script>
 </body>
 </html>
