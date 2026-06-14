@@ -1,0 +1,97 @@
+<header>
+  <div class="header-left">
+    <a href="index.html" class="header-logo">MonSite</a>
+  </div>
+  <div class="header-right" id="header-auth">
+  </div>
+</header>
+
+<style>
+  header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-logo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    text-decoration: none;
+  }
+
+  .header-logo:hover { color: #2563eb; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: .9rem;
+  }
+
+  .header-username { color: #555; }
+
+  .header-tag {
+    padding: .25rem .7rem;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 600;
+  }
+
+  .tag-commun { background: #e5e7eb; color: #374151; }
+  .tag-plus   { background: #dbeafe; color: #1d4ed8; }
+  .tag-admin  { background: #fee2e2; color: #b91c1c; }
+
+  .header-btn {
+    padding: .4rem 1rem;
+    border-radius: 7px;
+    font-size: .85rem;
+    text-decoration: none;
+    transition: background .15s;
+    cursor: pointer;
+    border: none;
+  }
+
+  .header-btn-primary { background: #2563eb; color: white; }
+  .header-btn-primary:hover { background: #1d4ed8; }
+
+  .header-btn-secondary { background: #e5e7eb; color: #1a1a1a; }
+  .header-btn-secondary:hover { background: #d1d5db; }
+</style>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+  const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
+  const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
+  const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+  const username = localStorage.getItem('username')
+  const niveau   = localStorage.getItem('niveau')
+  const authEl   = document.getElementById('header-auth')
+
+  if (username && niveau) {
+    authEl.innerHTML = `
+      <span class="header-username">${username}</span>
+      <span class="header-tag tag-${niveau}">${niveau}</span>
+      <button class="header-btn header-btn-secondary" id="btn-deco">Se déconnecter</button>
+    `
+    document.getElementById('btn-deco').addEventListener('click', async () => {
+      await db.auth.signOut()
+      localStorage.removeItem('username')
+      localStorage.removeItem('niveau')
+      window.location.href = 'index.html'
+    })
+  } else {
+    authEl.innerHTML = `
+      <a class="header-btn header-btn-secondary" href="connexion.html">Se connecter</a>
+      <a class="header-btn header-btn-primary" href="inscription.html">S'inscrire</a>
+    `
+  }
+</script>
