@@ -6,16 +6,11 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
 const THEME_KEY = 'theme_couleurs'
 
-// Applique le thème depuis le cache localStorage (instantané, sans flash),
-// puis rafraîchit depuis Supabase en arrière-plan et met à jour le cache.
+// Applique le thème depuis Supabase et met à jour le cache localStorage.
+// Le thème est déjà appliqué de façon synchrone par le snippet inline dans <head>
+// avant le chargement du module — cette fonction sert uniquement à rafraîchir
+// le cache pour les prochaines visites.
 export async function appliquerTheme() {
-  // 1. Application immédiate depuis le cache (évite le flash blanc)
-  const cache = localStorage.getItem(THEME_KEY)
-  if (cache) {
-    try { appliquerCouleurs(JSON.parse(cache)) } catch (e) {}
-  }
-
-  // 2. Récupération Supabase en arrière-plan pour mettre à jour le cache
   try {
     const { data, error } = await db.from('theme')
       .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
@@ -30,8 +25,6 @@ export async function appliquerTheme() {
 }
 
 // Applique un jeu de 4 couleurs aux variables CSS, sans toucher à la BDD.
-// Utilisé à la fois par appliquerTheme() (chargement) et par l'aperçu des
-// préréglages clair/sombre dans la page admin.
 export function appliquerCouleurs({ couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton }) {
   const racine = document.documentElement.style
   racine.setProperty('--couleur-fond', couleur_fond)
@@ -39,8 +32,6 @@ export function appliquerCouleurs({ couleur_fond, couleur_conteneur, couleur_bor
   racine.setProperty('--couleur-bordure', couleur_bordure)
   racine.setProperty('--couleur-bouton', couleur_bouton)
 
-  // Couleurs de texte calculées automatiquement selon la luminosité du fond,
-  // pour rester lisible aussi bien en thème clair qu'en thème sombre.
   if (estSombre(couleur_fond)) {
     racine.setProperty('--couleur-texte', '#f1f1f1')
     racine.setProperty('--couleur-texte-faible', '#9ca3af')
@@ -50,13 +41,12 @@ export function appliquerCouleurs({ couleur_fond, couleur_conteneur, couleur_bor
   }
 }
 
-// À appeler dans sauvegarderTheme() (admin) pour invalider le cache
+// À appeler dans sauvegarderTheme() (admin) pour vider le cache
 // quand le super admin change le thème.
 export function invaliderCacheTheme() {
   localStorage.removeItem(THEME_KEY)
 }
 
-// Estime si une couleur hexadécimale (#rrggbb) est "sombre" (luminosité perçue faible)
 function estSombre(hex) {
   const h = hex.replace('#', '')
   const r = parseInt(h.substring(0, 2), 16)
@@ -66,8 +56,6 @@ function estSombre(hex) {
   return luminosite < 0.5
 }
 
-// base : chemin relatif vers la racine du site
-// '' si la page est à la racine (index.html), '../' si la page est dans pages/
 export async function chargerHeader(base = '') {
   const html = await fetch(base + 'header.html').then(r => r.text())
   document.getElementById('header-placeholder').innerHTML = html
@@ -76,10 +64,8 @@ export async function chargerHeader(base = '') {
   const niveau   = localStorage.getItem('niveau')
   const authEl   = document.getElementById('header-auth')
 
-  // Logo -> accueil
   document.querySelector('.header-logo').setAttribute('href', base + 'index.html')
 
-  // Lien Administration, visible pour admin et super_admin
   const adminLink = document.getElementById('header-admin-link')
   if (niveau === 'admin' || niveau === 'super_admin') {
     adminLink.setAttribute('href', base + 'pages/admin.html')
