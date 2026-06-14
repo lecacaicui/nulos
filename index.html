@@ -69,10 +69,10 @@
   import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
 
   ;(async () => {
-  await appliquerTheme()
+  document.body.style.setProperty('visibility', 'visible', 'important')
+  appliquerTheme()  // arrière-plan
   await chargerHeader('')
   await chargerFooter('')
- document.body.style.setProperty('visibility', 'visible', 'important')  // ← après le header/footer
 
   const connecte = !!localStorage.getItem('username')
   document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
