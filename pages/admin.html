@@ -21,8 +21,29 @@
           <h1>Administration</h1>
           <a class="retour" href="hub.html">← Retour au hub</a>
         </div>
-        <span class="badge">Admin</span>
+        <span class="badge" id="badge-role">Admin</span>
       </div>
+
+      <div class="card-table" id="theme-card" style="display:none">
+        <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Thème du site</h2>
+        <p class="note-verrouille">Couleurs principale et secondaire utilisées sur tout le site.</p>
+        <div class="theme-grid">
+          <div class="theme-field">
+            <label for="couleur-principale">Couleur principale</label>
+            <input type="color" id="couleur-principale">
+          </div>
+          <div class="theme-field">
+            <label for="couleur-secondaire">Couleur secondaire</label>
+            <input type="color" id="couleur-secondaire">
+          </div>
+          <div class="theme-field">
+            <label>&nbsp;</label>
+            <button class="btn-save" id="btn-save-theme" onclick="sauvegarderTheme()">Appliquer</button>
+          </div>
+          <span class="msg-inline" id="msg-theme"></span>
+        </div>
+      </div>
+
       <div class="card-table">
         <table>
           <thead>
@@ -38,7 +59,8 @@
 
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    import { chargerHeader, chargerFooter } from '../script/header.js'
+    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    appliquerTheme()
     chargerHeader('../')
     chargerFooter('../')
 
@@ -46,11 +68,58 @@
     const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
     const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-    if (localStorage.getItem('niveau') !== 'admin') {
+    const monNiveau = localStorage.getItem('niveau')
+    let monUserId = null
+
+    if (monNiveau !== 'admin' && monNiveau !== 'super_admin') {
       document.getElementById('acces-refuse').style.display = 'block'
     } else {
       document.getElementById('contenu').style.display = 'block'
+      init()
+    }
+
+    async function init() {
+      const { data: session } = await db.auth.getUser()
+      monUserId = session?.user?.id ?? null
+
+      const badge = document.getElementById('badge-role')
+      if (monNiveau === 'super_admin') {
+        badge.textContent = 'Super Admin'
+        badge.classList.add('badge-super')
+        document.getElementById('theme-card').style.display = 'block'
+        chargerTheme()
+      }
+
       chargerUtilisateurs()
+    }
+
+    function tagClassPour(niveau) {
+      if (niveau === 'super_admin') return 'tag-super_admin'
+      if (niveau === 'admin') return 'tag-admin'
+      if (niveau === 'plus') return 'tag-plus'
+      return 'tag-commun'
+    }
+
+    // Détermine si l'utilisateur courant peut modifier la cible, et vers quels niveaux
+    function permissions(cible) {
+      const estMoi = cible.user_id === monUserId
+      if (estMoi) return { modifiable: false, options: [] }
+
+      if (monNiveau === 'admin') {
+        if (cible.niveau === 'commun' || cible.niveau === 'plus') {
+          return { modifiable: true, options: ['commun', 'plus'] }
+        }
+        return { modifiable: false, options: [] }
+      }
+
+      if (monNiveau === 'super_admin') {
+        if (cible.niveau === 'super_admin') {
+          return { modifiable: false, options: [] }
+        }
+        return { modifiable: true, options: ['commun', 'plus', 'admin', 'super_admin'] }
+      }
+
+      return { modifiable: false, options: [] }
     }
 
     async function chargerUtilisateurs() {
@@ -59,22 +128,28 @@
       const tbody = document.getElementById('tbody')
       tbody.innerHTML = ''
       data.forEach(u => {
-        const tagClass = u.niveau === 'admin' ? 'tag-admin' : u.niveau === 'plus' ? 'tag-plus' : 'tag-commun'
+        const tagClass = tagClassPour(u.niveau)
+        const perm = permissions(u)
+
+        let cellSelect
+        if (perm.modifiable) {
+          cellSelect = `<select id="sel-${u.id}">${perm.options.map(o =>
+            `<option value="${o}" ${u.niveau === o ? 'selected' : ''}>${o}</option>`
+          ).join('')}</select>`
+        } else {
+          cellSelect = `<span class="note-verrouille">— non modifiable —</span>`
+        }
+
+        const cellAction = perm.modifiable
+          ? `<button class="btn-save" onclick="sauvegarder('${u.id}')">Sauvegarder</button><span class="msg-inline" id="msg-${u.id}"></span>`
+          : ''
+
         tbody.innerHTML += `
           <tr>
             <td>${u.username}</td>
             <td><span class="tag ${tagClass}">${u.niveau}</span></td>
-            <td>
-              <select id="sel-${u.id}">
-                <option value="commun" ${u.niveau === 'commun' ? 'selected' : ''}>commun</option>
-                <option value="plus"   ${u.niveau === 'plus'   ? 'selected' : ''}>plus</option>
-                <option value="admin"  ${u.niveau === 'admin'  ? 'selected' : ''}>admin</option>
-              </select>
-            </td>
-            <td>
-              <button class="btn-save" onclick="sauvegarder('${u.id}')">Sauvegarder</button>
-              <span class="msg-inline" id="msg-${u.id}"></span>
-            </td>
+            <td>${cellSelect}</td>
+            <td>${cellAction}</td>
           </tr>`
       })
     }
@@ -85,6 +160,30 @@
       const { error } = await db.from('profils').update({ niveau: nouveauNiveau }).eq('id', id)
       if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
       else { msgEl.textContent = '✓ Sauvegardé'; msgEl.className = 'msg-inline ok'; setTimeout(() => chargerUtilisateurs(), 800) }
+    }
+
+    // ===== Thème (super admin uniquement) =====
+    async function chargerTheme() {
+      const { data, error } = await db.from('theme').select('couleur_principale, couleur_secondaire').eq('id', 1).single()
+      if (error || !data) return
+      document.getElementById('couleur-principale').value = data.couleur_principale
+      document.getElementById('couleur-secondaire').value = data.couleur_secondaire
+    }
+
+    window.sauvegarderTheme = async function() {
+      const principale  = document.getElementById('couleur-principale').value
+      const secondaire  = document.getElementById('couleur-secondaire').value
+      const msgEl = document.getElementById('msg-theme')
+      const { error } = await db.from('theme').update({
+        couleur_principale: principale,
+        couleur_secondaire: secondaire
+      }).eq('id', 1)
+      if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
+      else {
+        msgEl.textContent = '✓ Thème appliqué'
+        msgEl.className = 'msg-inline ok'
+        appliquerTheme()
+      }
     }
   </script>
 </body>
