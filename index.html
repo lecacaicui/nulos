@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Accueil</title>
   <link rel="stylesheet" href="style/style.css">
+  <style>body { visibility: hidden; }</style>
 </head>
 <body>
   <div id="header-placeholder"></div>
@@ -46,21 +47,18 @@
   <div id="footer-placeholder"></div>
 
   <script type="module">
-    import {
-      chargerHeader,
-      chargerFooter,
-      appliquerTheme
-    } from './script/header.js'
+  import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
 
-    appliquerTheme()
+  ;(async () => {
+    await appliquerTheme()
+    document.body.style.visibility = ''
+
     chargerHeader('')
     chargerFooter('')
 
     const connecte = !!localStorage.getItem('username')
-
-    document.getElementById(
-      connecte ? 'vue-connecte' : 'vue-deconnecte'
-    ).style.display = 'flex'
-  </script>
+    document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
+  })()
+</script>
 </body>
 </html>
