@@ -55,10 +55,10 @@
     function afficherMsg(texte, type) { msg.textContent = texte; msg.className = 'msg ' + type }
 
     ;(async () => {
-      await appliquerTheme()
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()  // arrière-plan
       await chargerHeader('../')
       await chargerFooter('../')
-      document.body.style.setProperty('visibility', 'visible', 'important')
     })()
 
     window.inscrire = async function() {
