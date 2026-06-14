@@ -54,10 +54,10 @@
     let tentativesEchouees = 0
 
     ;(async () => {
-      await appliquerTheme()
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()  // arrière-plan
       await chargerHeader('../')
       await chargerFooter('../')
-      document.body.style.setProperty('visibility', 'visible', 'important')
     })()
 
     window.connecter = async function() {
