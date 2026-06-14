@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hub</title>
   <link rel="stylesheet" href="../style/style.css">
+  <style>body { visibility: hidden; }</style>
 </head>
 <body>
   <div id="header-placeholder"></div>
-
   <main class="placeholder-page">
     <div class="placeholder">
       <div class="icon">🚧</div>
@@ -16,15 +16,20 @@
       <p>Les fonctionnalités seront ajoutées prochainement.</p>
     </div>
   </main>
-
   <div id="footer-placeholder"></div>
-
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
-    if (!localStorage.getItem('username')) window.location.href = 'connexion.html'
-    appliquerTheme()
-    chargerHeader('../')
-    chargerFooter('../')
+
+    ;(async () => {
+      if (!localStorage.getItem('username')) {
+        window.location.href = 'connexion.html'
+        return
+      }
+      await appliquerTheme()
+      await chargerHeader('../')
+      await chargerFooter('../')
+      document.body.style.visibility = ''
+    })()
   </script>
 </body>
 </html>
