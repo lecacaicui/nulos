@@ -107,10 +107,10 @@
     let monUserId = null
 
     ;(async () => {
-      await appliquerTheme()
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()  // arrière-plan
       await chargerHeader('../')
       await chargerFooter('../')
-      document.body.style.setProperty('visibility', 'visible', 'important')
 
       if (monNiveau !== 'admin' && monNiveau !== 'super_admin') {
         document.getElementById('acces-refuse').style.display = 'block'
