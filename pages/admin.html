@@ -66,7 +66,7 @@
   <div id="footer-placeholder"></div>
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs } from '../script/header.js'
+    import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs, invaliderCacheTheme } from '../script/header.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
@@ -200,7 +200,14 @@
       const msgEl = document.getElementById('msg-theme')
       const { error } = await db.from('theme').update(valeurs).eq('id', 1)
       if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
-      else { msgEl.textContent = '✓ Thème appliqué'; msgEl.className = 'msg-inline ok'; appliquerCouleurs(valeurs) }
+      else {
+        msgEl.textContent = '✓ Thème appliqué'; msgEl.className = 'msg-inline ok'
+        appliquerCouleurs(valeurs)
+        // Mise à jour du cache localStorage pour que la nouvelle couleur
+        // soit appliquée instantanément sur les prochaines pages
+        invaliderCacheTheme()
+        localStorage.setItem('theme_couleurs', JSON.stringify(valeurs))
+      }
     }
   </script>
 </body>
