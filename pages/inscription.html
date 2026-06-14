@@ -27,16 +27,14 @@
   <div id="footer-placeholder"></div>
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    import { chargerHeader, chargerFooter } from '../script/header.js'
+    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    appliquerTheme()
     chargerHeader('../')
     chargerFooter('../')
-
     const db  = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
     const msg = document.getElementById('msg')
     const btn = document.getElementById('btn')
-
     function afficherMsg(texte, type) { msg.textContent = texte; msg.className = 'msg ' + type }
-
     window.inscrire = async function() {
       const username  = document.getElementById('username').value.trim()
       const password  = document.getElementById('password').value
