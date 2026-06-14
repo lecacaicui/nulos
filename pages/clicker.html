@@ -6,19 +6,81 @@
   <title>Clicker</title>
   <link rel="stylesheet" href="../style/style.css">
   <style>body { visibility: hidden; }</style>
+  <style>
+    .clicker-wrap { max-width: 480px; margin: 0 auto; padding: 2rem 1rem 6rem; display: flex; flex-direction: column; align-items: center; gap: 1.5rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; }
+    .stat-card { background: var(--couleur-conteneur); border: 1px solid var(--couleur-bordure); border-radius: 10px; padding: .85rem 1rem; }
+    .stat-label { font-size: .75rem; color: var(--couleur-texte-faible); margin-bottom: .25rem; }
+    .stat-value { font-size: 1.3rem; font-weight: 600; color: var(--couleur-texte); }
+    .btn-click { background: none; border: none; cursor: pointer; padding: 0; transition: transform .08s; user-select: none; -webkit-user-select: none; }
+    .btn-click:active { transform: scale(0.91); }
+    .btn-click img { width: 140px; height: 140px; object-fit: contain; display: block; }
+    .float { position: absolute; pointer-events: none; font-size: .95rem; font-weight: 600; color: #f59e0b; animation: floatUp .8s ease-out forwards; }
+    @keyframes floatUp { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-60px)} }
+    .click-area { position: relative; display: inline-block; }
+    .upgrade-card { width: 100%; background: var(--couleur-conteneur); border: 1px solid var(--couleur-bordure); border-radius: 12px; padding: 1rem 1.1rem; display: flex; align-items: center; gap: 1rem; cursor: pointer; transition: filter .12s; }
+    .upgrade-card:hover:not(.disabled) { filter: brightness(.95); }
+    .upgrade-card.disabled { opacity: .5; cursor: not-allowed; }
+    .upgrade-img { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
+    .upgrade-info { flex: 1; }
+    .upgrade-name { font-size: .95rem; font-weight: 600; color: var(--couleur-texte); }
+    .upgrade-desc { font-size: .8rem; color: var(--couleur-texte-faible); margin-top: .15rem; }
+    .upgrade-cost { font-size: .9rem; font-weight: 600; color: var(--couleur-bouton); white-space: nowrap; }
+    .section-title { font-size: .8rem; font-weight: 600; color: var(--couleur-texte-faible); text-transform: uppercase; letter-spacing: .05em; align-self: flex-start; }
+    .saving { font-size: .75rem; color: var(--couleur-texte-faible); }
+  </style>
 </head>
 <body>
   <div id="header-placeholder"></div>
   <main>
-    <div class="card">
-      <h1>🎮 Clicker</h1>
-      <p>Bienvenue dans le Clicker.</p>
-      <p>Fonctionnalité en cours de développement...</p>
+    <div class="clicker-wrap">
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Pièces actuelles</div>
+          <div class="stat-value" id="stat-pieces">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Par clic</div>
+          <div class="stat-value" id="stat-par-clic">1</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total produit</div>
+          <div class="stat-value" id="stat-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Clics totaux</div>
+          <div class="stat-value" id="stat-clics">0</div>
+        </div>
+      </div>
+
+      <div class="click-area" id="click-area">
+        <button class="btn-click" id="btn-click" aria-label="Cliquer pour gagner des pièces">
+          <img src="../images/pas_content.png" alt="pas_content">
+        </button>
+      </div>
+
+      <div class="section-title">Améliorations</div>
+
+      <div class="upgrade-card disabled" id="upgrade-card" onclick="acheterUpgrade()">
+        <img class="upgrade-img" src="../images/nrv.png" alt="nrv">
+        <div class="upgrade-info">
+          <div class="upgrade-name">Boost de rage</div>
+          <div class="upgrade-desc" id="upgrade-desc">+2 pièces / clic</div>
+        </div>
+        <div class="upgrade-cost" id="upgrade-cost">25 🪙</div>
+      </div>
+
+      <div class="saving" id="saving-status">Sauvegarde…</div>
     </div>
   </main>
   <div id="footer-placeholder"></div>
+
   <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+
+    const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -29,7 +91,114 @@
       await chargerHeader('../')
       await chargerFooter('../')
       document.body.style.visibility = ''
+      await chargerSauvegarde()
     })()
+
+    // ===== État du jeu =====
+    let pieces       = 0
+    let totalProduit = 0
+    let totalClics   = 0
+    let nbUpgrades   = 0
+    let parClic      = 1
+    let coutUpgrade  = 25
+    let bonusUpgrade = 2
+    let saveTimer    = null
+    let userId       = null
+
+    // ===== Chargement depuis Supabase =====
+    async function chargerSauvegarde() {
+      const { data: session } = await db.auth.getUser()
+      if (!session?.user) return
+      userId = session.user.id
+
+      const { data } = await db.from('clicker').select('*').eq('user_id', userId).single()
+      if (data) {
+        pieces       = data.pieces_actuelles ?? 0
+        totalProduit = data.pieces_totales   ?? 0
+        totalClics   = data.total_clics      ?? 0
+        nbUpgrades   = data.nb_upgrades      ?? 0
+        recalculerEtat()
+      }
+      majAffichage()
+      document.getElementById('saving-status').textContent = 'Sauvegarde chargée'
+    }
+
+    // ===== Recalcule parClic, coutUpgrade, bonusUpgrade selon nbUpgrades =====
+    function recalculerEtat() {
+      parClic      = 1
+      coutUpgrade  = 25
+      bonusUpgrade = 2
+      for (let i = 0; i < nbUpgrades; i++) {
+        parClic      += bonusUpgrade
+        bonusUpgrade += 3
+        coutUpgrade   = Math.ceil(coutUpgrade * 1.4)
+      }
+    }
+
+    // ===== Clic principal =====
+    document.getElementById('btn-click').addEventListener('click', (e) => {
+      pieces       += parClic
+      totalProduit += parClic
+      totalClics   += 1
+      majAffichage()
+      afficherFloat(e, '+' + parClic)
+      planifierSauvegarde()
+    })
+
+    // ===== Achat upgrade =====
+    window.acheterUpgrade = function() {
+      if (pieces < coutUpgrade) return
+      pieces     -= coutUpgrade
+      nbUpgrades += 1
+      recalculerEtat()
+      majAffichage()
+      planifierSauvegarde()
+    }
+
+    // ===== Mise à jour de l'affichage =====
+    function majAffichage() {
+      document.getElementById('stat-pieces').textContent  = pieces.toLocaleString('fr')
+      document.getElementById('stat-par-clic').textContent = parClic.toLocaleString('fr')
+      document.getElementById('stat-total').textContent   = totalProduit.toLocaleString('fr')
+      document.getElementById('stat-clics').textContent   = totalClics.toLocaleString('fr')
+      document.getElementById('upgrade-cost').textContent = coutUpgrade.toLocaleString('fr') + ' 🪙'
+      document.getElementById('upgrade-desc').textContent = '+' + bonusUpgrade + ' pièces / clic (total : ' + (parClic + bonusUpgrade) + ')'
+      const card = document.getElementById('upgrade-card')
+      card.classList.toggle('disabled', pieces < coutUpgrade)
+    }
+
+    // ===== Animation float =====
+    function afficherFloat(e, texte) {
+      const area  = document.getElementById('click-area')
+      const rect  = area.getBoundingClientRect()
+      const span  = document.createElement('span')
+      span.className   = 'float'
+      span.textContent = texte
+      span.style.left  = (e.clientX - rect.left - 10) + 'px'
+      span.style.top   = (e.clientY - rect.top  - 20) + 'px'
+      area.appendChild(span)
+      span.addEventListener('animationend', () => span.remove())
+    }
+
+    // ===== Sauvegarde Supabase (debounce 2s) =====
+    function planifierSauvegarde() {
+      clearTimeout(saveTimer)
+      document.getElementById('saving-status').textContent = 'Modification en cours…'
+      saveTimer = setTimeout(sauvegarder, 2000)
+    }
+
+    async function sauvegarder() {
+      if (!userId) return
+      const payload = {
+        user_id:          userId,
+        pieces_actuelles: pieces,
+        pieces_totales:   totalProduit,
+        total_clics:      totalClics,
+        nb_upgrades:      nbUpgrades
+      }
+      const { error } = await db.from('clicker').upsert(payload, { onConflict: 'user_id' })
+      document.getElementById('saving-status').textContent = error ? '✗ Erreur de sauvegarde' : '✓ Sauvegardé'
+    }
   </script>
 </body>
 </html>
