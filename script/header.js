@@ -4,13 +4,45 @@ const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// Applique le thème (couleurs principale/secondaire) stocké en BDD
+// Applique le thème (4 couleurs) stocké en BDD
 // à appeler sur toutes les pages, dès que possible
 export async function appliquerTheme() {
-  const { data, error } = await db.from('theme').select('couleur_principale, couleur_secondaire').eq('id', 1).single()
+  const { data, error } = await db.from('theme')
+    .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
+    .eq('id', 1).single()
   if (error || !data) return
-  document.documentElement.style.setProperty('--couleur-principale', data.couleur_principale)
-  document.documentElement.style.setProperty('--couleur-secondaire', data.couleur_secondaire)
+  appliquerCouleurs(data)
+}
+
+// Applique un jeu de 4 couleurs aux variables CSS, sans toucher à la BDD.
+// Utilisé à la fois par appliquerTheme() (chargement) et par l'aperçu des
+// préréglages clair/sombre dans la page admin.
+export function appliquerCouleurs({ couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton }) {
+  const racine = document.documentElement.style
+  racine.setProperty('--couleur-fond', couleur_fond)
+  racine.setProperty('--couleur-conteneur', couleur_conteneur)
+  racine.setProperty('--couleur-bordure', couleur_bordure)
+  racine.setProperty('--couleur-bouton', couleur_bouton)
+
+  // Couleurs de texte calculées automatiquement selon la luminosité du fond,
+  // pour rester lisible aussi bien en thème clair qu'en thème sombre.
+  if (estSombre(couleur_fond)) {
+    racine.setProperty('--couleur-texte', '#f1f1f1')
+    racine.setProperty('--couleur-texte-faible', '#9ca3af')
+  } else {
+    racine.setProperty('--couleur-texte', '#1a1a1a')
+    racine.setProperty('--couleur-texte-faible', '#6b7280')
+  }
+}
+
+// Estime si une couleur hexadécimale (#rrggbb) est "sombre" (luminosité perçue faible)
+function estSombre(hex) {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  const luminosite = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminosite < 0.5
 }
 
 // base : chemin relatif vers la racine du site
