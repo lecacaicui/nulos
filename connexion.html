@@ -6,7 +6,6 @@
   <title>Connexion</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: system-ui, sans-serif;
       background: #f5f5f5;
@@ -16,7 +15,6 @@
       justify-content: center;
       min-height: 100vh;
     }
-
     .card {
       background: white;
       border-radius: 10px;
@@ -25,23 +23,9 @@
       width: 100%;
       max-width: 400px;
     }
-
     h1 { font-size: 1.6rem; margin-bottom: .4rem; }
-
-    .subtitle {
-      color: #666;
-      font-size: .9rem;
-      margin-bottom: 2rem;
-    }
-
-    label {
-      display: block;
-      font-size: .85rem;
-      font-weight: 600;
-      color: #444;
-      margin-bottom: .3rem;
-    }
-
+    .subtitle { color: #666; font-size: .9rem; margin-bottom: 2rem; }
+    label { display: block; font-size: .85rem; font-weight: 600; color: #444; margin-bottom: .3rem; }
     input {
       width: 100%;
       padding: .65rem .9rem;
@@ -52,9 +36,7 @@
       background: #fafafa;
       transition: border-color .15s;
     }
-
     input:focus { outline: none; border-color: #2563eb; background: white; }
-
     button {
       width: 100%;
       padding: .75rem;
@@ -66,10 +48,8 @@
       cursor: pointer;
       transition: background .15s;
     }
-
     button:hover { background: #1d4ed8; }
     button:disabled { background: #93c5fd; cursor: not-allowed; }
-
     .msg {
       margin-top: 1rem;
       padding: .65rem .9rem;
@@ -77,19 +57,9 @@
       font-size: .9rem;
       display: none;
     }
-
     .msg.ok  { background: #dcfce7; color: #15803d; display: block; }
     .msg.err { background: #fee2e2; color: #b91c1c; display: block; }
-
-    .lien {
-      display: block;
-      text-align: center;
-      margin-top: 1.5rem;
-      font-size: .9rem;
-      color: #2563eb;
-      text-decoration: none;
-    }
-
+    .lien { display: block; text-align: center; margin-top: 1.5rem; font-size: .9rem; color: #2563eb; text-decoration: none; }
     .lien:hover { text-decoration: underline; }
   </style>
 </head>
@@ -136,17 +106,28 @@
       btn.textContent = 'Connexion en cours…'
 
       const email = username + '@gmail.com'
-      const { error } = await db.auth.signInWithPassword({ email, password })
+      const { data, error } = await db.auth.signInWithPassword({ email, password })
 
       btn.disabled = false
       btn.textContent = 'Se connecter'
 
       if (error) {
-        afficherMsg('Nom d\'utilisateur ou mot de passe incorrect.', 'err')
-      } else {
-        afficherMsg('Connecté ! Redirection…', 'ok')
-        setTimeout(() => window.location.href = 'test.html', 1000)
+        afficherMsg("Nom d'utilisateur ou mot de passe incorrect.", 'err')
+        return
       }
+
+      const { data: profil } = await db
+        .from('profils')
+        .select('niveau')
+        .eq('user_id', data.user.id)
+        .single()
+
+      const niveau = profil?.niveau ?? 'commun'
+      localStorage.setItem('niveau', niveau)
+      localStorage.setItem('username', username)
+
+      afficherMsg('Connecté ! Redirection…', 'ok')
+      setTimeout(() => window.location.href = 'test.html', 1000)
     }
   </script>
 </body>
