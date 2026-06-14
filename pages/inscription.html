@@ -41,7 +41,9 @@
       const username  = document.getElementById('username').value.trim()
       const password  = document.getElementById('password').value
       const password2 = document.getElementById('password2').value
+      
       if (!username) return afficherMsg("Veuillez entrer un nom d'utilisateur.", 'err')
+      if (username.length < 3 || username.length > 20) return afficherMsg('Le nom d\'utilisateur doit faire entre 3 et 20 caractères.', 'err')
       if (password.length < 6) return afficherMsg('Le mot de passe doit faire au moins 6 caractères.', 'err')
       if (password !== password2) return afficherMsg('Les mots de passe ne correspondent pas.', 'err')
       btn.disabled = true; btn.textContent = 'Création en cours…'
