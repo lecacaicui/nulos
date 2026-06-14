@@ -35,20 +35,39 @@
 
     function afficherMsg(texte, type) { msg.textContent = texte; msg.className = 'msg ' + type }
 
-    window.connecter = async function() {
-      const username = document.getElementById('username').value.trim()
-      const password = document.getElementById('password').value
-      if (!username || !password) return afficherMsg('Veuillez remplir tous les champs.', 'err')
-      btn.disabled = true; btn.textContent = 'Connexion en cours…'
-      const { data, error } = await db.auth.signInWithPassword({ email: username + '@gmail.com', password })
-      btn.disabled = false; btn.textContent = 'Se connecter'
-      if (error) { afficherMsg("Nom d'utilisateur ou mot de passe incorrect.", 'err'); return }
-      const { data: profil } = await db.from('profils').select('niveau').eq('user_id', data.user.id).single()
-      localStorage.setItem('niveau', profil?.niveau ?? 'commun')
-      localStorage.setItem('username', username)
-      afficherMsg('Connecté ! Redirection…', 'ok')
-      setTimeout(() => window.location.href = 'hub.html', 1000)
+    let tentativesEchouees = 0
+
+window.connecter = async function() {
+  const username = document.getElementById('username').value.trim()
+  const password = document.getElementById('password').value
+  if (!username || !password) return afficherMsg('Veuillez remplir tous les champs.', 'err')
+
+  if (tentativesEchouees >= 3) {
+    return afficherMsg('Trop de tentatives. Réessayez dans quelques instants.', 'err')
+  }
+
+  btn.disabled = true; btn.textContent = 'Connexion en cours…'
+  const { data, error } = await db.auth.signInWithPassword({ email: username + '@gmail.com', password })
+  btn.disabled = false; btn.textContent = 'Se connecter'
+
+  if (error) {
+    tentativesEchouees++
+    if (tentativesEchouees >= 3) {
+      afficherMsg('Trop de tentatives. Réessayez dans 30 secondes.', 'err')
+      setTimeout(() => { tentativesEchouees = 0 }, 30000)
+    } else {
+      afficherMsg("Nom d'utilisateur ou mot de passe incorrect.", 'err')
     }
+    return
+  }
+
+  tentativesEchouees = 0
+  const { data: profil } = await db.from('profils').select('niveau').eq('user_id', data.user.id).single()
+  localStorage.setItem('niveau', profil?.niveau ?? 'commun')
+  localStorage.setItem('username', username)
+  afficherMsg('Connecté ! Redirection…', 'ok')
+  setTimeout(() => window.location.href = 'hub.html', 1000)
+}
   </script>
 </body>
 </html>
