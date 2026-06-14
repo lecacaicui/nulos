@@ -5,6 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clicker</title>
   <link rel="stylesheet" href="../style/style.css">
+  <script>
+  (function(){
+    var t = localStorage.getItem('theme_couleurs');
+    if (!t) return;
+    try {
+      var c = JSON.parse(t);
+      var r = document.documentElement.style;
+      r.setProperty('--couleur-fond', c.couleur_fond);
+      r.setProperty('--couleur-conteneur', c.couleur_conteneur);
+      r.setProperty('--couleur-bordure', c.couleur_bordure);
+      r.setProperty('--couleur-bouton', c.couleur_bouton);
+      var h = c.couleur_fond.replace('#','');
+      var lum = (0.299*parseInt(h.substring(0,2),16) + 0.587*parseInt(h.substring(2,4),16) + 0.114*parseInt(h.substring(4,6),16)) / 255;
+      r.setProperty('--couleur-texte', lum < 0.5 ? '#f1f1f1' : '#1a1a1a');
+      r.setProperty('--couleur-texte-faible', lum < 0.5 ? '#9ca3af' : '#6b7280');
+    } catch(e) {}
+  })();
+  </script>
+
   <style>body { visibility: hidden; }</style>
   <style>
     .clicker-wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1rem 6rem; display: grid; grid-template-columns: 1fr 280px; gap: 2rem; align-items: start; }
