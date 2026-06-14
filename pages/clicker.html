@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clicker</title>
+  <link rel="stylesheet" href="../style/style.css">
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <main>
+    <div class="card">
+      <h1>🎮 Clicker</h1>
+      <p>Bienvenue dans le Clicker.</p>
+
+      <p>Fonctionnalité en cours de développement...</p>
+    </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script type="module">
+    import {
+      chargerHeader,
+      chargerFooter,
+      appliquerTheme
+    } from '../script/header.js'
+
+    // Vérifie que l'utilisateur est connecté
+    if (!localStorage.getItem('username')) {
+      window.location.href = 'connexion.html'
+    }
+
+    appliquerTheme()
+    chargerHeader('../')
+    chargerFooter('../')
+  </script>
+</body>
+</html>
