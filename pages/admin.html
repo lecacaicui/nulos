@@ -26,15 +26,29 @@
 
       <div class="card-table" id="theme-card" style="display:none">
         <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Thème du site</h2>
-        <p class="note-verrouille">Couleurs principale et secondaire utilisées sur tout le site.</p>
+        <p class="note-verrouille">Couleurs utilisées sur tout le site. Choisissez un préréglage ou personnalisez chaque couleur, puis cliquez sur "Appliquer" pour enregistrer.</p>
+
+        <div class="theme-presets">
+          <button class="btn-preset" onclick="appliquerPreset('clair')">☀️ Thème clair</button>
+          <button class="btn-preset" onclick="appliquerPreset('sombre')">🌙 Thème sombre</button>
+        </div>
+
         <div class="theme-grid">
           <div class="theme-field">
-            <label for="couleur-principale">Couleur principale</label>
-            <input type="color" id="couleur-principale">
+            <label for="couleur-fond">Fond du site</label>
+            <input type="color" id="couleur-fond">
           </div>
           <div class="theme-field">
-            <label for="couleur-secondaire">Couleur secondaire</label>
-            <input type="color" id="couleur-secondaire">
+            <label for="couleur-conteneur">Conteneurs</label>
+            <input type="color" id="couleur-conteneur">
+          </div>
+          <div class="theme-field">
+            <label for="couleur-bordure">Bordures</label>
+            <input type="color" id="couleur-bordure">
+          </div>
+          <div class="theme-field">
+            <label for="couleur-bouton">Boutons</label>
+            <input type="color" id="couleur-bouton">
           </div>
           <div class="theme-field">
             <label>&nbsp;</label>
@@ -59,7 +73,7 @@
 
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs } from '../script/header.js'
     appliquerTheme()
     chargerHeader('../')
     chargerFooter('../')
@@ -67,6 +81,22 @@
     const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
     const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
     const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    // Préréglages de thème : remplissent les champs couleur et appliquent un
+    // aperçu immédiat, sans rien enregistrer (il faut cliquer sur "Appliquer")
+    const PRESETS = {
+      clair: { couleur_fond: '#f5f5f5', couleur_conteneur: '#ffffff', couleur_bordure: '#e5e7eb', couleur_bouton: '#2563eb' },
+      sombre: { couleur_fond: '#18181b', couleur_conteneur: '#27272a', couleur_bordure: '#3f3f46', couleur_bouton: '#3b82f6' }
+    }
+
+    window.appliquerPreset = function(nom) {
+      const p = PRESETS[nom]
+      document.getElementById('couleur-fond').value = p.couleur_fond
+      document.getElementById('couleur-conteneur').value = p.couleur_conteneur
+      document.getElementById('couleur-bordure').value = p.couleur_bordure
+      document.getElementById('couleur-bouton').value = p.couleur_bouton
+      appliquerCouleurs(p)
+    }
 
     const monNiveau = localStorage.getItem('niveau')
     let monUserId = null
@@ -141,7 +171,11 @@
         }
 
         const cellAction = perm.modifiable
-          ? `<button class="btn-save" onclick="sauvegarder('${u.id}')">Sauvegarder</button><span class="msg-inline" id="msg-${u.id}"></span>`
+          ? `<div class="row-actions">
+               <button class="btn-save" onclick="sauvegarder('${u.id}')">Sauvegarder</button>
+               <button class="btn-delete" onclick="supprimer('${u.id}', '${u.username}')">Supprimer</button>
+               <span class="msg-inline" id="msg-${u.id}"></span>
+             </div>`
           : ''
 
         tbody.innerHTML += `
@@ -162,27 +196,47 @@
       else { msgEl.textContent = '✓ Sauvegardé'; msgEl.className = 'msg-inline ok'; setTimeout(() => chargerUtilisateurs(), 800) }
     }
 
+    // Suppression d'un compte : un admin ne peut supprimer que commun/plus,
+    // un super_admin tout sauf un autre super_admin (et personne ne peut se
+    // supprimer soi-même). Vérifié ici pour l'affichage, et imposé côté BDD
+    // par la policy RLS DELETE sur profils.
+    window.supprimer = async function(id, username) {
+      if (!confirm(`Supprimer définitivement le compte "${username}" ? Cette action est irréversible.`)) return
+      const msgEl = document.getElementById('msg-' + id)
+      const { error } = await db.from('profils').delete().eq('id', id)
+      if (error) {
+        msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err'
+      } else {
+        chargerUtilisateurs()
+      }
+    }
+
     // ===== Thème (super admin uniquement) =====
     async function chargerTheme() {
-      const { data, error } = await db.from('theme').select('couleur_principale, couleur_secondaire').eq('id', 1).single()
+      const { data, error } = await db.from('theme')
+        .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
+        .eq('id', 1).single()
       if (error || !data) return
-      document.getElementById('couleur-principale').value = data.couleur_principale
-      document.getElementById('couleur-secondaire').value = data.couleur_secondaire
+      document.getElementById('couleur-fond').value = data.couleur_fond
+      document.getElementById('couleur-conteneur').value = data.couleur_conteneur
+      document.getElementById('couleur-bordure').value = data.couleur_bordure
+      document.getElementById('couleur-bouton').value = data.couleur_bouton
     }
 
     window.sauvegarderTheme = async function() {
-      const principale  = document.getElementById('couleur-principale').value
-      const secondaire  = document.getElementById('couleur-secondaire').value
+      const valeurs = {
+        couleur_fond: document.getElementById('couleur-fond').value,
+        couleur_conteneur: document.getElementById('couleur-conteneur').value,
+        couleur_bordure: document.getElementById('couleur-bordure').value,
+        couleur_bouton: document.getElementById('couleur-bouton').value
+      }
       const msgEl = document.getElementById('msg-theme')
-      const { error } = await db.from('theme').update({
-        couleur_principale: principale,
-        couleur_secondaire: secondaire
-      }).eq('id', 1)
+      const { error } = await db.from('theme').update(valeurs).eq('id', 1)
       if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
       else {
         msgEl.textContent = '✓ Thème appliqué'
         msgEl.className = 'msg-inline ok'
-        appliquerTheme()
+        appliquerCouleurs(valeurs)
       }
     }
   </script>
