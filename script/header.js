@@ -4,14 +4,26 @@ const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// Applique le thème (4 couleurs) stocké en BDD
-// à appeler sur toutes les pages, dès que possible
+const THEME_KEY = 'theme_couleurs'
+
+// Applique le thème depuis le cache localStorage (instantané, sans flash),
+// puis rafraîchit depuis Supabase en arrière-plan et met à jour le cache.
 export async function appliquerTheme() {
+  // 1. Application immédiate depuis le cache (évite le flash blanc)
+  const cache = localStorage.getItem(THEME_KEY)
+  if (cache) {
+    try { appliquerCouleurs(JSON.parse(cache)) } catch (e) {}
+  }
+
+  // 2. Récupération Supabase en arrière-plan pour mettre à jour le cache
   try {
     const { data, error } = await db.from('theme')
       .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
       .eq('id', 1).single()
-    if (!error && data) appliquerCouleurs(data)
+    if (!error && data) {
+      appliquerCouleurs(data)
+      localStorage.setItem(THEME_KEY, JSON.stringify(data))
+    }
   } catch (e) {
     console.error('appliquerTheme a échoué :', e)
   }
@@ -36,6 +48,12 @@ export function appliquerCouleurs({ couleur_fond, couleur_conteneur, couleur_bor
     racine.setProperty('--couleur-texte', '#1a1a1a')
     racine.setProperty('--couleur-texte-faible', '#6b7280')
   }
+}
+
+// À appeler dans sauvegarderTheme() (admin) pour invalider le cache
+// quand le super admin change le thème.
+export function invaliderCacheTheme() {
+  localStorage.removeItem(THEME_KEY)
 }
 
 // Estime si une couleur hexadécimale (#rrggbb) est "sombre" (luminosité perçue faible)
