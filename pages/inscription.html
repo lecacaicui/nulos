@@ -39,7 +39,7 @@
       await appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
-      document.body.style.visibility = ''
+      document.body.style.setProperty('visibility', 'visible', 'important')
     })()
 
     window.inscrire = async function() {
