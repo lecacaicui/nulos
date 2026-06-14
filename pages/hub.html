@@ -20,8 +20,9 @@
   <div id="footer-placeholder"></div>
 
   <script type="module">
-    import { chargerHeader, chargerFooter } from '../script/header.js'
+    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
     if (!localStorage.getItem('username')) window.location.href = 'connexion.html'
+    appliquerTheme()
     chargerHeader('../')
     chargerFooter('../')
   </script>
