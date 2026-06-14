@@ -128,10 +128,12 @@
         window.location.href = 'connexion.html'
         return
       }
-      await appliquerTheme()
+      // Le thème est déjà appliqué par le snippet inline dans <head> :
+      // on rend le body visible immédiatement, sans attendre Supabase.
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()  // arrière-plan, met à jour le cache sans bloquer
       await chargerHeader('../')
       await chargerFooter('../')
-      document.body.style.setProperty('visibility', 'visible', 'important')
       await chargerSauvegarde()
     })()
 
