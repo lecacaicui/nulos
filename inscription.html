@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Créer un compte</title>
   <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: system-ui, sans-serif;
@@ -64,6 +65,7 @@
   </style>
 </head>
 <body>
+  <div id="header-placeholder"></div>
   <div class="card">
     <h1>Créer un compte</h1>
     <p class="subtitle">Choisissez un nom d'utilisateur et un mot de passe.</p>
@@ -140,6 +142,11 @@
         afficherMsg('Compte créé ! Vous pouvez maintenant vous connecter.', 'ok')
       }
     }
+  </script>
+  <div id="footer-placeholder"></div>
+  <script>
+    fetch("header.html").then(r=>r.text()).then(h=>document.getElementById("header-placeholder").innerHTML=h)
+    fetch("footer.html").then(r=>r.text()).then(f=>document.getElementById("footer-placeholder").innerHTML=f)
   </script>
 </body>
 </html>

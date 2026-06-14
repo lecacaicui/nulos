@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administration</title>
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      padding: 2rem;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+    h1 { font-size: 1.8rem; }
+    .badge {
+      padding: .3rem .9rem;
+      border-radius: 999px;
+      font-size: .8rem;
+      font-weight: 600;
+      background: #dc2626;
+      color: white;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: .6rem .75rem; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; font-size: .85rem; color: #555; }
+    td { padding: .65rem .75rem; border-bottom: 1px solid #f1f5f9; font-size: .9rem; }
+    tr:last-child td { border-bottom: none; }
+    select {
+      padding: .3rem .6rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: .85rem;
+      background: white;
+      cursor: pointer;
+    }
+    .btn-save {
+      padding: .3rem .8rem;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: .85rem;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-save:hover { background: #1d4ed8; }
+    .tag {
+      padding: .25rem .7rem;
+      border-radius: 999px;
+      font-size: .78rem;
+      font-weight: 600;
+    }
+    .tag-commun { background: #e5e7eb; color: #374151; }
+    .tag-plus   { background: #dbeafe; color: #1d4ed8; }
+    .tag-admin  { background: #fee2e2; color: #b91c1c; }
+    .msg-inline {
+      font-size: .8rem;
+      margin-left: .5rem;
+    }
+    .msg-inline.ok  { color: #15803d; }
+    .msg-inline.err { color: #b91c1c; }
+    .acces-refuse {
+      display: none;
+      text-align: center;
+      padding: 4rem;
+      color: #b91c1c;
+      font-size: 1.2rem;
+    }
+    a.retour { color: #2563eb; text-decoration: none; font-size: .9rem; }
+    a.retour:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <div id="acces-refuse" class="acces-refuse">
+    ⛔ Accès refusé — réservé aux administrateurs.
+    <br><br>
+    <a href="index.html">← Retour à l'accueil</a>
+  </div>
+
+  <div id="contenu" style="display:none">
+    <div class="header">
+      <div>
+        <h1>Administration</h1>
+        <a class="retour" href="hub.html">← Retour au site</a>
+      </div>
+      <span class="badge">Admin</span>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Nom d'utilisateur</th>
+            <th>Niveau actuel</th>
+            <th>Changer le niveau</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+    const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
+    const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    const niveau = localStorage.getItem('niveau')
+
+    if (niveau !== 'admin') {
+      document.getElementById('acces-refuse').style.display = 'block'
+    } else {
+      document.getElementById('contenu').style.display = 'block'
+      chargerUtilisateurs()
+    }
+
+    async function chargerUtilisateurs() {
+      const { data, error } = await db.from('profils').select('*').order('username')
+      if (error) return
+
+      const tbody = document.getElementById('tbody')
+      tbody.innerHTML = ''
+
+      data.forEach(u => {
+        const tagClass = u.niveau === 'admin' ? 'tag-admin' : u.niveau === 'plus' ? 'tag-plus' : 'tag-commun'
+        tbody.innerHTML += `
+          <tr>
+            <td>${u.username}</td>
+            <td><span class="tag ${tagClass}">${u.niveau}</span></td>
+            <td>
+              <select id="sel-${u.id}">
+                <option value="commun" ${u.niveau === 'commun' ? 'selected' : ''}>commun</option>
+                <option value="plus"   ${u.niveau === 'plus'   ? 'selected' : ''}>plus</option>
+                <option value="admin"  ${u.niveau === 'admin'  ? 'selected' : ''}>admin</option>
+              </select>
+            </td>
+            <td>
+              <button class="btn-save" onclick="sauvegarder('${u.id}', '${u.username}')">Sauvegarder</button>
+              <span class="msg-inline" id="msg-${u.id}"></span>
+            </td>
+          </tr>`
+      })
+    }
+
+    window.sauvegarder = async function(id, username) {
+      const nouveauNiveau = document.getElementById('sel-' + id).value
+      const msgEl = document.getElementById('msg-' + id)
+
+      const { error } = await db.from('profils').update({ niveau: nouveauNiveau }).eq('id', id)
+
+      if (error) {
+        msgEl.textContent = '✗ Erreur'
+        msgEl.className = 'msg-inline err'
+      } else {
+        msgEl.textContent = '✓ Sauvegardé'
+        msgEl.className = 'msg-inline ok'
+        setTimeout(() => chargerUtilisateurs(), 800)
+      }
+    }
+  </script>
+  <div id="footer-placeholder"></div>
+  <script>
+    fetch("header.html").then(r=>r.text()).then(h=>document.getElementById("header-placeholder").innerHTML=h)
+    fetch("footer.html").then(r=>r.text()).then(f=>document.getElementById("footer-placeholder").innerHTML=f)
+  </script>
+</body>
+</html>

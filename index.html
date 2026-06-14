@@ -6,17 +6,21 @@
   <title>Accueil</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: system-ui, sans-serif;
       background: #f5f5f5;
       color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    main {
+      flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
+      padding-bottom: 4rem;
     }
-
     .card {
       background: white;
       border-radius: 10px;
@@ -26,17 +30,9 @@
       width: 100%;
       max-width: 380px;
     }
-
     h1 { font-size: 1.6rem; margin-bottom: .5rem; }
-
-    p {
-      color: #666;
-      margin-bottom: 2rem;
-      font-size: .95rem;
-    }
-
+    p { color: #666; margin-bottom: 2rem; font-size: .95rem; }
     .btn-group { display: flex; flex-direction: column; gap: .75rem; }
-
     a.btn {
       display: block;
       text-decoration: none;
@@ -45,27 +41,31 @@
       font-size: 1rem;
       transition: background .15s;
     }
-
     a.btn-primary { background: #2563eb; color: white; }
     a.btn-primary:hover { background: #1d4ed8; }
-
     a.btn-secondary { background: #e5e7eb; color: #1a1a1a; }
     a.btn-secondary:hover { background: #d1d5db; }
-
-    a.btn-ghost { color: #2563eb; font-size: .9rem; }
-    a.btn-ghost:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Accueil</h1>
-    <p>Bienvenue ! Connectez-vous ou créez un compte pour continuer.</p>
+  <div id="header-placeholder"></div>
 
-    <div class="btn-group">
-      <a class="btn btn-primary" href="connexion.html">Se connecter</a>
-      <a class="btn btn-secondary" href="inscription.html">Créer un compte</a>
-      <a class="btn btn-ghost" href="test.html">Accès rapide aux tests →</a>
+  <main>
+    <div class="card">
+      <h1>Accueil</h1>
+      <p>Bienvenue ! Connectez-vous ou créez un compte pour continuer.</p>
+      <div class="btn-group">
+        <a class="btn btn-primary" href="connexion.html">Se connecter</a>
+        <a class="btn btn-secondary" href="inscription.html">Créer un compte</a>
+      </div>
     </div>
-  </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script>
+    fetch('header.html').then(r => r.text()).then(h => document.getElementById('header-placeholder').innerHTML = h)
+    fetch('footer.html').then(r => r.text()).then(f => document.getElementById('footer-placeholder').innerHTML = f)
+  </script>
 </body>
 </html>
