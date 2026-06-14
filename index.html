@@ -15,33 +15,52 @@
       <div class="card card-sm">
         <h1>Accueil</h1>
         <p>Bienvenue ! Connectez-vous ou créez un compte pour continuer.</p>
+
         <div class="btn-group">
-          <a class="btn btn-primary" href="pages/connexion.html">Se connecter</a>
-          <a class="btn btn-secondary" href="pages/inscription.html">Créer un compte</a>
+          <a class="btn btn-primary" href="pages/connexion.html">
+            Se connecter
+          </a>
+          <a class="btn btn-secondary" href="pages/inscription.html">
+            Créer un compte
+          </a>
         </div>
       </div>
     </div>
 
-    <div class="card">
-  <h2>Fonctionnalités disponibles</h2>
+    <!-- Utilisateur connecté -->
+    <div class="centered" id="vue-connecte" style="display:none">
+      <div class="card">
+        <h1>Accueil</h1>
 
-  <div class="btn-group">
-    <a class="btn btn-primary" href="pages/clicker.html">
-      🎮 Accéder au Clicker
-    </a>
-  </div>
-</div>
+        <h2>Fonctionnalités disponibles</h2>
+
+        <div class="btn-group">
+          <a class="btn btn-primary" href="pages/clicker.html">
+            🎮 Accéder au Clicker
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
 
   <div id="footer-placeholder"></div>
 
   <script type="module">
-    import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
+    import {
+      chargerHeader,
+      chargerFooter,
+      appliquerTheme
+    } from './script/header.js'
+
     appliquerTheme()
     chargerHeader('')
     chargerFooter('')
 
     const connecte = !!localStorage.getItem('username')
-    document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
+
+    document.getElementById(
+      connecte ? 'vue-connecte' : 'vue-deconnecte'
+    ).style.display = 'flex'
   </script>
 </body>
 </html>
