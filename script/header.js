@@ -7,11 +7,14 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 // Applique le thème (4 couleurs) stocké en BDD
 // à appeler sur toutes les pages, dès que possible
 export async function appliquerTheme() {
-  const { data, error } = await db.from('theme')
-    .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
-    .eq('id', 1).single()
-  if (error || !data) return
-  appliquerCouleurs(data)
+  try {
+    const { data, error } = await db.from('theme')
+      .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
+      .eq('id', 1).single()
+    if (!error && data) appliquerCouleurs(data)
+  } catch {
+    // couleurs CSS par défaut appliquées automatiquement
+  }
 }
 
 // Applique un jeu de 4 couleurs aux variables CSS, sans toucher à la BDD.
