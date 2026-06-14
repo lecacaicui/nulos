@@ -4,6 +4,15 @@ const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
+// Applique le thème (couleurs principale/secondaire) stocké en BDD
+// à appeler sur toutes les pages, dès que possible
+export async function appliquerTheme() {
+  const { data, error } = await db.from('theme').select('couleur_principale, couleur_secondaire').eq('id', 1).single()
+  if (error || !data) return
+  document.documentElement.style.setProperty('--couleur-principale', data.couleur_principale)
+  document.documentElement.style.setProperty('--couleur-secondaire', data.couleur_secondaire)
+}
+
 // base : chemin relatif vers la racine du site
 // '' si la page est à la racine (index.html), '../' si la page est dans pages/
 export async function chargerHeader(base = '') {
@@ -17,9 +26,9 @@ export async function chargerHeader(base = '') {
   // Logo -> accueil
   document.querySelector('.header-logo').setAttribute('href', base + 'index.html')
 
-  // Lien Administration, visible uniquement si niveau === 'admin'
+  // Lien Administration, visible pour admin et super_admin
   const adminLink = document.getElementById('header-admin-link')
-  if (niveau === 'admin') {
+  if (niveau === 'admin' || niveau === 'super_admin') {
     adminLink.setAttribute('href', base + 'pages/admin.html')
     adminLink.style.display = 'inline'
   } else {
