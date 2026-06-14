@@ -12,8 +12,8 @@ export async function appliquerTheme() {
       .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
       .eq('id', 1).single()
     if (!error && data) appliquerCouleurs(data)
-  } catch {
-    // couleurs CSS par défaut appliquées automatiquement
+  } catch (e) {
+    console.error('appliquerTheme a échoué :', e)
   }
 }
 
