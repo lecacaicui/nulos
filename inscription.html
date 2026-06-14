@@ -141,7 +141,7 @@
       btn.disabled = true
       btn.textContent = 'Création en cours…'
 
-      const email = username + '@site.local'
+      const email = username + '@gmail.com'
       const { error } = await db.auth.signUp({ email, password })
 
       btn.disabled = false
