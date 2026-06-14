@@ -5,16 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Administration</title>
   <link rel="stylesheet" href="../style/style.css">
+  <style>body { visibility: hidden; }</style>
 </head>
 <body>
   <div id="header-placeholder"></div>
-
   <main class="main-admin">
     <div id="acces-refuse" class="acces-refuse" style="display:none">
       ⛔ Accès refusé — réservé aux administrateurs.<br><br>
       <a href="../index.html">← Retour à l'accueil</a>
     </div>
-
     <div id="contenu" style="display:none">
       <div class="page-header">
         <div>
@@ -23,16 +22,13 @@
         </div>
         <span class="badge" id="badge-role">Admin</span>
       </div>
-
       <div class="card-table" id="theme-card" style="display:none">
         <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Thème du site</h2>
         <p class="note-verrouille">Couleurs utilisées sur tout le site. Choisissez un préréglage ou personnalisez chaque couleur, puis cliquez sur "Appliquer" pour enregistrer.</p>
-
         <div class="theme-presets">
           <button class="btn-preset" onclick="appliquerPreset('clair')">☀️ Thème clair</button>
           <button class="btn-preset" onclick="appliquerPreset('sombre')">🌙 Thème sombre</button>
         </div>
-
         <div class="theme-grid">
           <div class="theme-field">
             <label for="couleur-fond">Fond du site</label>
@@ -57,7 +53,6 @@
           <span class="msg-inline" id="msg-theme"></span>
         </div>
       </div>
-
       <div class="card-table">
         <table>
           <thead>
@@ -68,24 +63,15 @@
       </div>
     </div>
   </main>
-
   <div id="footer-placeholder"></div>
-
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs } from '../script/header.js'
-    appliquerTheme()
-    chargerHeader('../')
-    chargerFooter('../')
 
-    const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
-    const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
-    const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
-    // Préréglages de thème : remplissent les champs couleur et appliquent un
-    // aperçu immédiat, sans rien enregistrer (il faut cliquer sur "Appliquer")
     const PRESETS = {
-      clair: { couleur_fond: '#f5f5f5', couleur_conteneur: '#ffffff', couleur_bordure: '#e5e7eb', couleur_bouton: '#2563eb' },
+      clair:  { couleur_fond: '#f5f5f5', couleur_conteneur: '#ffffff', couleur_bordure: '#e5e7eb', couleur_bouton: '#2563eb' },
       sombre: { couleur_fond: '#18181b', couleur_conteneur: '#27272a', couleur_bordure: '#3f3f46', couleur_bouton: '#3b82f6' }
     }
 
@@ -101,17 +87,23 @@
     const monNiveau = localStorage.getItem('niveau')
     let monUserId = null
 
-    if (monNiveau !== 'admin' && monNiveau !== 'super_admin') {
-      document.getElementById('acces-refuse').style.display = 'block'
-    } else {
-      document.getElementById('contenu').style.display = 'block'
-      init()
-    }
+    ;(async () => {
+      await appliquerTheme()
+      await chargerHeader('../')
+      await chargerFooter('../')
+      document.body.style.visibility = ''
+
+      if (monNiveau !== 'admin' && monNiveau !== 'super_admin') {
+        document.getElementById('acces-refuse').style.display = 'block'
+      } else {
+        document.getElementById('contenu').style.display = 'block'
+        await init()
+      }
+    })()
 
     async function init() {
       const { data: session } = await db.auth.getUser()
       monUserId = session?.user?.id ?? null
-
       const badge = document.getElementById('badge-role')
       if (monNiveau === 'super_admin') {
         badge.textContent = 'Super Admin'
@@ -119,7 +111,6 @@
         document.getElementById('theme-card').style.display = 'block'
         chargerTheme()
       }
-
       chargerUtilisateurs()
     }
 
@@ -130,25 +121,17 @@
       return 'tag-commun'
     }
 
-    // Détermine si l'utilisateur courant peut modifier la cible, et vers quels niveaux
     function permissions(cible) {
       const estMoi = cible.user_id === monUserId
       if (estMoi) return { modifiable: false, options: [] }
-
       if (monNiveau === 'admin') {
-        if (cible.niveau === 'commun' || cible.niveau === 'plus') {
-          return { modifiable: true, options: ['commun', 'plus'] }
-        }
+        if (cible.niveau === 'commun' || cible.niveau === 'plus') return { modifiable: true, options: ['commun', 'plus'] }
         return { modifiable: false, options: [] }
       }
-
       if (monNiveau === 'super_admin') {
-        if (cible.niveau === 'super_admin') {
-          return { modifiable: false, options: [] }
-        }
+        if (cible.niveau === 'super_admin') return { modifiable: false, options: [] }
         return { modifiable: true, options: ['commun', 'plus', 'admin', 'super_admin'] }
       }
-
       return { modifiable: false, options: [] }
     }
 
@@ -160,16 +143,9 @@
       data.forEach(u => {
         const tagClass = tagClassPour(u.niveau)
         const perm = permissions(u)
-
-        let cellSelect
-        if (perm.modifiable) {
-          cellSelect = `<select id="sel-${u.id}">${perm.options.map(o =>
-            `<option value="${o}" ${u.niveau === o ? 'selected' : ''}>${o}</option>`
-          ).join('')}</select>`
-        } else {
-          cellSelect = `<span class="note-verrouille">— non modifiable —</span>`
-        }
-
+        const cellSelect = perm.modifiable
+          ? `<select id="sel-${u.id}">${perm.options.map(o => `<option value="${o}" ${u.niveau === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`
+          : `<span class="note-verrouille">— non modifiable —</span>`
         const cellAction = perm.modifiable
           ? `<div class="row-actions">
                <button class="btn-save" onclick="sauvegarder('${u.id}')">Sauvegarder</button>
@@ -177,7 +153,6 @@
                <span class="msg-inline" id="msg-${u.id}"></span>
              </div>`
           : ''
-
         tbody.innerHTML += `
           <tr>
             <td>${u.username}</td>
@@ -196,22 +171,14 @@
       else { msgEl.textContent = '✓ Sauvegardé'; msgEl.className = 'msg-inline ok'; setTimeout(() => chargerUtilisateurs(), 800) }
     }
 
-    // Suppression d'un compte : un admin ne peut supprimer que commun/plus,
-    // un super_admin tout sauf un autre super_admin (et personne ne peut se
-    // supprimer soi-même). Vérifié ici pour l'affichage, et imposé côté BDD
-    // par la policy RLS DELETE sur profils.
     window.supprimer = async function(id, username) {
       if (!confirm(`Supprimer définitivement le compte "${username}" ? Cette action est irréversible.`)) return
       const msgEl = document.getElementById('msg-' + id)
       const { error } = await db.from('profils').delete().eq('id', id)
-      if (error) {
-        msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err'
-      } else {
-        chargerUtilisateurs()
-      }
+      if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
+      else { chargerUtilisateurs() }
     }
 
-    // ===== Thème (super admin uniquement) =====
     async function chargerTheme() {
       const { data, error } = await db.from('theme')
         .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
@@ -233,11 +200,7 @@
       const msgEl = document.getElementById('msg-theme')
       const { error } = await db.from('theme').update(valeurs).eq('id', 1)
       if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
-      else {
-        msgEl.textContent = '✓ Thème appliqué'
-        msgEl.className = 'msg-inline ok'
-        appliquerCouleurs(valeurs)
-      }
+      else { msgEl.textContent = '✓ Thème appliqué'; msgEl.className = 'msg-inline ok'; appliquerCouleurs(valeurs) }
     }
   </script>
 </body>
