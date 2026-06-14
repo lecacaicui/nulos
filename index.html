@@ -53,7 +53,7 @@
   await appliquerTheme()
   await chargerHeader('')
   await chargerFooter('')
-  document.body.style.visibility = ''  // ← après le header/footer
+ document.body.style.setProperty('visibility', 'visible', 'important')  // ← après le header/footer
 
   const connecte = !!localStorage.getItem('username')
   document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
