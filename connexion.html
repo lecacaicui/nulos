@@ -135,7 +135,7 @@
       btn.disabled = true
       btn.textContent = 'Connexion en cours…'
 
-      const email = username + '@site.local'
+      const email = username + '@gmail.com'
       const { error } = await db.auth.signInWithPassword({ email, password })
 
       btn.disabled = false
