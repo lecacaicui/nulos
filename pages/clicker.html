@@ -26,9 +26,15 @@
 
   <style>body { visibility: hidden; }</style>
   <style>
-    .clicker-wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1rem 6rem; display: grid; grid-template-columns: 1fr 280px; gap: 2rem; align-items: start; }
+    .clicker-wrap { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 6rem; }
+    .clicker-grid { display: grid; grid-template-columns: 280px 1fr 280px; gap: 2rem; align-items: start; }
+    .col-ameliorations { display: flex; flex-direction: column; gap: 1rem; }
     .clicker-main { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; }
     .classement { background: var(--couleur-conteneur); border: 1px solid var(--couleur-bordure); border-radius: 12px; padding: 1rem 1.1rem; }
+    @media (max-width: 900px) {
+      .clicker-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
     .classement-titre { font-size: .8rem; font-weight: 600; color: var(--couleur-texte-faible); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .75rem; }
     .classement-ligne { display: flex; align-items: center; gap: .6rem; padding: .4rem 0; border-bottom: 1px solid var(--couleur-bordure); font-size: .85rem; }
     .classement-ligne:last-child { border-bottom: none; }
@@ -39,7 +45,7 @@
     .classement-nom { flex: 1; color: var(--couleur-texte); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .classement-score { color: var(--couleur-texte-faible); font-size: .8rem; white-space: nowrap; }
     .classement-moi { background: var(--couleur-fond); border-radius: 6px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; margin-bottom: 1.5rem; }
     .stat-card { background: var(--couleur-conteneur); border: 1px solid var(--couleur-bordure); border-radius: 10px; padding: .85rem 1rem; }
     .stat-label { font-size: .75rem; color: var(--couleur-texte-faible); margin-bottom: .25rem; }
     .stat-value { font-size: 1.3rem; font-weight: 600; color: var(--couleur-texte); }
@@ -56,6 +62,7 @@
     .upgrade-info { flex: 1; }
     .upgrade-name { font-size: .95rem; font-weight: 600; color: var(--couleur-texte); }
     .upgrade-desc { font-size: .8rem; color: var(--couleur-texte-faible); margin-top: .15rem; }
+    .upgrade-count { font-size: .75rem; color: var(--couleur-bouton); margin-top: .25rem; font-weight: 600; }
     .upgrade-cost { font-size: .9rem; font-weight: 600; color: var(--couleur-bouton); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
     .section-title { font-size: .8rem; font-weight: 600; color: var(--couleur-texte-faible); text-transform: uppercase; letter-spacing: .05em; align-self: flex-start; }
     .saving { font-size: .75rem; color: var(--couleur-texte-faible); }
@@ -66,53 +73,57 @@
   <main>
     <div class="clicker-wrap">
 
-      <div class="clicker-main">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Pièces actuelles</div>
-            <div class="stat-value" id="stat-pieces">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Par clic</div>
-            <div class="stat-value" id="stat-par-clic">1</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Total produit</div>
-            <div class="stat-value" id="stat-total">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Clics totaux</div>
-            <div class="stat-value" id="stat-clics">0</div>
-          </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Pièces actuelles</div>
+          <div class="stat-value" id="stat-pieces">0</div>
         </div>
-
-        <div class="click-area" id="click-area">
-          <button class="btn-click" id="btn-click" aria-label="Cliquer pour gagner des pièces">
-            <img src="../pictures/pas_content.png" alt="pas_content">
-          </button>
+        <div class="stat-card">
+          <div class="stat-label">Par clic</div>
+          <div class="stat-value" id="stat-par-clic">1</div>
         </div>
-
-        <div class="section-title">Améliorations</div>
-
-        <div class="upgrade-card disabled" id="upgrade-card" onclick="acheterUpgrade()">
-          <img class="upgrade-img" src="../pictures/nrv.png" alt="nrv" style="width:100px;height:100px;" >
-          <div class="upgrade-info">
-            <div class="upgrade-name">Boost de rage</div>
-            <div class="upgrade-desc" id="upgrade-desc">+2 pièces / clic</div>
-          </div>
-          <div class="upgrade-cost" id="upgrade-cost">25</div>
+        <div class="stat-card">
+          <div class="stat-label">Total produit</div>
+          <div class="stat-value" id="stat-total">0</div>
         </div>
-
-        <div class="saving" id="saving-status">Sauvegarde…</div>
-      </div>
-
-      <div class="classement">
-        <div class="classement-titre">🏆 Top 5 — Total produit</div>
-        <div id="classement-liste">
-          <div style="font-size:.8rem;color:var(--couleur-texte-faible);">Chargement…</div>
+        <div class="stat-card">
+          <div class="stat-label">Clics totaux</div>
+          <div class="stat-value" id="stat-clics">0</div>
         </div>
       </div>
 
+      <div class="clicker-grid">
+
+        <div class="col-ameliorations">
+          <div class="section-title">Améliorations</div>
+          <div class="upgrade-card disabled" id="upgrade-card" onclick="acheterUpgrade()">
+            <img class="upgrade-img" src="../pictures/nrv.png" alt="nrv" style="width:100px;height:100px;" >
+            <div class="upgrade-info">
+              <div class="upgrade-name">Boost de rage</div>
+              <div class="upgrade-desc" id="upgrade-desc">+2 pièces / clic</div>
+              <div class="upgrade-count" id="upgrade-count">Pas encore achetée</div>
+            </div>
+            <div class="upgrade-cost" id="upgrade-cost">25</div>
+          </div>
+        </div>
+
+        <div class="clicker-main">
+          <div class="click-area" id="click-area">
+            <button class="btn-click" id="btn-click" aria-label="Cliquer pour gagner des pièces">
+              <img src="../pictures/pas_content.png" alt="pas_content">
+            </button>
+          </div>
+          <div class="saving" id="saving-status">Sauvegarde…</div>
+        </div>
+
+        <div class="classement">
+          <div class="classement-titre">🏆 Top 5 — Total produit</div>
+          <div id="classement-liste">
+            <div style="font-size:.8rem;color:var(--couleur-texte-faible);">Chargement…</div>
+          </div>
+        </div>
+
+      </div>
     </div>
   </main>
   <div id="footer-placeholder"></div>
@@ -201,6 +212,7 @@
       document.getElementById('stat-clics').textContent    = totalClics.toLocaleString('fr')
       document.getElementById('upgrade-cost').innerHTML    = coutUpgrade.toLocaleString('fr') + ' <img src="../pictures/pascontentpiece.png" style="width:50px;height:50px;object-fit:contain;vertical-align:middle;">'
       document.getElementById('upgrade-desc').textContent  = '+' + bonusUpgrade + ' pièces / clic (total : ' + (parClic + bonusUpgrade) + ')'
+      document.getElementById('upgrade-count').textContent = nbUpgrades > 0 ? 'Achetée ' + nbUpgrades + ' fois' : 'Pas encore achetée'
       document.getElementById('upgrade-card').classList.toggle('disabled', pieces < coutUpgrade)
     }
 
