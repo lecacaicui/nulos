@@ -66,6 +66,8 @@
     .upgrade-cost { font-size: .9rem; font-weight: 600; color: var(--couleur-bouton); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
     .section-title { font-size: .8rem; font-weight: 600; color: var(--couleur-texte-faible); text-transform: uppercase; letter-spacing: .05em; align-self: flex-start; }
     .saving { font-size: .75rem; color: var(--couleur-texte-faible); }
+    .upgrade-progress { width: 100%; height: 4px; background: var(--couleur-bordure); border-radius: 2px; overflow: hidden; margin-top: .4rem; }
+    .upgrade-progress-bar { height: 100%; background: var(--couleur-bouton); border-radius: 2px; transition: width .1s linear; }
   </style>
 </head>
 <body>
@@ -77,14 +79,30 @@
 
         <div class="col-ameliorations">
           <div class="section-title">Améliorations</div>
+
+          <!-- Amélioration 1 : Boost de rage -->
           <div class="upgrade-card disabled" id="upgrade-card" onclick="acheterUpgrade()">
-            <img class="upgrade-img" src="../pictures/nrv.png" alt="nrv" style="width:100px;height:100px;" >
+            <img class="upgrade-img" src="../pictures/nrv.png" alt="nrv" style="width:100px;height:100px;">
             <div class="upgrade-info">
               <div class="upgrade-name">Boost de rage</div>
               <div class="upgrade-desc" id="upgrade-desc">+2 pièces / clic</div>
               <div class="upgrade-count" id="upgrade-count">Pas encore achetée</div>
             </div>
             <div class="upgrade-cost" id="upgrade-cost">25</div>
+          </div>
+
+          <!-- Amélioration 2 : Auto-cliqueur -->
+          <div class="upgrade-card disabled" id="upgrade-auto-card" onclick="acheterUpgradeAuto()">
+            <img class="upgrade-img" src="../pictures/nrv.png" alt="auto" style="width:100px;height:100px;">
+            <div class="upgrade-info">
+              <div class="upgrade-name">Auto-cliqueur</div>
+              <div class="upgrade-desc" id="upgrade-auto-desc">Clique automatiquement toutes les 5s</div>
+              <div class="upgrade-count" id="upgrade-auto-count">Pas encore achetée</div>
+              <div class="upgrade-progress" id="upgrade-auto-progress" style="display:none">
+                <div class="upgrade-progress-bar" id="upgrade-auto-bar" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="upgrade-cost" id="upgrade-auto-cost">100</div>
           </div>
         </div>
 
@@ -141,24 +159,26 @@
         window.location.href = 'connexion.html'
         return
       }
-      // Le thème est déjà appliqué par le snippet inline dans <head> :
-      // on rend le body visible immédiatement, sans attendre Supabase.
       document.body.style.setProperty('visibility', 'visible', 'important')
-      appliquerTheme()  // arrière-plan, met à jour le cache sans bloquer
+      appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
       await chargerSauvegarde()
     })()
 
-    let pieces       = 0
-    let totalProduit = 0
-    let totalClics   = 0
-    let nbUpgrades   = 0
-    let parClic      = 1
-    let coutUpgrade  = 25
-    let bonusUpgrade = 2
-    let saveTimer    = null
-    let userId       = null
+    let pieces          = 0
+    let totalProduit    = 0
+    let totalClics      = 0
+    let nbUpgrades      = 0
+    let parClic         = 1
+    let coutUpgrade     = 25
+    let bonusUpgrade    = 2
+    let nbAutoClickers  = 0
+    let coutAutoClicker = 100
+    let autoClickTimer  = null
+    let autoClickProgress = 0
+    let saveTimer       = null
+    let userId          = null
 
     async function chargerSauvegarde() {
       const { data: session } = await db.auth.getUser()
@@ -167,11 +187,13 @@
 
       const { data } = await db.from('clicker').select('*').eq('user_id', userId).single()
       if (data) {
-        pieces       = data.pieces_actuelles ?? 0
-        totalProduit = data.pieces_totales   ?? 0
-        totalClics   = data.total_clics      ?? 0
-        nbUpgrades   = data.nb_upgrades      ?? 0
+        pieces          = data.pieces_actuelles  ?? 0
+        totalProduit    = data.pieces_totales    ?? 0
+        totalClics      = data.total_clics       ?? 0
+        nbUpgrades      = data.nb_upgrades       ?? 0
+        nbAutoClickers  = data.nb_auto_clickers  ?? 0
         recalculerEtat()
+        if (nbAutoClickers > 0) demarrerAutoClicker()
       }
       majAffichage()
       document.getElementById('saving-status').textContent = 'Sauvegarde chargée'
@@ -186,6 +208,10 @@
         parClic      += bonusUpgrade
         bonusUpgrade += 3
         coutUpgrade   = Math.ceil(coutUpgrade * 1.4)
+      }
+      coutAutoClicker = 100
+      for (let i = 0; i < nbAutoClickers; i++) {
+        coutAutoClicker = Math.ceil(coutAutoClicker * 2)
       }
     }
 
@@ -207,15 +233,53 @@
       planifierSauvegarde()
     }
 
+    window.acheterUpgradeAuto = function() {
+      if (pieces < coutAutoClicker) return
+      pieces         -= coutAutoClicker
+      nbAutoClickers += 1
+      recalculerEtat()
+      majAffichage()
+      planifierSauvegarde()
+      if (nbAutoClickers === 1) demarrerAutoClicker()
+    }
+
+    function demarrerAutoClicker() {
+      if (autoClickTimer) return
+      autoClickProgress = 0
+      const interval = 100
+      const total    = 5000
+      autoClickTimer = setInterval(() => {
+        autoClickProgress += interval
+        const pct = (autoClickProgress / total) * 100
+        document.getElementById('upgrade-auto-bar').style.width = pct + '%'
+        if (autoClickProgress >= total) {
+          autoClickProgress = 0
+          const gain = parClic * nbAutoClickers
+          pieces       += gain
+          totalProduit += gain
+          majAffichage()
+          planifierSauvegarde()
+        }
+      }, interval)
+    }
+
     function majAffichage() {
       document.getElementById('stat-pieces').textContent   = pieces.toLocaleString('fr')
       document.getElementById('stat-par-clic').textContent = parClic.toLocaleString('fr')
       document.getElementById('stat-total').textContent    = totalProduit.toLocaleString('fr')
       document.getElementById('stat-clics').textContent    = totalClics.toLocaleString('fr')
+
       document.getElementById('upgrade-cost').innerHTML    = coutUpgrade.toLocaleString('fr') + ' <img src="../pictures/pascontentpiece.png" style="width:50px;height:50px;object-fit:contain;vertical-align:middle;">'
       document.getElementById('upgrade-desc').textContent  = '+' + bonusUpgrade + ' pièces / clic (total : ' + (parClic + bonusUpgrade) + ')'
       document.getElementById('upgrade-count').textContent = nbUpgrades > 0 ? 'Achetée ' + nbUpgrades + ' fois' : 'Pas encore achetée'
       document.getElementById('upgrade-card').classList.toggle('disabled', pieces < coutUpgrade)
+
+      document.getElementById('upgrade-auto-cost').innerHTML    = coutAutoClicker.toLocaleString('fr') + ' <img src="../pictures/pascontentpiece.png" style="width:50px;height:50px;object-fit:contain;vertical-align:middle;">'
+      document.getElementById('upgrade-auto-count').textContent = nbAutoClickers > 0
+        ? 'Achetée ' + nbAutoClickers + ' fois — ' + (parClic * nbAutoClickers).toLocaleString('fr') + ' pièces / 5s'
+        : 'Pas encore achetée'
+      document.getElementById('upgrade-auto-card').classList.toggle('disabled', pieces < coutAutoClicker)
+      document.getElementById('upgrade-auto-progress').style.display = nbAutoClickers > 0 ? 'block' : 'none'
     }
 
     function afficherFloat(e, texte) {
@@ -271,11 +335,12 @@
     async function sauvegarder() {
       if (!userId) return
       const payload = {
-        user_id:          userId,
-        pieces_actuelles: pieces,
-        pieces_totales:   totalProduit,
-        total_clics:      totalClics,
-        nb_upgrades:      nbUpgrades
+        user_id:           userId,
+        pieces_actuelles:  pieces,
+        pieces_totales:    totalProduit,
+        total_clics:       totalClics,
+        nb_upgrades:       nbUpgrades,
+        nb_auto_clickers:  nbAutoClickers
       }
       const { error } = await db.from('clicker').upsert(payload, { onConflict: 'user_id' })
       document.getElementById('saving-status').textContent = error ? '✗ Erreur de sauvegarde' : '✓ Sauvegardé'
