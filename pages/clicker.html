@@ -68,6 +68,32 @@
     .saving { font-size: .75rem; color: var(--couleur-texte-faible); }
     .upgrade-progress { width: 100%; height: 4px; background: var(--couleur-bordure); border-radius: 2px; overflow: hidden; margin-top: .4rem; }
     .upgrade-progress-bar { height: 100%; background: var(--couleur-bouton); border-radius: 2px; transition: width .1s linear; }
+
+    /* Animation de clic */
+    @keyframes clickPulse {
+      0%   { transform: scale(1);    opacity: 1; }
+      40%  { transform: scale(1.13); opacity: .85; }
+      100% { transform: scale(1);    opacity: 1; }
+    }
+    @keyframes ripple {
+      0%   { transform: scale(0);   opacity: .55; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+    @keyframes shockwave {
+      0%   { transform: scale(.9); opacity: .7; }
+      100% { transform: scale(2);  opacity: 0; }
+    }
+    .btn-click.clicking img { animation: clickPulse .25s ease-out forwards; }
+    .ripple-ring {
+      position: absolute; border-radius: 50%; pointer-events: none;
+      border: 3px solid #f59e0b;
+      animation: ripple .55s ease-out forwards;
+    }
+    .shockwave-ring {
+      position: absolute; border-radius: 50%; pointer-events: none;
+      border: 2px solid #f59e0b; opacity: 0;
+      animation: shockwave .4s ease-out forwards;
+    }
   </style>
 </head>
 <body>
@@ -221,6 +247,7 @@
       totalClics   += 1
       majAffichage()
       afficherFloat(e, '+' + parClic)
+      animerClic(e)
       planifierSauvegarde()
     })
 
@@ -292,6 +319,35 @@
       span.style.top  = (e.clientY - rect.top  - 20) + 'px'
       area.appendChild(span)
       span.addEventListener('animationend', () => span.remove())
+    }
+
+    function animerClic(e) {
+      const btn  = document.getElementById('btn-click')
+      const area = document.getElementById('click-area')
+      const rect = area.getBoundingClientRect()
+      const cx   = e.clientX - rect.left
+      const cy   = e.clientY - rect.top
+      const size = 80
+
+      // Pulse sur l'image
+      btn.classList.remove('clicking')
+      void btn.offsetWidth // reflow pour relancer l'animation
+      btn.classList.add('clicking')
+      btn.addEventListener('animationend', () => btn.classList.remove('clicking'), { once: true })
+
+      // Anneau ripple principal
+      const ring = document.createElement('div')
+      ring.className = 'ripple-ring'
+      ring.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;`
+      area.appendChild(ring)
+      ring.addEventListener('animationend', () => ring.remove())
+
+      // Anneau shockwave décalé
+      const shock = document.createElement('div')
+      shock.className = 'shockwave-ring'
+      shock.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;animation-delay:.08s;`
+      area.appendChild(shock)
+      shock.addEventListener('animationend', () => shock.remove())
     }
 
     function planifierSauvegarde() {
