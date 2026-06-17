@@ -51,7 +51,7 @@
     .stat-value { font-size: 1.3rem; font-weight: 600; color: var(--couleur-texte); }
     .btn-click { background: none; border: none; cursor: pointer; padding: 0; transition: transform .08s; user-select: none; -webkit-user-select: none; }
     .btn-click:active { transform: scale(0.91); }
-    .btn-click img { width: 140px; height: 140px; object-fit: contain; display: block; }
+    .btn-click img { width: 30vw; max-width: 380px; min-width: 120px; height: auto; object-fit: contain; display: block; }
     .float { position: absolute; pointer-events: none; font-size: .95rem; font-weight: 600; color: #f59e0b; animation: floatUp .8s ease-out forwards; }
     @keyframes floatUp { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-60px)} }
     .click-area { position: relative; display: inline-block; }
@@ -91,7 +91,7 @@
         <div class="clicker-main">
           <div class="click-area" id="click-area">
             <button class="btn-click" id="btn-click" aria-label="Cliquer pour gagner des pièces">
-              <img src="../pictures/pas_content.png" alt="pas_content" style="width:30 %;">
+              <img src="../pictures/pas_content.png" alt="pas_content">
             </button>
           </div>
           <div class="saving" id="saving-status">Sauvegarde…</div>
