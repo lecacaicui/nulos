@@ -286,8 +286,36 @@
           totalProduit += gain
           majAffichage()
           planifierSauvegarde()
+          animerClicAuto()
         }
       }, interval)
+    }
+
+    function animerClicAuto() {
+      const btn      = document.getElementById('btn-click')
+      const area     = document.getElementById('click-area')
+      const areaRect = area.getBoundingClientRect()
+      const btnRect  = btn.getBoundingClientRect()
+      const cx   = btnRect.left + btnRect.width  / 2 - areaRect.left
+      const cy   = btnRect.top  + btnRect.height / 2 - areaRect.top
+      const size = 80
+
+      btn.classList.remove('clicking')
+      void btn.offsetWidth
+      btn.classList.add('clicking')
+      btn.addEventListener('animationend', () => btn.classList.remove('clicking'), { once: true })
+
+      const ring = document.createElement('div')
+      ring.className = 'ripple-ring'
+      ring.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;`
+      area.appendChild(ring)
+      ring.addEventListener('animationend', () => ring.remove())
+
+      const shock = document.createElement('div')
+      shock.className = 'shockwave-ring'
+      shock.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;animation-delay:.08s;`
+      area.appendChild(shock)
+      shock.addEventListener('animationend', () => shock.remove())
     }
 
     function majAffichage() {
