@@ -177,6 +177,7 @@
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    import { debloquerBadge, chargerBadgesUtilisateur } from '../script/badges.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
@@ -205,6 +206,7 @@
     let autoClickProgress = 0
     let saveTimer       = null
     let userId          = null
+    let badgesObtenus   = new Set()
 
     async function chargerSauvegarde() {
       const { data: session } = await db.auth.getUser()
@@ -221,6 +223,8 @@
         recalculerEtat()
         if (nbAutoClickers > 0) demarrerAutoClicker()
       }
+      badgesObtenus = await chargerBadgesUtilisateur(userId)
+      verifierBadgesClicker()
       majAffichage()
       document.getElementById('saving-status').textContent = 'Sauvegarde chargée'
       await chargerClassement()
@@ -241,10 +245,28 @@
       }
     }
 
+    // Vérifie si totalProduit a franchi un palier de badge (1M / 10M / 100M)
+    // et débloque le badge correspondant le cas échéant. Sûr à appeler souvent :
+    // on ne tente l'écriture que la première fois qu'un palier est franchi.
+    function verifierBadgesClicker() {
+      const PALIERS = [
+        [1_000_000,   'clicker_1m'],
+        [10_000_000,  'clicker_10m'],
+        [100_000_000, 'clicker_100m']
+      ]
+      for (const [seuil, badgeId] of PALIERS) {
+        if (totalProduit >= seuil && !badgesObtenus.has(badgeId)) {
+          badgesObtenus.add(badgeId)
+          debloquerBadge(userId, badgeId)
+        }
+      }
+    }
+
     document.getElementById('btn-click').addEventListener('click', (e) => {
       pieces       += parClic
       totalProduit += parClic
       totalClics   += 1
+      verifierBadgesClicker()
       majAffichage()
       afficherFloat(e, '+' + parClic)
       animerClic(e)
@@ -284,6 +306,7 @@
           const gain = parClic * nbAutoClickers
           pieces       += gain
           totalProduit += gain
+          verifierBadgesClicker()
           majAffichage()
           planifierSauvegarde()
           animerClicAuto()
