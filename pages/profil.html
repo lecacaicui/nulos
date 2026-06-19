@@ -66,6 +66,36 @@
     .profil-ligne .valeur { font-weight: 600; color: var(--couleur-texte); }
     a.retour { color: var(--couleur-bouton); text-decoration: none; font-size: .9rem; display: inline-block; margin-bottom: 1.5rem; }
     a.retour:hover { text-decoration: underline; }
+
+    .profil-badges { margin-top: 1.5rem; }
+    .profil-badges h2 {
+      font-size: 1rem;
+      color: var(--couleur-texte-faible);
+      margin-bottom: 1rem;
+      font-weight: 600;
+      text-align: left;
+    }
+    .badges-grille {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .75rem;
+    }
+    .badge-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .4rem;
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 12px;
+      padding: 1rem .5rem;
+    }
+    .badge-tile-img { width: 56px; height: 56px; object-fit: contain; }
+    .badge-tile-label { font-size: .75rem; font-weight: 600; text-align: center; color: var(--couleur-texte); }
+    .badge-tile-verrouille { opacity: .35; filter: grayscale(1); }
+    @media (max-width: 560px) {
+      .badges-grille { grid-template-columns: repeat(2, 1fr); }
+    }
   </style>
 </head>
 <body>
@@ -90,13 +120,24 @@
           </div>
         </div>
       </div>
+
+      <div class="profil-badges">
+        <h2>🏅 Badges</h2>
+        <div class="badges-grille" id="badges-grille">
+          <div style="grid-column:1/-1;font-size:.85rem;color:var(--couleur-texte-faible);">Chargement…</div>
+        </div>
+      </div>
     </div>
   </main>
 
   <div id="footer-placeholder"></div>
 
   <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    import { BADGES, chargerBadgesUtilisateur } from '../script/badges.js'
+
+    const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -119,7 +160,23 @@
       const tagNiveau = document.getElementById('profil-niveau')
       tagNiveau.textContent = niveau
       tagNiveau.className = 'header-tag tag-' + niveau
+
+      const { data: session } = await db.auth.getUser()
+      await afficherBadges(session?.user?.id ?? null)
     })()
+
+    async function afficherBadges(userId) {
+      const obtenus = await chargerBadgesUtilisateur(userId)
+      const grille = document.getElementById('badges-grille')
+      grille.innerHTML = BADGES.map(b => {
+        const ok = obtenus.has(b.id)
+        return `
+          <div class="badge-tile ${ok ? '' : 'badge-tile-verrouille'}" title="${b.description}">
+            <img class="badge-tile-img" src="../pictures/${b.image}" alt="${b.titre}">
+            <span class="badge-tile-label">${b.titre}</span>
+          </div>`
+      }).join('')
+    }
   </script>
 </body>
 </html>
