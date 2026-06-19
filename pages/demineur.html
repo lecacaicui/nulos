@@ -24,17 +24,166 @@
   })();
   </script>
   <style>body { visibility: hidden; }</style>
+  <style>
+    .demineur-wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 2rem 1rem 6rem;
+    }
+    .demineur-wrap h1 { margin-bottom: .25rem; }
+    .demineur-wrap .subtitle { margin-bottom: 1.5rem; }
+
+    .demineur-barre {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .demineur-niveaux {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+    .btn-niveau {
+      padding: .5rem 1rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 7px;
+      background: var(--couleur-conteneur);
+      color: var(--couleur-texte);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter .15s, background .15s;
+    }
+    .btn-niveau:hover { filter: brightness(.95); }
+    .btn-niveau.actif {
+      background: var(--couleur-bouton);
+      color: white;
+      border-color: var(--couleur-bouton);
+    }
+
+    .demineur-stats {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+    .stat-pill {
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 999px;
+      padding: .45rem 1rem;
+      font-size: .85rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .stat-pill .valeur { font-weight: 700; color: var(--couleur-texte); }
+
+    .demineur-message {
+      text-align: center;
+      font-size: .95rem;
+      font-weight: 600;
+      min-height: 1.6em;
+      margin-bottom: 1rem;
+    }
+    .demineur-message.gagne { color: #22c55e; }
+    .demineur-message.perdu { color: #ef4444; }
+
+    .demineur-plateau-conteneur {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      padding-bottom: .5rem;
+    }
+    .demineur-grille {
+      display: grid;
+      gap: 2px;
+      background: var(--couleur-bordure);
+      border: 2px solid var(--couleur-bordure);
+      border-radius: 6px;
+      padding: 2px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .case-demineur {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .85rem;
+      font-weight: 700;
+      cursor: pointer;
+      border-radius: 3px;
+      background: #9ad1f0;
+      color: #0c4a6e;
+      transition: filter .08s;
+    }
+    .case-demineur:hover { filter: brightness(.95); }
+    .case-demineur.revelee {
+      cursor: default;
+      background: var(--couleur-fond);
+      color: var(--couleur-texte);
+    }
+    .case-demineur.marquee {
+      background: #fef9c3;
+      color: #92400e;
+    }
+    .case-demineur.mine {
+      background: #ef4444;
+      color: white;
+    }
+    .case-demineur.mine-autres {
+      background: #fecaca;
+      color: #7f1d1d;
+    }
+    .case-demineur[data-n="1"] { color: #2563eb; }
+    .case-demineur[data-n="2"] { color: #16a34a; }
+    .case-demineur[data-n="3"] { color: #dc2626; }
+    .case-demineur[data-n="4"] { color: #7c3aed; }
+    .case-demineur[data-n="5"] { color: #b45309; }
+    .case-demineur[data-n="6"] { color: #0891b2; }
+    .case-demineur[data-n="7"] { color: #1a1a1a; }
+    .case-demineur[data-n="8"] { color: #6b7280; }
+
+    .demineur-aide {
+      text-align: center;
+      font-size: .8rem;
+      color: var(--couleur-texte-faible);
+      margin-top: 1rem;
+    }
+  </style>
 </head>
 <body>
   <div id="header-placeholder"></div>
 
   <main>
-    <div class="placeholder-page">
-      <div class="placeholder">
-        <div class="icon">💣</div>
-        <h2>Démineur</h2>
-        <p>Cette page est en cours de construction.</p>
+    <div class="demineur-wrap">
+      <h1>Démineur</h1>
+      <p class="subtitle">Clic gauche pour révéler une case, clic droit pour la marquer.</p>
+
+      <div class="demineur-barre">
+        <div class="demineur-niveaux">
+          <button class="btn-niveau" id="niveau-facile" onclick="changerNiveau('facile')">Facile</button>
+          <button class="btn-niveau" id="niveau-moyen" onclick="changerNiveau('moyen')">Moyen</button>
+          <button class="btn-niveau" id="niveau-difficile" onclick="changerNiveau('difficile')">Difficile</button>
+          <button class="btn-niveau" id="niveau-recommencer" onclick="recommencer()">↻ Recommencer</button>
+        </div>
+        <div class="demineur-stats">
+          <span class="stat-pill">💣 Mines restantes&nbsp;: <span class="valeur" id="stat-mines">0</span></span>
+          <span class="stat-pill">⬜ Cases inconnues&nbsp;: <span class="valeur" id="stat-inconnues">0</span></span>
+        </div>
       </div>
+
+      <div class="demineur-message" id="demineur-message"></div>
+
+      <div class="demineur-plateau-conteneur">
+        <div class="demineur-grille" id="demineur-grille"></div>
+      </div>
+
+      <p class="demineur-aide">Le nombre de mines restantes correspond aux mines moins les cases marquées.</p>
     </div>
   </main>
 
@@ -53,6 +202,242 @@
       await chargerHeader('../')
       await chargerFooter('../')
     })()
+
+    // ===== Niveaux de difficulté (largeur, hauteur, nb de mines) =====
+    const NIVEAUX = {
+      facile:    { x: 9,  y: 9,  mines: 10 },
+      moyen:     { x: 16, y: 16, mines: 40 },
+      difficile: { x: 24, y: 16, mines: 99 }
+    }
+
+    // ===== Modèle du démineur =====
+    // Traduction fidèle de la logique de ModeleDemineur.java (Java/JavaFX) en JS.
+    class ModeleDemineur {
+      constructor(tailleY, tailleX, nbMines) {
+        this.autoZero = true
+        this.setTaille(tailleY, tailleX, nbMines)
+      }
+
+      setTaille(tailleY, tailleX, nbMines) {
+        this.tailleY = tailleY
+        this.tailleX = tailleX
+        this.mines = Array.from({ length: tailleY }, () => new Array(tailleX).fill(false))
+        this.revelees = Array.from({ length: tailleY }, () => new Array(tailleX).fill(false))
+        this.marquees = Array.from({ length: tailleY }, () => new Array(tailleX).fill(false))
+        this.textes = Array.from({ length: tailleY }, () => new Array(tailleX).fill(0))
+
+        let nb = nbMines
+        while (nb > 0) {
+          const y = Math.floor(Math.random() * tailleY)
+          const x = Math.floor(Math.random() * tailleX)
+          if (!this.mines[y][x]) {
+            this.mines[y][x] = true
+            this.textes[y][x] = -1
+            nb--
+            for (let dx = -1; dx <= 1; dx++) {
+              if (x + dx >= 0 && x + dx < tailleX) {
+                for (let dy = -1; dy <= 1; dy++) {
+                  if (y + dy >= 0 && y + dy < tailleY) {
+                    if (!this.mines[y + dy][x + dx]) this.textes[y + dy][x + dx]++
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        this.nbInconnues = tailleX * tailleY
+        this.nbMarques = 0
+        this.perdu = false
+      }
+
+      estRevelee(y, x) { return this.revelees[y][x] }
+      estMarquee(y, x) { return this.marquees[y][x] }
+
+      getText(y, x) {
+        if (this.revelees[y][x]) {
+          return this.mines[y][x] ? 'X' : String(this.textes[y][x])
+        }
+        return this.marquees[y][x] ? 'P' : '?'
+      }
+
+      marque(y, x) {
+        if (this.perdu) return
+        if (this.revelees[y][x]) return
+        if (this.marquees[y][x]) {
+          this.marquees[y][x] = false
+          this.nbMarques--
+        } else {
+          this.marquees[y][x] = true
+          this.nbMarques++
+        }
+      }
+
+      revele(y, x) {
+        if (this.perdu) return
+        if (this.revelees[y][x]) return
+
+        if (this.marquees[y][x]) {
+          this.marquees[y][x] = false
+          this.nbMarques--
+        }
+        this.revelees[y][x] = true
+        this.nbInconnues--
+
+        if (this.mines[y][x]) {
+          this.perdu = true
+        } else if (this.autoZero && this.textes[y][x] === 0) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const ny = y + dy
+            if (ny >= 0 && ny < this.tailleY) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const nx = x + dx
+                if (nx >= 0 && nx < this.tailleX) {
+                  if (!this.estMarquee(ny, nx) && !this.estRevelee(ny, nx)) this.revele(ny, nx)
+                }
+              }
+            }
+          }
+        }
+      }
+
+      estPerdu() { return this.perdu }
+
+      getNbMines() {
+        let cpt = 0
+        for (const ligne of this.mines) for (const c of ligne) if (c) cpt++
+        return cpt
+      }
+
+      // Victoire = toutes les cases sans mine sont révélées
+      estGagne() {
+        return !this.perdu && this.nbInconnues === this.getNbMines()
+      }
+    }
+
+    // ===== Contrôleur / rendu =====
+    let modele = null
+    let niveauActuel = 'facile'
+    let partieTerminee = false
+
+    window.changerNiveau = function(nom) {
+      niveauActuel = nom
+      document.querySelectorAll('.btn-niveau').forEach(b => b.classList.remove('actif'))
+      document.getElementById('niveau-' + nom).classList.add('actif')
+      demarrerPartie()
+    }
+
+    window.recommencer = function() {
+      demarrerPartie()
+    }
+
+    function demarrerPartie() {
+      const cfg = NIVEAUX[niveauActuel]
+      modele = new ModeleDemineur(cfg.y, cfg.x, cfg.mines)
+      partieTerminee = false
+      afficherMessage('', '')
+      construireGrille(cfg.x, cfg.y)
+      majStats()
+    }
+
+    function construireGrille(tailleX, tailleY) {
+      const grille = document.getElementById('demineur-grille')
+      grille.innerHTML = ''
+      grille.style.gridTemplateColumns = `repeat(${tailleX}, 32px)`
+      grille.style.gridTemplateRows = `repeat(${tailleY}, 32px)`
+
+      for (let y = 0; y < tailleY; y++) {
+        for (let x = 0; x < tailleX; x++) {
+          const cell = document.createElement('div')
+          cell.className = 'case-demineur'
+          cell.dataset.y = y
+          cell.dataset.x = x
+          cell.textContent = '?'
+          cell.addEventListener('click', () => onClicGauche(y, x))
+          cell.addEventListener('contextmenu', (e) => { e.preventDefault(); onClicDroit(y, x) })
+          grille.appendChild(cell)
+        }
+      }
+    }
+
+    function onClicGauche(y, x) {
+      if (partieTerminee || !modele) return
+      modele.revele(y, x)
+      rafraichirGrille()
+      verifierFin()
+    }
+
+    function onClicDroit(y, x) {
+      if (partieTerminee || !modele) return
+      if (modele.estRevelee(y, x)) return
+      modele.marque(y, x)
+      rafraichirGrille()
+      majStats()
+    }
+
+    function rafraichirGrille() {
+      const cells = document.querySelectorAll('.case-demineur')
+      cells.forEach(cell => {
+        const y = parseInt(cell.dataset.y)
+        const x = parseInt(cell.dataset.x)
+        const texte = modele.getText(y, x)
+        cell.textContent = texte === '0' ? '' : texte
+
+        cell.classList.remove('revelee', 'marquee', 'mine', 'mine-autres')
+        cell.removeAttribute('data-n')
+
+        if (modele.estRevelee(y, x)) {
+          cell.classList.add('revelee')
+          if (texte === 'X') {
+            cell.classList.add('mine')
+            cell.textContent = '💣'
+          } else {
+            cell.setAttribute('data-n', texte)
+          }
+        } else if (modele.estMarquee(y, x)) {
+          cell.classList.add('marquee')
+          cell.textContent = '🚩'
+        }
+      })
+
+      // Si la partie est perdue, révèle toutes les mines restantes
+      if (modele.estPerdu()) {
+        cells.forEach(cell => {
+          const y = parseInt(cell.dataset.y)
+          const x = parseInt(cell.dataset.x)
+          if (modele.mines[y][x] && !modele.estRevelee(y, x)) {
+            cell.classList.add('mine-autres')
+            cell.textContent = '💣'
+          }
+        })
+      }
+
+      majStats()
+    }
+
+    function majStats() {
+      document.getElementById('stat-mines').textContent = Math.max(0, modele.getNbMines() - modele.nbMarques)
+      document.getElementById('stat-inconnues').textContent = modele.nbInconnues
+    }
+
+    function verifierFin() {
+      if (modele.estPerdu()) {
+        partieTerminee = true
+        afficherMessage('💥 Boum ! Vous avez touché une mine.', 'perdu')
+      } else if (modele.estGagne()) {
+        partieTerminee = true
+        afficherMessage('🎉 Bravo, toutes les cases sûres sont révélées !', 'gagne')
+      }
+    }
+
+    function afficherMessage(texte, type) {
+      const el = document.getElementById('demineur-message')
+      el.textContent = texte
+      el.className = 'demineur-message' + (type ? ' ' + type : '')
+    }
+
+    // Démarrage : niveau facile par défaut
+    changerNiveau('facile')
   </script>
 </body>
 </html>
