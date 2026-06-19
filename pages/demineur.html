@@ -192,7 +192,12 @@
   <div id="footer-placeholder"></div>
 
   <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    import { debloquerBadge } from '../script/badges.js'
+
+    const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
+    let userId = null
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -203,6 +208,8 @@
       appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
+      const { data: session } = await db.auth.getUser()
+      userId = session?.user?.id ?? null
     })()
 
     // ===== Niveaux de difficulté (largeur, hauteur, nb de mines) =====
@@ -451,6 +458,12 @@
       } else if (modele.estGagne()) {
         partieTerminee = true
         afficherMessage('Bravo, toutes les cases sûres sont révélées !', 'gagne')
+        const BADGE_PAR_NIVEAU = {
+          facile:    'demineur_facile',
+          moyen:     'demineur_moyen',
+          difficile: 'demineur_difficile'
+        }
+        debloquerBadge(userId, BADGE_PAR_NIVEAU[niveauActuel])
       }
     }
 
