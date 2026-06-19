@@ -211,7 +211,8 @@
     }
 
     // ===== Modèle du démineur =====
-    // Traduction fidèle de la logique de ModeleDemineur.java (Java/JavaFX) en JS.
+    // Traduction fidèle de la logique de ModeleDemineur.java (Java/JavaFX) en JS,
+    // avec ajout : le premier clic est toujours sur une case vide (sans mine autour).
     class ModeleDemineur {
       constructor(tailleY, tailleX, nbMines) {
         this.autoZero = true
@@ -221,23 +222,43 @@
       setTaille(tailleY, tailleX, nbMines) {
         this.tailleY = tailleY
         this.tailleX = tailleX
+        this.nbMinesVoulu = nbMines
         this.mines = Array.from({ length: tailleY }, () => new Array(tailleX).fill(false))
         this.revelees = Array.from({ length: tailleY }, () => new Array(tailleX).fill(false))
         this.marquees = Array.from({ length: tailleY }, () => new Array(tailleX).fill(false))
         this.textes = Array.from({ length: tailleY }, () => new Array(tailleX).fill(0))
 
-        let nb = nbMines
+        this.minesPlacees = false
+        this.nbInconnues = tailleX * tailleY
+        this.nbMarques = 0
+        this.perdu = false
+      }
+
+      // Place les mines en excluant la case (y0,x0) et ses 8 voisines,
+      // pour garantir que le premier clic révèle toujours une zone vide.
+      placerMines(y0, x0) {
+        const interdit = new Set()
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const ny = y0 + dy, nx = x0 + dx
+            if (ny >= 0 && ny < this.tailleY && nx >= 0 && nx < this.tailleX) {
+              interdit.add(ny + ',' + nx)
+            }
+          }
+        }
+
+        let nb = Math.min(this.nbMinesVoulu, this.tailleX * this.tailleY - interdit.size)
         while (nb > 0) {
-          const y = Math.floor(Math.random() * tailleY)
-          const x = Math.floor(Math.random() * tailleX)
-          if (!this.mines[y][x]) {
+          const y = Math.floor(Math.random() * this.tailleY)
+          const x = Math.floor(Math.random() * this.tailleX)
+          if (!this.mines[y][x] && !interdit.has(y + ',' + x)) {
             this.mines[y][x] = true
             this.textes[y][x] = -1
             nb--
             for (let dx = -1; dx <= 1; dx++) {
-              if (x + dx >= 0 && x + dx < tailleX) {
+              if (x + dx >= 0 && x + dx < this.tailleX) {
                 for (let dy = -1; dy <= 1; dy++) {
-                  if (y + dy >= 0 && y + dy < tailleY) {
+                  if (y + dy >= 0 && y + dy < this.tailleY) {
                     if (!this.mines[y + dy][x + dx]) this.textes[y + dy][x + dx]++
                   }
                 }
@@ -245,10 +266,7 @@
             }
           }
         }
-
-        this.nbInconnues = tailleX * tailleY
-        this.nbMarques = 0
-        this.perdu = false
+        this.minesPlacees = true
       }
 
       estRevelee(y, x) { return this.revelees[y][x] }
@@ -276,6 +294,10 @@
       revele(y, x) {
         if (this.perdu) return
         if (this.revelees[y][x]) return
+
+        // Premier clic de la partie : on place les mines maintenant,
+        // en garantissant que cette case (et ses voisines) sont sûres.
+        if (!this.minesPlacees) this.placerMines(y, x)
 
         if (this.marquees[y][x]) {
           this.marquees[y][x] = false
