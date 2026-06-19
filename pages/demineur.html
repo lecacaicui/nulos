@@ -131,13 +131,15 @@
       background: #fef9c3;
       color: #92400e;
     }
-    .case-demineur.mine {
-      background: #ef4444;
-      color: white;
-    }
+    .case-demineur.mine,
     .case-demineur.mine-autres {
-      background: #fecaca;
-      color: #7f1d1d;
+      background: var(--couleur-fond);
+    }
+    .icone-case {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      pointer-events: none;
     }
     .case-demineur[data-n="1"] { color: #2563eb; }
     .case-demineur[data-n="2"] { color: #16a34a; }
@@ -169,11 +171,11 @@
           <button class="btn-niveau" id="niveau-facile" onclick="changerNiveau('facile')">Facile</button>
           <button class="btn-niveau" id="niveau-moyen" onclick="changerNiveau('moyen')">Moyen</button>
           <button class="btn-niveau" id="niveau-difficile" onclick="changerNiveau('difficile')">Difficile</button>
-          <button class="btn-niveau" id="niveau-recommencer" onclick="recommencer()">↻ Recommencer</button>
+          <button class="btn-niveau" id="niveau-recommencer" onclick="recommencer()">Recommencer</button>
         </div>
         <div class="demineur-stats">
-          <span class="stat-pill">💣 Mines restantes&nbsp;: <span class="valeur" id="stat-mines">0</span></span>
-          <span class="stat-pill">⬜ Cases inconnues&nbsp;: <span class="valeur" id="stat-inconnues">0</span></span>
+          <span class="stat-pill">Mines restantes&nbsp;: <span class="valeur" id="stat-mines">0</span></span>
+          <span class="stat-pill">Cases inconnues&nbsp;: <span class="valeur" id="stat-inconnues">0</span></span>
         </div>
       </div>
 
@@ -412,13 +414,13 @@
           cell.classList.add('revelee')
           if (texte === 'X') {
             cell.classList.add('mine')
-            cell.textContent = '💣'
+            cell.innerHTML = '<img class="icone-case" src="../pictures/bombe.png" alt="mine">'
           } else {
             cell.setAttribute('data-n', texte)
           }
         } else if (modele.estMarquee(y, x)) {
           cell.classList.add('marquee')
-          cell.textContent = '🚩'
+          cell.innerHTML = '<img class="icone-case" src="../pictures/bombepined.png" alt="marqué">'
         }
       })
 
@@ -429,7 +431,7 @@
           const x = parseInt(cell.dataset.x)
           if (modele.mines[y][x] && !modele.estRevelee(y, x)) {
             cell.classList.add('mine-autres')
-            cell.textContent = '💣'
+            cell.innerHTML = '<img class="icone-case" src="../pictures/bombe.png" alt="mine">'
           }
         })
       }
@@ -445,10 +447,10 @@
     function verifierFin() {
       if (modele.estPerdu()) {
         partieTerminee = true
-        afficherMessage('💥 Boum ! Vous avez touché une mine.', 'perdu')
+        afficherMessage('Boum ! Vous avez touché une mine.', 'perdu')
       } else if (modele.estGagne()) {
         partieTerminee = true
-        afficherMessage('🎉 Bravo, toutes les cases sûres sont révélées !', 'gagne')
+        afficherMessage('Bravo, toutes les cases sûres sont révélées !', 'gagne')
       }
     }
 
