@@ -79,6 +79,7 @@ export async function chargerHeader(base = '') {
       <span class="header-username">${username}</span>
       <span class="header-tag tag-${niveau}">${niveau}</span>
       <button class="header-btn header-btn-secondary" id="btn-deco">Se déconnecter</button>
+      <a class="header-btn header-btn-secondary" href="${base}pages/profil.html">Profil</a>
     `
     document.getElementById('btn-deco').addEventListener('click', async () => {
       await db.auth.signOut()
