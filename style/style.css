@@ -270,7 +270,8 @@ a.retour:hover { text-decoration: underline; }
 }
 
 /* ===== Tableau de pages (tuiles, page d'accueil connecté) ===== */
-.card-pages { max-width: 640px; }
+.card-pages { max-width: 80vw; width: 80vw; }
+@media (min-width: 1400px) { .card-pages { max-width: 1100px; } }
 .card-pages h2 { font-size: 1rem; color: var(--couleur-texte-faible); margin-bottom: 1.5rem; font-weight: 600; }
 .pages-grid {
   display: grid;
