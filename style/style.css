@@ -268,3 +268,41 @@ a.retour:hover { text-decoration: underline; }
   text-align: center;
   max-width: 400px;
 }
+
+/* ===== Tableau de pages (tuiles, page d'accueil connecté) ===== */
+.card-pages { max-width: 640px; }
+.card-pages h2 { font-size: 1rem; color: var(--couleur-texte-faible); margin-bottom: 1.5rem; font-weight: 600; }
+.pages-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.page-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  background: var(--couleur-fond);
+  border: 1px solid var(--couleur-bordure);
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  text-decoration: none;
+  color: var(--couleur-texte);
+  transition: filter .15s, transform .1s;
+  min-height: 140px;
+}
+.page-tile:hover { filter: brightness(0.95); transform: translateY(-2px); }
+.page-tile-img { width: 56px; height: 56px; object-fit: contain; }
+.page-tile-emoji { font-size: 2.6rem; line-height: 1; }
+.page-tile-label { font-size: .85rem; font-weight: 600; text-align: center; }
+.page-tile-vide {
+  border-style: dashed;
+  cursor: default;
+  pointer-events: none;
+  opacity: .4;
+}
+@media (max-width: 560px) {
+  .pages-grid { grid-template-columns: repeat(2, 1fr); }
+  .page-tile-vide { display: none; }
+}
