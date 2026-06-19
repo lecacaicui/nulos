@@ -49,18 +49,20 @@
 
     <!-- Utilisateur connecté -->
     <div class="centered" id="vue-connecte" style="display:none">
-      <div class="card">
+      <div class="card card-pages">
         <h1>Accueil</h1>
-
         <h2>Fonctionnalités disponibles</h2>
 
-        <div class="btn-group">
-          <a class="btn btn-primary" href="pages/clicker.html">
-             Accéder au Clicker
+        <div class="pages-grid">
+          <a class="page-tile" href="pages/clicker.html">
+            <img class="page-tile-img" src="pictures/pas_content.png" alt="Clicker">
+            <span class="page-tile-label">Clicker</span>
           </a>
-          <a class="btn btn-secondary" href="pages/scrabble.html">
-             🔠 Scrabble — Joker
+          <a class="page-tile" href="pages/scrabble.html">
+            <span class="page-tile-emoji">🔠</span>
+            <span class="page-tile-label">Scrabble — Joker</span>
           </a>
+          <div class="page-tile page-tile-vide" aria-hidden="true"></div>
         </div>
       </div>
     </div>
