@@ -93,9 +93,69 @@
     .badge-tile-img { width: 56px; height: 56px; object-fit: contain; }
     .badge-tile-label { font-size: .75rem; font-weight: 600; text-align: center; color: var(--couleur-texte); }
     .badge-tile-verrouille { opacity: .35; filter: grayscale(1); }
+    .badge-tile { cursor: pointer; transition: filter .15s, transform .1s; }
+    .badge-tile:hover { filter: brightness(.95); transform: translateY(-2px); }
+    .badge-tile-verrouille:hover { filter: grayscale(1) brightness(.95); transform: translateY(-2px); }
     @media (max-width: 560px) {
       .badges-grille { grid-template-columns: repeat(2, 1fr); }
     }
+
+    /* ===== Modale détail badge ===== */
+    .modale-fond {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modale-fond.ouverte { display: flex; }
+    .modale-badge {
+      background: var(--couleur-conteneur);
+      border-radius: 14px;
+      padding: 2rem;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    }
+    .modale-fermer {
+      position: absolute;
+      top: .75rem;
+      right: .9rem;
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modale-fermer:hover { color: var(--couleur-texte); }
+    .modale-img {
+      width: 110px;
+      height: 110px;
+      object-fit: contain;
+      margin: 0 auto 1rem;
+    }
+    .modale-img.verrouille { opacity: .35; filter: grayscale(1); }
+    .modale-titre { font-size: 1.15rem; font-weight: 700; margin-bottom: .3rem; }
+    .modale-statut { font-size: .85rem; margin-bottom: 1.25rem; }
+    .modale-statut.ok  { color: #22c55e; }
+    .modale-statut.non { color: var(--couleur-texte-faible); }
+    .modale-infos { text-align: left; }
+    .modale-ligne {
+      display: flex;
+      justify-content: space-between;
+      padding: .55rem 0;
+      border-bottom: 1px solid var(--couleur-bordure);
+      font-size: .85rem;
+    }
+    .modale-ligne:last-child { border-bottom: none; }
+    .modale-ligne .label { color: var(--couleur-texte-faible); }
+    .modale-ligne .valeur { font-weight: 600; color: var(--couleur-texte); }
   </style>
 </head>
 <body>
@@ -130,12 +190,35 @@
     </div>
   </main>
 
+  <div class="modale-fond" id="modale-fond" onclick="if(event.target===this) fermerModaleBadge()">
+    <div class="modale-badge">
+      <button class="modale-fermer" onclick="fermerModaleBadge()">✕</button>
+      <img class="modale-img" id="modale-img" src="" alt="">
+      <div class="modale-titre" id="modale-titre">—</div>
+      <div class="modale-statut" id="modale-statut">—</div>
+      <div class="modale-infos">
+        <div class="modale-ligne">
+          <span class="label">Description</span>
+          <span class="valeur" id="modale-description">—</span>
+        </div>
+        <div class="modale-ligne">
+          <span class="label">Obtenu le</span>
+          <span class="valeur" id="modale-date">—</span>
+        </div>
+        <div class="modale-ligne">
+          <span class="label">Taux d'obtention</span>
+          <span class="valeur" id="modale-taux">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="footer-placeholder"></div>
 
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
-    import { BADGES, chargerBadgesUtilisateur } from '../script/badges.js'
+    import { BADGES, chargerBadgesUtilisateur, chargerTauxObtention } from '../script/badges.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
@@ -166,16 +249,56 @@
     })()
 
     async function afficherBadges(userId) {
-      const obtenus = await chargerBadgesUtilisateur(userId)
+      const obtenus = await chargerBadgesUtilisateur(userId)   // Map badge_id -> date ISO
+      const taux = await chargerTauxObtention()                // { badge_id: pourcentage }
+
       const grille = document.getElementById('badges-grille')
       grille.innerHTML = BADGES.map(b => {
         const ok = obtenus.has(b.id)
         return `
-          <div class="badge-tile ${ok ? '' : 'badge-tile-verrouille'}" title="${b.description}">
+          <div class="badge-tile ${ok ? '' : 'badge-tile-verrouille'}" title="${b.description}" onclick="ouvrirModaleBadge('${b.id}')">
             <img class="badge-tile-img" src="../pictures/${b.image}" alt="${b.titre}">
             <span class="badge-tile-label">${b.titre}</span>
           </div>`
       }).join('')
+
+      // Rendues disponibles globalement pour le clic et la modale
+      window.__badgesObtenus = obtenus
+      window.__badgesTaux = taux
+    }
+
+    window.ouvrirModaleBadge = function(badgeId) {
+      const b = BADGES.find(x => x.id === badgeId)
+      if (!b) return
+      const obtenus = window.__badgesObtenus || new Map()
+      const taux = window.__badgesTaux || {}
+      const dateObtention = obtenus.get(badgeId)
+      const ok = !!dateObtention
+
+      const img = document.getElementById('modale-img')
+      img.src = '../pictures/' + b.image
+      img.alt = b.titre
+      img.className = 'modale-img' + (ok ? '' : ' verrouille')
+
+      document.getElementById('modale-titre').textContent = b.titre
+      document.getElementById('modale-description').textContent = b.description
+
+      const statut = document.getElementById('modale-statut')
+      statut.textContent = ok ? 'Badge obtenu' : 'Pas encore obtenu'
+      statut.className = 'modale-statut ' + (ok ? 'ok' : 'non')
+
+      document.getElementById('modale-date').textContent = ok
+        ? new Date(dateObtention).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '—'
+
+      const pct = taux[badgeId]
+      document.getElementById('modale-taux').textContent = (pct === undefined) ? '—' : pct + '% des joueurs'
+
+      document.getElementById('modale-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleBadge = function() {
+      document.getElementById('modale-fond').classList.remove('ouverte')
     }
   </script>
 </body>
