@@ -82,6 +82,71 @@
     }
     .ligne-composition:last-child { border-bottom: none; }
     .ligne-composition .infos { display: flex; align-items: center; gap: .5rem; }
+
+    /* ===== Onglets d'administration ===== */
+    .admin-onglets {
+      display: flex;
+      gap: .35rem;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .onglet {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.4rem;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-bottom: none;
+      border-radius: 12px 12px 0 0;
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      white-space: nowrap;
+      position: relative;
+      top: 1px;
+      transition: color .15s, background .15s;
+    }
+    .onglet:hover { color: var(--couleur-texte); }
+    .onglet.actif {
+      background: var(--couleur-conteneur);
+      color: var(--couleur-texte);
+    }
+    .onglet.actif::after {
+      content: '';
+      position: absolute;
+      left: .9rem; right: .9rem; bottom: -1px;
+      height: 3px;
+      background: var(--couleur-bouton);
+      border-radius: 3px 3px 0 0;
+    }
+    .onglet-icone { font-size: 1.05rem; line-height: 1; }
+    .onglet-compteur {
+      font-size: .7rem;
+      font-weight: 700;
+      color: var(--couleur-texte-faible);
+      background: var(--couleur-bordure);
+      border-radius: 999px;
+      padding: .05rem .45rem;
+    }
+    .onglet.actif .onglet-compteur { color: var(--couleur-texte); }
+
+    .onglet-panneaux {
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 0 10px 10px 10px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      transition: background .15s, border-color .15s;
+    }
+    .onglet-panneau { display: none; }
+    .onglet-panneau.actif { display: block; animation: onglet-apparait .12s ease-out; }
+    @keyframes onglet-apparait {
+      from { opacity: 0; transform: translateY(2px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .onglet-panneau h2 { margin-bottom: .5rem; font-size: 1.1rem; }
   </style>
 </head>
 <body>
@@ -99,72 +164,94 @@
         </div>
         <span class="badge" id="badge-role">Admin</span>
       </div>
-      <div class="card-table" id="theme-card" style="display:none">
-        <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Thème du site</h2>
-        <p class="note-verrouille">Couleurs utilisées sur tout le site. Choisissez un préréglage ou personnalisez chaque couleur, puis cliquez sur "Appliquer" pour enregistrer.</p>
-        <div class="theme-presets">
-          <button class="btn-preset" onclick="appliquerPreset('clair')">☀️ Thème clair</button>
-          <button class="btn-preset" onclick="appliquerPreset('sombre')">🌙 Thème sombre</button>
-        </div>
-        <div class="theme-grid">
-          <div class="theme-field">
-            <label for="couleur-fond">Fond du site</label>
-            <input type="color" id="couleur-fond">
-          </div>
-          <div class="theme-field">
-            <label for="couleur-conteneur">Conteneurs</label>
-            <input type="color" id="couleur-conteneur">
-          </div>
-          <div class="theme-field">
-            <label for="couleur-bordure">Bordures</label>
-            <input type="color" id="couleur-bordure">
-          </div>
-          <div class="theme-field">
-            <label for="couleur-bouton">Boutons</label>
-            <input type="color" id="couleur-bouton">
-          </div>
-          <div class="theme-field">
-            <label>&nbsp;</label>
-            <button class="btn-save" id="btn-save-theme" onclick="sauvegarderTheme()">Appliquer</button>
-          </div>
-          <span class="msg-inline" id="msg-theme"></span>
-        </div>
-      </div>
-      <div class="card-table" id="creatures-card" style="display:none">
-        <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Créatures</h2>
-        <p class="note-verrouille">Gérez les créatures obtenables dans les loot box : image, rareté, multiplicateur de production, prix de revente en cas de doublon.</p>
-        <div class="row-actions" style="margin:1rem 0;">
-          <button class="btn-save" onclick="ouvrirFormCreature(null)">+ Nouvelle créature</button>
-        </div>
-        <table>
-          <thead>
-            <tr><th>Image</th><th>Nom</th><th>Rareté</th><th>Multiplicateur</th><th>Prix revente</th><th>Statut</th><th>Actions</th></tr>
-          </thead>
-          <tbody id="tbody-creatures"></tbody>
-        </table>
+      <div class="admin-onglets" id="admin-onglets">
+        <button class="onglet actif" data-onglet="utilisateurs" onclick="ouvrirOnglet('utilisateurs')">
+          <span class="onglet-icone">👤</span> Utilisateurs
+        </button>
+        <button class="onglet" id="onglet-theme" data-onglet="theme" onclick="ouvrirOnglet('theme')" style="display:none">
+          <span class="onglet-icone">🎨</span> Thème
+        </button>
+        <button class="onglet" id="onglet-creatures" data-onglet="creatures" onclick="ouvrirOnglet('creatures')" style="display:none">
+          <span class="onglet-icone">🐾</span> Créatures
+        </button>
+        <button class="onglet" id="onglet-lootbox" data-onglet="lootbox" onclick="ouvrirOnglet('lootbox')" style="display:none">
+          <span class="onglet-icone">🎁</span> Loot Box
+        </button>
       </div>
 
-      <div class="card-table" id="lootbox-card" style="display:none">
-        <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Loot Box</h2>
-        <p class="note-verrouille">Gérez les loot box disponibles : prix, image, et composition (créatures + poids de tirage).</p>
-        <div class="row-actions" style="margin:1rem 0;">
-          <button class="btn-save" onclick="ouvrirFormLootBox(null)">+ Nouvelle loot box</button>
-        </div>
-        <table>
-          <thead>
-            <tr><th>Image</th><th>Nom</th><th>Prix</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr>
-          </thead>
-          <tbody id="tbody-lootboxes"></tbody>
-        </table>
-      </div>
+      <div class="onglet-panneaux">
 
-      <div class="card-table">
-        <table>
-          <thead>
-            <tr><th>Nom d'utilisateur</th><th>Niveau actuel</th><th>Changer le niveau</th><th>Action</th></tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
+        <div class="onglet-panneau actif" data-panneau="utilisateurs">
+          <h2>👤 Comptes utilisateurs</h2>
+          <p class="note-verrouille" style="margin-bottom:1rem;">Gérez le niveau d'accès des comptes du site, ou supprimez-en un.</p>
+          <table>
+            <thead>
+              <tr><th>Nom d'utilisateur</th><th>Niveau actuel</th><th>Changer le niveau</th><th>Action</th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="onglet-panneau" data-panneau="theme" id="theme-card">
+          <h2>🎨 Thème du site</h2>
+          <p class="note-verrouille">Couleurs utilisées sur tout le site. Choisissez un préréglage ou personnalisez chaque couleur, puis cliquez sur "Appliquer" pour enregistrer.</p>
+          <div class="theme-presets">
+            <button class="btn-preset" onclick="appliquerPreset('clair')">☀️ Thème clair</button>
+            <button class="btn-preset" onclick="appliquerPreset('sombre')">🌙 Thème sombre</button>
+          </div>
+          <div class="theme-grid">
+            <div class="theme-field">
+              <label for="couleur-fond">Fond du site</label>
+              <input type="color" id="couleur-fond">
+            </div>
+            <div class="theme-field">
+              <label for="couleur-conteneur">Conteneurs</label>
+              <input type="color" id="couleur-conteneur">
+            </div>
+            <div class="theme-field">
+              <label for="couleur-bordure">Bordures</label>
+              <input type="color" id="couleur-bordure">
+            </div>
+            <div class="theme-field">
+              <label for="couleur-bouton">Boutons</label>
+              <input type="color" id="couleur-bouton">
+            </div>
+            <div class="theme-field">
+              <label>&nbsp;</label>
+              <button class="btn-save" id="btn-save-theme" onclick="sauvegarderTheme()">Appliquer</button>
+            </div>
+            <span class="msg-inline" id="msg-theme"></span>
+          </div>
+        </div>
+
+        <div class="onglet-panneau" data-panneau="creatures" id="creatures-card">
+          <h2>🐾 Créatures</h2>
+          <p class="note-verrouille">Gérez les créatures obtenables dans les loot box : image, rareté, multiplicateur de production, prix de revente en cas de doublon.</p>
+          <div class="row-actions" style="margin:1rem 0;">
+            <button class="btn-save" onclick="ouvrirFormCreature(null)">+ Nouvelle créature</button>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Image</th><th>Nom</th><th>Rareté</th><th>Multiplicateur</th><th>Prix revente</th><th>Statut</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="tbody-creatures"></tbody>
+          </table>
+        </div>
+
+        <div class="onglet-panneau" data-panneau="lootbox" id="lootbox-card">
+          <h2>🎁 Loot Box</h2>
+          <p class="note-verrouille">Gérez les loot box disponibles : prix, image, et composition (créatures + poids de tirage).</p>
+          <div class="row-actions" style="margin:1rem 0;">
+            <button class="btn-save" onclick="ouvrirFormLootBox(null)">+ Nouvelle loot box</button>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Image</th><th>Nom</th><th>Prix</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="tbody-lootboxes"></tbody>
+          </table>
+        </div>
+
       </div>
     </div>
   </main>
@@ -279,14 +366,19 @@
       if (monNiveau === 'super_admin') {
         badge.textContent = 'Super Admin'
         badge.classList.add('badge-super')
-        document.getElementById('theme-card').style.display = 'block'
-        document.getElementById('creatures-card').style.display = 'block'
-        document.getElementById('lootbox-card').style.display = 'block'
+        document.getElementById('onglet-theme').style.display = 'flex'
+        document.getElementById('onglet-creatures').style.display = 'flex'
+        document.getElementById('onglet-lootbox').style.display = 'flex'
         chargerTheme()
         chargerCreatures()
         chargerLootBoxesAdmin()
       }
       chargerUtilisateurs()
+    }
+
+    window.ouvrirOnglet = function(nom) {
+      document.querySelectorAll('.onglet').forEach(b => b.classList.toggle('actif', b.dataset.onglet === nom))
+      document.querySelectorAll('.onglet-panneau').forEach(p => p.classList.toggle('actif', p.dataset.panneau === nom))
     }
 
     function tagClassPour(niveau) {
