@@ -25,6 +25,64 @@
   </script>
 
   <style>body { visibility: hidden; }</style>
+  <style>
+    .modale-fond {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .modale-fond.ouverte { display: flex; }
+    .modale-admin {
+      background: var(--couleur-conteneur);
+      border-radius: 14px;
+      padding: 2rem;
+      max-width: 440px;
+      width: 100%;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+      margin: 2rem 0;
+    }
+    .modale-fermer {
+      position: absolute;
+      top: .75rem;
+      right: .9rem;
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modale-fermer:hover { color: var(--couleur-texte); }
+    .modale-admin h2 { font-size: 1.2rem; margin-bottom: .25rem; }
+    .modale-admin h3 { color: var(--couleur-texte); }
+    .img-mini { width: 36px; height: 36px; object-fit: contain; vertical-align: middle; }
+    .tag-rarete {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 700;
+      color: white;
+    }
+    .ligne-composition {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      padding: .4rem 0;
+      border-bottom: 1px solid var(--couleur-bordure);
+      font-size: .85rem;
+    }
+    .ligne-composition:last-child { border-bottom: none; }
+    .ligne-composition .infos { display: flex; align-items: center; gap: .5rem; }
+  </style>
 </head>
 <body>
   <div id="header-placeholder"></div>
@@ -72,6 +130,34 @@
           <span class="msg-inline" id="msg-theme"></span>
         </div>
       </div>
+      <div class="card-table" id="creatures-card" style="display:none">
+        <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Créatures</h2>
+        <p class="note-verrouille">Gérez les créatures obtenables dans les loot box : image, rareté, multiplicateur de production, prix de revente en cas de doublon.</p>
+        <div class="row-actions" style="margin:1rem 0;">
+          <button class="btn-save" onclick="ouvrirFormCreature(null)">+ Nouvelle créature</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Image</th><th>Nom</th><th>Rareté</th><th>Multiplicateur</th><th>Prix revente</th><th>Statut</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="tbody-creatures"></tbody>
+        </table>
+      </div>
+
+      <div class="card-table" id="lootbox-card" style="display:none">
+        <h2 style="margin-bottom:.5rem; font-size:1.1rem;">Loot Box</h2>
+        <p class="note-verrouille">Gérez les loot box disponibles : prix, image, et composition (créatures + poids de tirage).</p>
+        <div class="row-actions" style="margin:1rem 0;">
+          <button class="btn-save" onclick="ouvrirFormLootBox(null)">+ Nouvelle loot box</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Image</th><th>Nom</th><th>Prix</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="tbody-lootboxes"></tbody>
+        </table>
+      </div>
+
       <div class="card-table">
         <table>
           <thead>
@@ -82,10 +168,76 @@
       </div>
     </div>
   </main>
+
+  <!-- ===== Modale Créature (création / édition) ===== -->
+  <div class="modale-fond" id="modale-creature-fond" onclick="if(event.target===this) fermerModaleCreature()">
+    <div class="modale-admin">
+      <button class="modale-fermer" onclick="fermerModaleCreature()">✕</button>
+      <h2 id="titre-modale-creature">Nouvelle créature</h2>
+      <label for="c-id">Identifiant unique (texte, ex: flamby)</label>
+      <input type="text" id="c-id" placeholder="ex: flamby">
+      <label for="c-nom">Nom affiché</label>
+      <input type="text" id="c-nom" placeholder="ex: Flamby">
+      <label for="c-rarete">Rareté</label>
+      <select id="c-rarete">
+        <option value="commun">Commun</option>
+        <option value="rare">Rare</option>
+        <option value="epique">Épique</option>
+        <option value="legendaire">Légendaire</option>
+        <option value="cosmique">Cosmique</option>
+        <option value="secret">Secret (caché du site)</option>
+      </select>
+      <label for="c-multiplicateur">Multiplicateur de production (ex: 1.15)</label>
+      <input type="number" id="c-multiplicateur" step="0.01" min="1" placeholder="1.10">
+      <label for="c-image">Nom du fichier image (dans /pictures/)</label>
+      <input type="text" id="c-image" placeholder="ex: flamby.png">
+      <label for="c-prix-vente">Prix de revente si doublon (pièces)</label>
+      <input type="number" id="c-prix-vente" min="0" step="1" placeholder="100">
+      <button class="btn btn-primary btn-full" onclick="sauvegarderCreature()">Enregistrer</button>
+      <div class="msg-inline" id="msg-modale-creature"></div>
+    </div>
+  </div>
+
+  <!-- ===== Modale Loot Box (création / édition + composition) ===== -->
+  <div class="modale-fond" id="modale-lootbox-fond" onclick="if(event.target===this) fermerModaleLootBox()">
+    <div class="modale-admin">
+      <button class="modale-fermer" onclick="fermerModaleLootBox()">✕</button>
+      <h2 id="titre-modale-lootbox">Nouvelle loot box</h2>
+      <label for="lb-id">Identifiant unique (texte, ex: premium)</label>
+      <input type="text" id="lb-id" placeholder="ex: premium">
+      <label for="lb-nom">Nom affiché</label>
+      <input type="text" id="lb-nom" placeholder="ex: Loot Box Premium">
+      <label for="lb-prix">Prix (pièces)</label>
+      <input type="number" id="lb-prix" min="0" step="1" placeholder="400000">
+      <label for="lb-image">Nom du fichier image (dans /pictures/)</label>
+      <input type="text" id="lb-image" placeholder="ex: lootbox_premium.png">
+      <label for="lb-ordre">Ordre d'affichage</label>
+      <input type="number" id="lb-ordre" step="1" placeholder="1">
+      <button class="btn btn-primary btn-full" onclick="sauvegarderLootBox()">Enregistrer</button>
+      <div class="msg-inline" id="msg-modale-lootbox"></div>
+
+      <div id="composition-lootbox" style="display:none; margin-top:1.5rem; text-align:left;">
+        <h3 style="font-size:.95rem; margin-bottom:.5rem;">Composition (créatures de cette boîte)</h3>
+        <div id="liste-composition"></div>
+        <div class="row-actions" style="margin-top:.75rem;">
+          <select id="ajout-creature-select" style="flex:1;"></select>
+          <input type="number" id="ajout-creature-poids" value="10" min="0.01" step="0.01" style="width:80px;" placeholder="poids">
+          <button class="btn-save" onclick="ajouterCreatureALaBox()">Ajouter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="footer-placeholder"></div>
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs, invaliderCacheTheme } from '../script/header.js'
+    import {
+      RARETES,
+      adminListerCreatures, adminSauvegarderCreature, adminToggleActifCreature, adminSupprimerCreature,
+      adminListerLootBoxes, adminSauvegarderLootBox, adminToggleActifLootBox, adminSupprimerLootBox,
+      adminListerLiaisons, adminAjouterCreatureBox, adminRetirerCreatureBox
+    } from '../script/lootbox.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
@@ -128,7 +280,11 @@
         badge.textContent = 'Super Admin'
         badge.classList.add('badge-super')
         document.getElementById('theme-card').style.display = 'block'
+        document.getElementById('creatures-card').style.display = 'block'
+        document.getElementById('lootbox-card').style.display = 'block'
         chargerTheme()
+        chargerCreatures()
+        chargerLootBoxesAdmin()
       }
       chargerUtilisateurs()
     }
@@ -225,6 +381,229 @@
         invaliderCacheTheme()
         localStorage.setItem('theme_couleurs', JSON.stringify(valeurs))
       }
+    }
+
+    // ===========================================================================
+    // ===== Gestion des créatures =====
+    // ===========================================================================
+    let creaturesCache = []
+    let creatureEnEdition = null  // id de la créature en cours d'édition, ou null = création
+
+    async function chargerCreatures() {
+      creaturesCache = await adminListerCreatures()
+      const tbody = document.getElementById('tbody-creatures')
+      tbody.innerHTML = creaturesCache.map(c => {
+        const infosRarete = RARETES[c.rarete] ?? { label: c.rarete, couleur: '#9ca3af' }
+        return `
+          <tr>
+            <td><img class="img-mini" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=0.2"></td>
+            <td>${c.nom}</td>
+            <td><span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span></td>
+            <td>x${Number(c.multiplicateur).toFixed(2)}</td>
+            <td>${Number(c.prix_vente).toLocaleString('fr')}</td>
+            <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+            <td>
+              <div class="row-actions">
+                <button class="btn-save" onclick="ouvrirFormCreature('${c.id}')">Modifier</button>
+                <button class="btn-preset" onclick="toggleActifCreature('${c.id}', ${c.actif})">${c.actif ? 'Désactiver' : 'Activer'}</button>
+                <button class="btn-delete" onclick="supprimerCreature('${c.id}', '${c.nom}')">Supprimer</button>
+              </div>
+            </td>
+          </tr>`
+      }).join('') || '<tr><td colspan="7" class="note-verrouille">Aucune créature pour le moment.</td></tr>'
+    }
+
+    window.ouvrirFormCreature = function(id) {
+      creatureEnEdition = id
+      const c = id ? creaturesCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-creature').textContent = id ? 'Modifier la créature' : 'Nouvelle créature'
+      document.getElementById('c-id').value = c?.id ?? ''
+      document.getElementById('c-id').disabled = !!id  // id non modifiable après création
+      document.getElementById('c-nom').value = c?.nom ?? ''
+      document.getElementById('c-rarete').value = c?.rarete ?? 'commun'
+      document.getElementById('c-multiplicateur').value = c?.multiplicateur ?? '1.10'
+      document.getElementById('c-image').value = c?.image ?? ''
+      document.getElementById('c-prix-vente').value = c?.prix_vente ?? '0'
+      document.getElementById('msg-modale-creature').textContent = ''
+      document.getElementById('modale-creature-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleCreature = function() {
+      document.getElementById('modale-creature-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderCreature = async function() {
+      const id = document.getElementById('c-id').value.trim()
+      const nom = document.getElementById('c-nom').value.trim()
+      const rarete = document.getElementById('c-rarete').value
+      const multiplicateur = parseFloat(document.getElementById('c-multiplicateur').value)
+      const image = document.getElementById('c-image').value.trim()
+      const prix_vente = parseInt(document.getElementById('c-prix-vente').value) || 0
+      const msgEl = document.getElementById('msg-modale-creature')
+
+      if (!id || !nom || !image || isNaN(multiplicateur)) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+
+      const { ok, error } = await adminSauvegarderCreature({ id, nom, rarete, multiplicateur, image, prix_vente, actif: true })
+      if (!ok) {
+        msgEl.textContent = '✗ Erreur : ' + (error?.message ?? '')
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      msgEl.textContent = '✓ Enregistré'
+      msgEl.className = 'msg-inline ok'
+      await chargerCreatures()
+      setTimeout(() => fermerModaleCreature(), 500)
+    }
+
+    window.toggleActifCreature = async function(id, actifActuel) {
+      await adminToggleActifCreature(id, !actifActuel)
+      await chargerCreatures()
+    }
+
+    window.supprimerCreature = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement la créature "${nom}" ? Elle disparaîtra aussi de toutes les loot box et des collections des joueurs. Cette action est irréversible.`)) return
+      await adminSupprimerCreature(id)
+      await chargerCreatures()
+    }
+
+    // ===========================================================================
+    // ===== Gestion des loot box =====
+    // ===========================================================================
+    let lootBoxesCache = []
+    let lootBoxEnEdition = null
+
+    async function chargerLootBoxesAdmin() {
+      lootBoxesCache = await adminListerLootBoxes()
+      const tbody = document.getElementById('tbody-lootboxes')
+      tbody.innerHTML = lootBoxesCache.map(b => `
+        <tr>
+          <td><img class="img-mini" src="../pictures/${b.image}" alt="${b.nom}" onerror="this.style.opacity=0.2"></td>
+          <td>${b.nom}</td>
+          <td>${Number(b.prix).toLocaleString('fr')}</td>
+          <td>${b.ordre}</td>
+          <td>${b.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn-save" onclick="ouvrirFormLootBox('${b.id}')">Modifier</button>
+              <button class="btn-preset" onclick="toggleActifLootBox('${b.id}', ${b.actif})">${b.actif ? 'Désactiver' : 'Activer'}</button>
+              <button class="btn-delete" onclick="supprimerLootBox('${b.id}', '${b.nom}')">Supprimer</button>
+            </div>
+          </td>
+        </tr>`).join('') || '<tr><td colspan="6" class="note-verrouille">Aucune loot box pour le moment.</td></tr>'
+    }
+
+    window.ouvrirFormLootBox = async function(id) {
+      lootBoxEnEdition = id
+      const b = id ? lootBoxesCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-lootbox').textContent = id ? 'Modifier la loot box' : 'Nouvelle loot box'
+      document.getElementById('lb-id').value = b?.id ?? ''
+      document.getElementById('lb-id').disabled = !!id
+      document.getElementById('lb-nom').value = b?.nom ?? ''
+      document.getElementById('lb-prix').value = b?.prix ?? '400000'
+      document.getElementById('lb-image').value = b?.image ?? ''
+      document.getElementById('lb-ordre').value = b?.ordre ?? (lootBoxesCache.length + 1)
+      document.getElementById('msg-modale-lootbox').textContent = ''
+
+      const compoEl = document.getElementById('composition-lootbox')
+      if (id) {
+        compoEl.style.display = 'block'
+        await rafraichirComposition(id)
+        remplirSelectCreaturesDispo(id)
+      } else {
+        compoEl.style.display = 'none'
+      }
+
+      document.getElementById('modale-lootbox-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleLootBox = function() {
+      document.getElementById('modale-lootbox-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderLootBox = async function() {
+      const id = document.getElementById('lb-id').value.trim()
+      const nom = document.getElementById('lb-nom').value.trim()
+      const prix = parseInt(document.getElementById('lb-prix').value)
+      const image = document.getElementById('lb-image').value.trim()
+      const ordre = parseInt(document.getElementById('lb-ordre').value) || 0
+      const msgEl = document.getElementById('msg-modale-lootbox')
+
+      if (!id || !nom || !image || isNaN(prix)) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+
+      const nouvelleCreation = !lootBoxEnEdition
+      const { ok, error } = await adminSauvegarderLootBox({ id, nom, prix, image, ordre, actif: true })
+      if (!ok) {
+        msgEl.textContent = '✗ Erreur : ' + (error?.message ?? '')
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      msgEl.textContent = '✓ Enregistré'
+      msgEl.className = 'msg-inline ok'
+      await chargerLootBoxesAdmin()
+
+      if (nouvelleCreation) {
+        // On rouvre directement en mode édition pour permettre d'ajouter des créatures
+        setTimeout(() => ouvrirFormLootBox(id), 400)
+      }
+    }
+
+    window.toggleActifLootBox = async function(id, actifActuel) {
+      await adminToggleActifLootBox(id, !actifActuel)
+      await chargerLootBoxesAdmin()
+    }
+
+    window.supprimerLootBox = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement la loot box "${nom}" ? Cette action est irréversible.`)) return
+      await adminSupprimerLootBox(id)
+      await chargerLootBoxesAdmin()
+    }
+
+    // ===== Composition d'une loot box (créatures + poids) =====
+    async function rafraichirComposition(lootBoxId) {
+      const liaisons = await adminListerLiaisons(lootBoxId)
+      const liste = document.getElementById('liste-composition')
+      liste.innerHTML = liaisons.map(l => {
+        const infosRarete = RARETES[l.creatures?.rarete] ?? { label: l.creatures?.rarete, couleur: '#9ca3af' }
+        return `
+          <div class="ligne-composition">
+            <div class="infos">
+              <img class="img-mini" src="../pictures/${l.creatures?.image}" alt="" onerror="this.style.opacity=0.2">
+              <span>${l.creatures?.nom ?? l.creature_id}</span>
+              <span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
+              <span class="note-verrouille">poids ${l.poids}</span>
+            </div>
+            <button class="btn-delete" onclick="retirerCreatureDeLaBox('${lootBoxId}', '${l.creature_id}')">Retirer</button>
+          </div>`
+      }).join('') || '<p class="note-verrouille">Aucune créature dans cette boîte pour le moment.</p>'
+    }
+
+    function remplirSelectCreaturesDispo(lootBoxId) {
+      const select = document.getElementById('ajout-creature-select')
+      select.innerHTML = creaturesCache
+        .filter(c => c.actif)
+        .map(c => `<option value="${c.id}">${c.nom} (${RARETES[c.rarete]?.label ?? c.rarete})</option>`)
+        .join('')
+    }
+
+    window.ajouterCreatureALaBox = async function() {
+      const creatureId = document.getElementById('ajout-creature-select').value
+      const poids = parseFloat(document.getElementById('ajout-creature-poids').value) || 1
+      if (!creatureId || !lootBoxEnEdition) return
+      await adminAjouterCreatureBox(lootBoxEnEdition, creatureId, poids)
+      await rafraichirComposition(lootBoxEnEdition)
+    }
+
+    window.retirerCreatureDeLaBox = async function(lootBoxId, creatureId) {
+      await adminRetirerCreatureBox(lootBoxId, creatureId)
+      await rafraichirComposition(lootBoxId)
     }
   </script>
 </body>
