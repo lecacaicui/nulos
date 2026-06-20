@@ -178,6 +178,7 @@
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
     import { debloquerBadge, chargerBadgesUtilisateur } from '../script/badges.js'
+    import { chargerMultiplicateurEquipe } from '../script/lootbox.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
@@ -207,6 +208,7 @@
     let saveTimer       = null
     let userId          = null
     let badgesObtenus   = new Set()
+    let multiplicateurCreature = 1
 
     async function chargerSauvegarde() {
       const { data: session } = await db.auth.getUser()
@@ -214,6 +216,7 @@
       userId = session.user.id
 
       const { data } = await db.from('clicker').select('*').eq('user_id', userId).single()
+      multiplicateurCreature = await chargerMultiplicateurEquipe(userId)
       if (data) {
         pieces          = data.pieces_actuelles  ?? 0
         totalProduit    = data.pieces_totales    ?? 0
@@ -239,6 +242,7 @@
         bonusUpgrade += 3
         coutUpgrade   = Math.ceil(coutUpgrade * 1.4)
       }
+      parClic = Math.round(parClic * multiplicateurCreature)
       coutAutoClicker = 100
       for (let i = 0; i < nbAutoClickers; i++) {
         coutAutoClicker = Math.ceil(coutAutoClicker * 2)
