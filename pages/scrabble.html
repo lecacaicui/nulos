@@ -20,6 +20,26 @@
   </script>
   <style>body { visibility: hidden; }</style>
   <style>
+    /* Cette page utilise des couleurs fixes (voir script ci-dessus) ; on ajuste
+       ici les boutons secondaires et les textes gris pour rester lisibles
+       sur le fond vert, sans toucher au CSS global du site. */
+    .header-btn-secondary,
+    .btn-secondary {
+      background: #1f2937;
+      color: #ffffff;
+    }
+    .header-btn-secondary:hover,
+    .btn-secondary:hover {
+      filter: brightness(1.15);
+    }
+    .header-link,
+    .header-username,
+    .subtitle,
+    .empty {
+      color: #1a1a1a;
+    }
+  </style>
+  <style>
     .scrabble-wrap {
       max-width: 700px;
       margin: 0 auto;
