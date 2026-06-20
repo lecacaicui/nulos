@@ -136,3 +136,85 @@ export async function chargerMultiplicateurEquipe(userId) {
   if (error || !data || !data.creatures) return 1
   return Number(data.creatures.multiplicateur) || 1
 }
+
+
+// ===========================================================================
+// ===== Administration (super admin) — gestion complète en BDD =====
+// ===========================================================================
+
+/** Liste TOUTES les créatures (actives ou non), pour l'admin. */
+export async function adminListerCreatures() {
+  const { data, error } = await db.from('creatures').select('*').order('rarete').order('nom')
+  if (error) { console.error('adminListerCreatures :', error); return [] }
+  return data
+}
+
+/** Crée ou met à jour une créature (upsert sur id). */
+export async function adminSauvegarderCreature(creature) {
+  const { error } = await db.from('creatures').upsert(creature, { onConflict: 'id' })
+  if (error) { console.error('adminSauvegarderCreature :', error); return { ok: false, error } }
+  return { ok: true }
+}
+
+/** Active/désactive une créature (n'apparaît plus dans les tirages si inactive). */
+export async function adminToggleActifCreature(creatureId, actif) {
+  const { error } = await db.from('creatures').update({ actif }).eq('id', creatureId)
+  return { ok: !error, error }
+}
+
+/** Supprime définitivement une créature (et ses liaisons via ON DELETE CASCADE). */
+export async function adminSupprimerCreature(creatureId) {
+  const { error } = await db.from('creatures').delete().eq('id', creatureId)
+  return { ok: !error, error }
+}
+
+/** Liste TOUTES les loot box (actives ou non), pour l'admin. */
+export async function adminListerLootBoxes() {
+  const { data, error } = await db.from('loot_boxes').select('*').order('ordre')
+  if (error) { console.error('adminListerLootBoxes :', error); return [] }
+  return data
+}
+
+/** Crée ou met à jour une loot box (upsert sur id). */
+export async function adminSauvegarderLootBox(lootBox) {
+  const { error } = await db.from('loot_boxes').upsert(lootBox, { onConflict: 'id' })
+  if (error) { console.error('adminSauvegarderLootBox :', error); return { ok: false, error } }
+  return { ok: true }
+}
+
+/** Active/désactive une loot box (n'apparaît plus sur la page Loot Box si inactive). */
+export async function adminToggleActifLootBox(lootBoxId, actif) {
+  const { error } = await db.from('loot_boxes').update({ actif }).eq('id', lootBoxId)
+  return { ok: !error, error }
+}
+
+/** Supprime définitivement une loot box (et ses liaisons via ON DELETE CASCADE). */
+export async function adminSupprimerLootBox(lootBoxId) {
+  const { error } = await db.from('loot_boxes').delete().eq('id', lootBoxId)
+  return { ok: !error, error }
+}
+
+/** Liste les liaisons (creature_id + poids) d'une loot box donnée, pour l'admin. */
+export async function adminListerLiaisons(lootBoxId) {
+  const { data, error } = await db.from('loot_box_creatures')
+    .select('*, creatures(nom, rarete, image)')
+    .eq('loot_box_id', lootBoxId)
+  if (error) { console.error('adminListerLiaisons :', error); return [] }
+  return data
+}
+
+/** Ajoute (ou met à jour le poids d') une créature dans une loot box. */
+export async function adminAjouterCreatureBox(lootBoxId, creatureId, poids) {
+  const { error } = await db.from('loot_box_creatures')
+    .upsert({ loot_box_id: lootBoxId, creature_id: creatureId, poids }, { onConflict: 'loot_box_id,creature_id' })
+  return { ok: !error, error }
+}
+
+/** Retire une créature d'une loot box. */
+export async function adminRetirerCreatureBox(lootBoxId, creatureId) {
+  const { error } = await db.from('loot_box_creatures')
+    .delete()
+    .eq('loot_box_id', lootBoxId)
+    .eq('creature_id', creatureId)
+  return { ok: !error, error }
+}
