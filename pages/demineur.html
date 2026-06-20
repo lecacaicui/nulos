@@ -26,9 +26,13 @@
   <style>body { visibility: hidden; }</style>
   <style>
     .demineur-wrap {
-      max-width: 760px;
+      max-width: 95vw;
+      width: 95vw;
       margin: 0 auto;
       padding: 2rem 1rem 6rem;
+    }
+    @media (min-width: 1100px) {
+      .demineur-wrap { max-width: 900px; }
     }
     .demineur-wrap h1 { margin-bottom: .25rem; }
     .demineur-wrap .subtitle { margin-bottom: 1.5rem; }
@@ -106,10 +110,11 @@
       padding: 2px;
       user-select: none;
       -webkit-user-select: none;
+      max-width: 100%;
     }
     .case-demineur {
-      width: 32px;
-      height: 32px;
+      width: var(--taille-case, 32px);
+      height: var(--taille-case, 32px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -373,9 +378,19 @@
 
     function construireGrille(tailleX, tailleY) {
       const grille = document.getElementById('demineur-grille')
+      const conteneur = document.querySelector('.demineur-plateau-conteneur')
       grille.innerHTML = ''
-      grille.style.gridTemplateColumns = `repeat(${tailleX}, 32px)`
-      grille.style.gridTemplateRows = `repeat(${tailleY}, 32px)`
+
+      // Calcule la plus grande taille de case (en px) qui permet à toute la
+      // grille de tenir dans la largeur disponible, sans dépasser 32px et sans
+      // descendre sous 16px (lisibilité minimale, sinon on autorise le scroll).
+      const largeurDispo = conteneur.clientWidth - 4 // moins la bordure de la grille
+      const tailleBrute = Math.floor((largeurDispo - (tailleX - 1) * 2) / tailleX)
+      const taille = Math.max(16, Math.min(32, tailleBrute))
+
+      grille.style.setProperty('--taille-case', taille + 'px')
+      grille.style.gridTemplateColumns = `repeat(${tailleX}, ${taille}px)`
+      grille.style.gridTemplateRows = `repeat(${tailleY}, ${taille}px)`
 
       for (let y = 0; y < tailleY; y++) {
         for (let x = 0; x < tailleX; x++) {
@@ -475,6 +490,25 @@
 
     // Démarrage : niveau facile par défaut
     changerNiveau('facile')
+
+    // Recalcule la taille des cases si la fenêtre est redimensionnée
+    // (ex: bascule portrait/paysage sur mobile, redimensionnement de fenêtre).
+    let resizeTimer = null
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => {
+        if (!modele) return
+        const cfg = NIVEAUX[niveauActuel]
+        const grille = document.getElementById('demineur-grille')
+        const conteneur = document.querySelector('.demineur-plateau-conteneur')
+        const largeurDispo = conteneur.clientWidth - 4
+        const tailleBrute = Math.floor((largeurDispo - (cfg.x - 1) * 2) / cfg.x)
+        const taille = Math.max(16, Math.min(32, tailleBrute))
+        grille.style.setProperty('--taille-case', taille + 'px')
+        grille.style.gridTemplateColumns = `repeat(${cfg.x}, ${taille}px)`
+        grille.style.gridTemplateRows = `repeat(${cfg.y}, ${taille}px)`
+      }, 150)
+    })
   </script>
 </body>
 </html>
