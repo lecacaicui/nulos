@@ -45,6 +45,51 @@ export const BADGES = [
   }
 ]
 
+// Récupère, pour l'utilisateur donné, un Map badge_id -> date d'obtention (string ISO).
+export async function chargerBadgesUtilisateur(userId) {
+  if (!userId) return new Map()
+  const { data, error } = await db.from('badges_utilisateurs')
+    .select('badge_id, obtenu_le')
+    .eq('user_id', userId)
+  if (error || !data) return new Map()
+  return new Map(data.map(b => [b.badge_id, b.obtenu_le]))
+}
+
+// Calcule le taux d'obtention (en %) de chaque badge, parmi les comptes
+// qui ne sont PAS super_admin. Retourne un objet { badge_id: pourcentage }.
+export async function chargerTauxObtention() {
+  const resultat = {}
+
+  // 1) Liste des user_id à compter : tous les profils sauf super_admin.
+  const { data: profils, error: errProfils } = await db.from('profils')
+    .select('user_id')
+    .neq('niveau', 'super_admin')
+  if (errProfils || !profils) return resultat
+
+  const idsValides = new Set(profils.map(p => p.user_id))
+  const totalComptes = idsValides.size
+  if (totalComptes === 0) return resultat
+
+  // 2) Tous les badges obtenus, qu'on filtre ensuite côté client sur idsValides
+  //    (évite une jointure complexe ; le volume reste raisonnable pour ce site).
+  const { data: obtentions, error: errObtentions } = await db.from('badges_utilisateurs')
+    .select('badge_id, user_id')
+  if (errObtentions || !obtentions) return resultat
+
+  const compteurs = {}
+  for (const o of obtentions) {
+    if (!idsValides.has(o.user_id)) continue
+    compteurs[o.badge_id] = (compteurs[o.badge_id] ?? 0) + 1
+  }
+
+  for (const b of BADGES) {
+    const nb = compteurs[b.id] ?? 0
+    resultat[b.id] = Math.round((nb / totalComptes) * 100)
+  }
+
+  return resultat
+}
+
 // Débloque un badge pour l'utilisateur s'il ne l'a pas déjà.
 // Idempotent : peut être appelée plusieurs fois sans créer de doublon
 // (clé primaire composite user_id + badge_id côté BDD).
@@ -53,14 +98,4 @@ export async function debloquerBadge(userId, badgeId) {
   const { error } = await db.from('badges_utilisateurs')
     .upsert({ user_id: userId, badge_id: badgeId }, { onConflict: 'user_id,badge_id', ignoreDuplicates: true })
   if (error) console.error('debloquerBadge a échoué :', error)
-}
-
-// Récupère l'ensemble des badge_id déjà obtenus par l'utilisateur.
-export async function chargerBadgesUtilisateur(userId) {
-  if (!userId) return new Set()
-  const { data, error } = await db.from('badges_utilisateurs')
-    .select('badge_id')
-    .eq('user_id', userId)
-  if (error || !data) return new Set()
-  return new Set(data.map(b => b.badge_id))
 }
