@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loot Box</title>
+  <link rel="stylesheet" href="../style/style.css">
+  <script>
+  (function(){
+    var t = localStorage.getItem('theme_couleurs');
+    if (!t) return;
+    try {
+      var c = JSON.parse(t);
+      var r = document.documentElement.style;
+      r.setProperty('--couleur-fond', c.couleur_fond);
+      r.setProperty('--couleur-conteneur', c.couleur_conteneur);
+      r.setProperty('--couleur-bordure', c.couleur_bordure);
+      r.setProperty('--couleur-bouton', c.couleur_bouton);
+      var h = c.couleur_fond.replace('#','');
+      var lum = (0.299*parseInt(h.substring(0,2),16) + 0.587*parseInt(h.substring(2,4),16) + 0.114*parseInt(h.substring(4,6),16)) / 255;
+      r.setProperty('--couleur-texte', lum < 0.5 ? '#f1f1f1' : '#1a1a1a');
+      r.setProperty('--couleur-texte-faible', lum < 0.5 ? '#9ca3af' : '#6b7280');
+    } catch(e) {}
+  })();
+  </script>
+  <style>body { visibility: hidden; }</style>
+  <style>
+    .lootbox-wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1rem 6rem;
+    }
+    .lootbox-wrap h1 { margin-bottom: .25rem; }
+    .lootbox-wrap .subtitle { margin-bottom: 1.5rem; }
+
+    .lootbox-solde {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 999px;
+      padding: .5rem 1.1rem;
+      font-size: .9rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+    }
+
+    /* ===== Liste des loot box achetables ===== */
+    .boxes-grille {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 3rem;
+    }
+    .box-carte {
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 14px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .6rem;
+    }
+    .box-img { width: 96px; height: 96px; object-fit: contain; }
+    .box-nom { font-weight: 700; }
+    .box-prix { font-size: .85rem; color: var(--couleur-texte-faible); }
+    .box-carte .btn { width: 100%; margin-top: .4rem; }
+
+    /* ===== Zone de résultat de tirage (point d'extension pour une future animation) ===== */
+    .resultat-tirage {
+      display: none;
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .resultat-tirage.visible { display: block; }
+    .resultat-img {
+      width: 140px;
+      height: 140px;
+      object-fit: contain;
+      margin: 0 auto 1rem;
+    }
+    .resultat-rarete {
+      display: inline-block;
+      padding: .25rem .8rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: .5rem;
+    }
+    .resultat-nom { font-size: 1.3rem; font-weight: 700; margin-bottom: .3rem; }
+    .resultat-multi { font-size: .9rem; color: var(--couleur-texte-faible); margin-bottom: 1rem; }
+    .resultat-doublon { font-size: .9rem; color: #f59e0b; font-weight: 600; margin-bottom: 1rem; }
+
+    /* ===== Collection ===== */
+    .collection-titre {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .collection-titre h2 { font-size: 1.1rem; }
+    .equipee-info { font-size: .85rem; color: var(--couleur-texte-faible); }
+
+    .collection-grille {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: .85rem;
+    }
+    .creature-carte {
+      background: var(--couleur-conteneur);
+      border: 2px solid var(--couleur-bordure);
+      border-radius: 12px;
+      padding: 1rem .75rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .4rem;
+      cursor: pointer;
+      transition: transform .1s, filter .15s;
+    }
+    .creature-carte:hover { transform: translateY(-2px); filter: brightness(.97); }
+    .creature-carte.equipee { border-color: var(--couleur-bouton); }
+    .creature-carte-img { width: 64px; height: 64px; object-fit: contain; }
+    .creature-carte-nom { font-size: .8rem; font-weight: 700; }
+    .creature-carte-multi { font-size: .72rem; color: var(--couleur-texte-faible); }
+    .creature-carte-tag {
+      font-size: .65rem;
+      font-weight: 700;
+      color: white;
+      padding: .1rem .5rem;
+      border-radius: 999px;
+    }
+    .creature-carte-equipee-label {
+      font-size: .65rem;
+      font-weight: 700;
+      color: var(--couleur-bouton);
+    }
+
+    .collection-vide {
+      color: var(--couleur-texte-faible);
+      font-size: .9rem;
+      padding: 2rem 0;
+      text-align: center;
+    }
+
+    .msg-inline { font-size: .85rem; margin-top: .5rem; }
+    .msg-inline.err { color: #ef4444; }
+    .msg-inline.ok  { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <main>
+    <div class="lootbox-wrap">
+      <h1>Loot Box</h1>
+      <p class="subtitle">Ouvrez des loot box avec vos pièces pour obtenir des créatures qui boostent votre production.</p>
+
+      <div class="lootbox-solde">💰 <span id="solde-pieces">0</span> pièces</div>
+
+      <div class="boxes-grille" id="boxes-grille">
+        <p class="collection-vide">Chargement des loot box…</p>
+      </div>
+
+      <!-- Résultat du dernier tirage.
+           Point d'extension : remplacer affichageImmediat() par une fonction
+           d'animation (coffre qui s'ouvre, etc.) qui appelle ensuite
+           afficherResultat() une fois l'animation terminée. -->
+      <div class="resultat-tirage" id="resultat-tirage">
+        <img class="resultat-img" id="resultat-img" src="" alt="">
+        <div>
+          <span class="resultat-rarete" id="resultat-rarete">—</span>
+        </div>
+        <div class="resultat-nom" id="resultat-nom">—</div>
+        <div class="resultat-multi" id="resultat-multi">—</div>
+        <div class="resultat-doublon" id="resultat-doublon" style="display:none"></div>
+        <button class="btn btn-secondary" onclick="fermerResultat()">Fermer</button>
+      </div>
+
+      <div class="collection-titre">
+        <h2>Ma collection</h2>
+        <span class="equipee-info" id="equipee-info">Aucune créature équipée</span>
+      </div>
+      <div class="collection-grille" id="collection-grille">
+        <p class="collection-vide">Chargement…</p>
+      </div>
+    </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script type="module">
+    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+    import {
+      RARETES,
+      chargerLootBoxes,
+      ouvrirLootBox,
+      chargerCollection,
+      equiperCreature,
+      deseqiperCreature
+    } from '../script/lootbox.js'
+
+    const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
+
+    let userId = null
+    let pieces = 0
+    let lootBoxes = []
+    let collectionDetaillee = []  // tableau enrichi : {ligne BDD + infos créature}
+
+    ;(async () => {
+      if (!localStorage.getItem('username')) {
+        window.location.href = 'connexion.html'
+        return
+      }
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()
+      await chargerHeader('../')
+      await chargerFooter('../')
+
+      const { data: session } = await db.auth.getUser()
+      userId = session?.user?.id ?? null
+      if (!userId) return
+
+      await chargerSoldePieces()
+      lootBoxes = await chargerLootBoxes()
+      afficherBoxes()
+      await rafraichirCollection()
+    })()
+
+    async function chargerSoldePieces() {
+      const { data } = await db.from('clicker').select('pieces_actuelles').eq('user_id', userId).single()
+      pieces = data?.pieces_actuelles ?? 0
+      document.getElementById('solde-pieces').textContent = pieces.toLocaleString('fr')
+    }
+
+    async function sauvegarderSoldePieces() {
+      await db.from('clicker').update({ pieces_actuelles: pieces }).eq('user_id', userId)
+    }
+
+    function afficherBoxes() {
+      const grille = document.getElementById('boxes-grille')
+      if (lootBoxes.length === 0) {
+        grille.innerHTML = '<p class="collection-vide">Aucune loot box disponible pour le moment.</p>'
+        return
+      }
+      grille.innerHTML = lootBoxes.map(b => `
+        <div class="box-carte">
+          <img class="box-img" src="../pictures/${b.image}" alt="${b.nom}">
+          <div class="box-nom">${b.nom}</div>
+          <div class="box-prix">${Number(b.prix).toLocaleString('fr')} pièces</div>
+          <button class="btn btn-primary" onclick="acheterBox('${b.id}')">Ouvrir</button>
+        </div>
+      `).join('')
+    }
+
+    window.acheterBox = async function(lootBoxId) {
+      const box = lootBoxes.find(b => b.id === lootBoxId)
+      if (!box) return
+      if (pieces < box.prix) {
+        alert('Pas assez de pièces pour ouvrir cette loot box.')
+        return
+      }
+
+      pieces -= Number(box.prix)
+
+      let resultat
+      try {
+        resultat = await ouvrirLootBox(userId, lootBoxId)
+      } catch (e) {
+        console.error(e)
+        alert("Erreur lors de l'ouverture de la loot box.")
+        pieces += Number(box.prix) // on annule le débit en cas d'échec
+        return
+      }
+
+      if (resultat.estDoublon) {
+        pieces += Number(resultat.gainVente)
+      }
+
+      document.getElementById('solde-pieces').textContent = pieces.toLocaleString('fr')
+      await sauvegarderSoldePieces()
+
+      // Point d'extension future animation : appeler ici une fonction
+      // d'ouverture animée, puis afficherResultat(resultat) en callback.
+      afficherResultat(resultat)
+      await rafraichirCollection()
+    }
+
+    function afficherResultat(resultat) {
+      const { creature, estDoublon, gainVente } = resultat
+      const infosRarete = RARETES[creature.rarete] ?? { label: creature.rarete, couleur: '#9ca3af' }
+
+      document.getElementById('resultat-img').src = '../pictures/' + creature.image
+      document.getElementById('resultat-img').alt = creature.nom
+      const tagRarete = document.getElementById('resultat-rarete')
+      tagRarete.textContent = infosRarete.label
+      tagRarete.style.background = infosRarete.couleur
+
+      document.getElementById('resultat-nom').textContent = creature.nom
+      document.getElementById('resultat-multi').textContent = 'Multiplicateur de production : x' + Number(creature.multiplicateur).toFixed(2)
+
+      const elDoublon = document.getElementById('resultat-doublon')
+      if (estDoublon) {
+        elDoublon.style.display = 'block'
+        elDoublon.textContent = `Déjà possédée — revendue automatiquement pour ${Number(gainVente).toLocaleString('fr')} pièces`
+      } else {
+        elDoublon.style.display = 'none'
+      }
+
+      document.getElementById('resultat-tirage').classList.add('visible')
+    }
+
+    window.fermerResultat = function() {
+      document.getElementById('resultat-tirage').classList.remove('visible')
+    }
+
+    async function rafraichirCollection() {
+      const collection = await chargerCollection(userId)
+      const ids = [...collection.keys()]
+
+      if (ids.length === 0) {
+        collectionDetaillee = []
+        document.getElementById('collection-grille').innerHTML =
+          '<p class="collection-vide">Aucune créature pour le moment. Ouvrez une loot box pour commencer !</p>'
+        document.getElementById('equipee-info').textContent = 'Aucune créature équipée'
+        return
+      }
+
+      const { data: creaturesInfos } = await db.from('creatures').select('*').in('id', ids)
+      const infosParId = new Map((creaturesInfos ?? []).map(c => [c.id, c]))
+
+      collectionDetaillee = ids.map(id => ({
+        ligne: collection.get(id),
+        creature: infosParId.get(id)
+      })).filter(x => x.creature)
+
+      afficherCollection()
+    }
+
+    function afficherCollection() {
+      const grille = document.getElementById('collection-grille')
+      grille.innerHTML = collectionDetaillee.map(({ ligne, creature }) => {
+        const infosRarete = RARETES[creature.rarete] ?? { label: creature.rarete, couleur: '#9ca3af' }
+        return `
+          <div class="creature-carte ${ligne.equipee ? 'equipee' : ''}" onclick="toggleEquipement('${creature.id}', ${ligne.equipee})">
+            <span class="creature-carte-tag" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
+            <img class="creature-carte-img" src="../pictures/${creature.image}" alt="${creature.nom}">
+            <span class="creature-carte-nom">${creature.nom}</span>
+            <span class="creature-carte-multi">x${Number(creature.multiplicateur).toFixed(2)}</span>
+            ${ligne.equipee ? '<span class="creature-carte-equipee-label">✓ Équipée</span>' : ''}
+          </div>`
+      }).join('')
+
+      const equipee = collectionDetaillee.find(x => x.ligne.equipee)
+      document.getElementById('equipee-info').textContent = equipee
+        ? `Équipée : ${equipee.creature.nom} (x${Number(equipee.creature.multiplicateur).toFixed(2)})`
+        : 'Aucune créature équipée'
+    }
+
+    window.toggleEquipement = async function(creatureId, estDejaEquipee) {
+      if (estDejaEquipee) {
+        await deseqiperCreature(userId)
+      } else {
+        await equiperCreature(userId, creatureId)
+      }
+      await rafraichirCollection()
+    }
+  </script>
+</body>
+</html>
