@@ -68,6 +68,13 @@
     .box-nom { font-weight: 700; }
     .box-prix { font-size: .85rem; color: var(--couleur-texte-faible); }
     .box-carte .btn { width: 100%; margin-top: .4rem; }
+    .box-carte .btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+      filter: grayscale(.4);
+    }
+    .box-carte .btn:disabled:hover { filter: grayscale(.4); }
+    .box-prix.insuffisant { color: #ef4444; font-weight: 600; }
 
     /* ===== Zone de résultat de tirage (point d'extension pour une future animation) ===== */
     .resultat-tirage {
@@ -503,6 +510,7 @@
       const { data } = await db.from('clicker').select('pieces_actuelles').eq('user_id', userId).single()
       pieces = data?.pieces_actuelles ?? 0
       document.getElementById('solde-pieces').textContent = pieces.toLocaleString('fr')
+      afficherBoxes()
     }
 
     async function sauvegarderSoldePieces() {
@@ -515,15 +523,17 @@
         grille.innerHTML = '<p class="collection-vide">Aucune loot box disponible pour le moment.</p>'
         return
       }
-      grille.innerHTML = lootBoxes.map(b => `
+      grille.innerHTML = lootBoxes.map(b => {
+        const abordable = pieces >= Number(b.prix)
+        return `
         <div class="box-carte">
           <button class="box-info-btn" onclick="ouvrirModalePool('${b.id}', '${b.nom.replace(/'/g,"\\'")}')">?</button>
           <img class="box-img" src="../pictures/${b.image}" alt="${b.nom}">
           <div class="box-nom">${b.nom}</div>
-          <div class="box-prix">${Number(b.prix).toLocaleString('fr')} pièces</div>
-          <button class="btn btn-primary" onclick="acheterBox('${b.id}')">Ouvrir</button>
-        </div>
-      `).join('')
+          <div class="box-prix ${abordable ? '' : 'insuffisant'}">${Number(b.prix).toLocaleString('fr')} pièces</div>
+          <button class="btn btn-primary" onclick="acheterBox('${b.id}')" ${abordable ? '' : 'disabled title="Pas assez de pièces"'}>Ouvrir</button>
+        </div>`
+      }).join('')
     }
 
     window.ouvrirModalePool = async function(lootBoxId, nom) {
@@ -597,6 +607,7 @@
 
       document.getElementById('solde-pieces').textContent = pieces.toLocaleString('fr')
       await sauvegarderSoldePieces()
+      afficherBoxes()
 
       // Point d'extension future animation : appeler ici une fonction
       // d'ouverture animée, puis afficherResultat(resultat) en callback.
