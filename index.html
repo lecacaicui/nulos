@@ -25,6 +25,51 @@
   </script>
 
   <style>body { visibility: hidden; }</style>
+  <style>
+    .annonces-zone {
+      text-align: left;
+      margin-bottom: 1.75rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--couleur-bordure);
+    }
+    .annonces-zone h2 {
+      font-size: 1rem;
+      color: var(--couleur-texte-faible);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    .annonces-liste-scroll {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+    }
+    .annonce-carte {
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+    }
+    .annonce-titre {
+      font-weight: 700;
+      font-size: .95rem;
+      margin-bottom: .35rem;
+    }
+    .annonce-contenu {
+      font-size: .85rem;
+      color: var(--couleur-texte);
+      white-space: pre-wrap;
+      margin-bottom: .5rem;
+    }
+    .annonce-meta {
+      font-size: .72rem;
+      color: var(--couleur-texte-faible);
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+  </style>
 </head>
 <body>
   <div id="header-placeholder"></div>
@@ -51,6 +96,12 @@
     <div class="centered" id="vue-connecte" style="display:none">
       <div class="card card-pages">
         <h1>Accueil</h1>
+
+        <div class="annonces-zone" id="annonces-zone" style="display:none">
+          <h2>📢 Annonces</h2>
+          <div id="annonces-liste"></div>
+        </div>
+
         <h2>Fonctionnalités disponibles</h2>
 
         <div class="pages-grid">
@@ -79,6 +130,7 @@
 
   <script type="module">
   import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
+  import { chargerAnnonces } from './script/annonces.js'
 
   ;(async () => {
   document.body.style.setProperty('visibility', 'visible', 'important')
@@ -88,7 +140,37 @@
 
   const connecte = !!localStorage.getItem('username')
   document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
+
+  if (connecte) {
+    await afficherAnnonces()
+  }
 })()
+
+  async function afficherAnnonces() {
+    const annonces = await chargerAnnonces()
+    if (annonces.length === 0) return
+
+    const zone = document.getElementById('annonces-zone')
+    zone.style.display = 'block'
+    document.getElementById('annonces-liste').innerHTML = `
+      <div class="annonces-liste-scroll">
+        ${annonces.map(a => `
+          <div class="annonce-carte">
+            <div class="annonce-titre">${a.titre}</div>
+            <div class="annonce-contenu">${a.contenu}</div>
+            <div class="annonce-meta">
+              <span>Par ${a.auteur_username}</span>
+              <span>· Créée le ${formaterDateAnnonce(a.date_creation)}</span>
+              <span>· Publiée le ${formaterDateAnnonce(a.date_publication)}</span>
+            </div>
+          </div>`).join('')}
+      </div>`
+  }
+
+  function formaterDateAnnonce(iso) {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
 </script>
 </body>
 </html>
