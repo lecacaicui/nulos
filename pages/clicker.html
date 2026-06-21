@@ -66,6 +66,14 @@
     .upgrade-cost { font-size: .9rem; font-weight: 600; color: var(--couleur-bouton); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
     .section-title { font-size: .8rem; font-weight: 600; color: var(--couleur-texte-faible); text-transform: uppercase; letter-spacing: .05em; align-self: flex-start; }
     .saving { font-size: .75rem; color: var(--couleur-texte-faible); }
+    .creature-equipee { background: var(--couleur-conteneur); border: 1px solid var(--couleur-bordure); border-radius: 12px; padding: 1rem 1.1rem; }
+    .creature-equipee-inner { display: flex; align-items: center; gap: .9rem; }
+    .creature-equipee-img { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
+    .creature-equipee-nom { font-size: .9rem; font-weight: 600; color: var(--couleur-texte); }
+    .creature-equipee-multi { font-size: .82rem; color: var(--couleur-bouton); font-weight: 700; margin-top: .15rem; }
+    .creature-equipee-aucune { font-size: .82rem; color: var(--couleur-texte-faible); }
+    .nav-page-link { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--couleur-bouton); text-decoration: none; padding: .35rem .75rem; border: 1px solid var(--couleur-bordure); border-radius: 7px; background: var(--couleur-conteneur); transition: filter .12s; align-self: flex-start; }
+    .nav-page-link:hover { filter: brightness(.93); }
     .upgrade-progress { width: 100%; height: 4px; background: var(--couleur-bordure); border-radius: 2px; overflow: hidden; margin-top: .4rem; }
     .upgrade-progress-bar { height: 100%; background: var(--couleur-bouton); border-radius: 2px; transition: width .1s linear; }
 
@@ -105,6 +113,7 @@
 
         <div class="col-ameliorations">
           <div class="section-title">Améliorations</div>
+          <a class="nav-page-link" href="loot_box.html">🎁 Voir les Loot Box</a>
 
           <!-- Amélioration 1 : Boost de rage -->
           <div class="upgrade-card disabled" id="upgrade-card" onclick="acheterUpgrade()">
@@ -161,6 +170,13 @@
             </div>
           </div>
 
+          <div class="creature-equipee">
+            <div class="classement-titre">⚔️ Créature équipée</div>
+            <div id="creature-equipee-contenu">
+              <div class="creature-equipee-aucune">Chargement…</div>
+            </div>
+          </div>
+
           <div class="classement">
             <div class="classement-titre">🏆 Top 5 — Total produit</div>
             <div id="classement-liste">
@@ -209,6 +225,7 @@
     let userId          = null
     let badgesObtenus   = new Set()
     let multiplicateurCreature = 1
+    let creatureEquipee = null
 
     async function chargerSauvegarde() {
       const { data: session } = await db.auth.getUser()
@@ -231,6 +248,30 @@
       majAffichage()
       document.getElementById('saving-status').textContent = 'Sauvegarde chargée'
       await chargerClassement()
+      await chargerCreatureEquipee()
+    }
+
+    async function chargerCreatureEquipee() {
+      const { data } = await db.from('creatures_utilisateurs')
+        .select('creatures(nom, image, multiplicateur, rarete)')
+        .eq('user_id', userId)
+        .eq('equipee', true)
+        .maybeSingle()
+
+      const el = document.getElementById('creature-equipee-contenu')
+      if (!data?.creatures) {
+        el.innerHTML = `<div class="creature-equipee-aucune">Aucune créature équipée — <a href="loot_box.html" style="color:var(--couleur-bouton);text-decoration:none;">ouvrir des loot box</a></div>`
+        return
+      }
+      const c = data.creatures
+      el.innerHTML = `
+        <div class="creature-equipee-inner">
+          <img class="creature-equipee-img" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=.3">
+          <div>
+            <div class="creature-equipee-nom">${c.nom}</div>
+            <div class="creature-equipee-multi">✕${Number(c.multiplicateur).toFixed(2)} sur la production</div>
+          </div>
+        </div>`
     }
 
     function recalculerEtat() {
