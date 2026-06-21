@@ -33,23 +33,27 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .6rem;
   position: sticky;
   top: 0;
   z-index: 100;
   transition: background .15s, border-color .15s;
 }
-.header-left { display: flex; align-items: center; gap: 1.25rem; }
+.header-left { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
 .header-logo {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--couleur-texte);
   text-decoration: none;
+  white-space: nowrap;
 }
 .header-logo:hover { color: var(--couleur-bouton); }
 .header-link {
   font-size: .9rem;
   color: var(--couleur-texte-faible);
   text-decoration: none;
+  white-space: nowrap;
 }
 .header-link:hover { color: var(--couleur-bouton); }
 .header-right {
@@ -57,6 +61,8 @@ header {
   align-items: center;
   gap: 1rem;
   font-size: .9rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .header-btn {
   padding: .4rem 1rem;
@@ -66,17 +72,36 @@ header {
   transition: filter .15s, background .15s;
   cursor: pointer;
   border: none;
+  white-space: nowrap;
 }
 .header-btn-primary { background: var(--couleur-bouton); color: white; }
 .header-btn-primary:hover { filter: brightness(0.88); }
 .header-btn-secondary { background: var(--couleur-bordure); color: var(--couleur-texte); }
 .header-btn-secondary:hover { filter: brightness(0.95); }
-.header-username { color: var(--couleur-texte-faible); font-size: .9rem; }
+.header-username { color: var(--couleur-texte-faible); font-size: .9rem; white-space: nowrap; }
 .header-tag {
   padding: .25rem .7rem;
   border-radius: 999px;
   font-size: .75rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ===== Header responsive (mobile/tablette) ===== */
+@media (max-width: 700px) {
+  header { padding: .75rem 1rem; gap: .5rem; }
+  .header-left { gap: .75rem; }
+  .header-right { gap: .5rem; }
+  .header-logo { font-size: 1rem; }
+  .header-link { font-size: .8rem; }
+  .header-btn { padding: .35rem .75rem; font-size: .8rem; }
+  .header-username { display: none; } /* le tag de niveau suffit, le pseudo prend de la place inutile */
+}
+@media (max-width: 480px) {
+  header { justify-content: center; }
+  .header-left, .header-right { justify-content: center; width: 100%; }
+  .header-tag { font-size: .68rem; padding: .2rem .55rem; }
+  .header-btn { padding: .3rem .6rem; font-size: .75rem; }
 }
 
 /* ===== Footer ===== */
