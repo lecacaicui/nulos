@@ -226,20 +226,38 @@
     let badgesObtenus   = new Set()
     let multiplicateurCreature = 1
     let creatureEquipee = null
+    const PLAFOND_SUR = 2_000_000_000 // reste sous la limite int4 de Postgres (~2.147 milliards)
+    let sauvegardeEnCours  = false
+    let sauvegardeRejouer  = false
 
     async function chargerSauvegarde() {
       const { data: session } = await db.auth.getUser()
       if (!session?.user) return
       userId = session.user.id
 
-      const { data } = await db.from('clicker').select('*').eq('user_id', userId).single()
+      const { data, error, count } = await db.from('clicker')
+        .select('*', { count: 'exact' })
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (error) {
+        // .maybeSingle() renvoie une erreur si la requête trouve PLUSIEURS lignes
+        // pour le même user_id (ne devrait jamais arriver si la contrainte unique
+        // sur user_id existe en BDD, mais on l'affiche clairement au lieu de
+        // laisser silencieusement tout à 0).
+        console.error('chargerSauvegarde a échoué :', error)
+        document.getElementById('saving-status').textContent =
+          '✗ Erreur de chargement — contactez un admin (voir console)'
+        return
+      }
+
       multiplicateurCreature = await chargerMultiplicateurEquipe(userId)
       if (data) {
-        pieces          = data.pieces_actuelles  ?? 0
-        totalProduit    = data.pieces_totales    ?? 0
-        totalClics      = data.total_clics       ?? 0
-        nbUpgrades      = data.nb_upgrades       ?? 0
-        nbAutoClickers  = data.nb_auto_clickers  ?? 0
+        pieces          = Number(data.pieces_actuelles) || 0
+        totalProduit    = Number(data.pieces_totales)   || 0
+        totalClics      = Number(data.total_clics)      || 0
+        nbUpgrades      = Number(data.nb_upgrades)       || 0
+        nbAutoClickers  = Number(data.nb_auto_clickers)  || 0
         recalculerEtat()
         if (nbAutoClickers > 0) demarrerAutoClicker()
       }
@@ -308,9 +326,9 @@
     }
 
     document.getElementById('btn-click').addEventListener('click', (e) => {
-      pieces       += parClic
-      totalProduit += parClic
-      totalClics   += 1
+      pieces       = Math.min(pieces       + parClic, PLAFOND_SUR)
+      totalProduit = Math.min(totalProduit + parClic, PLAFOND_SUR)
+      totalClics   = Math.min(totalClics   + 1,       PLAFOND_SUR)
       verifierBadgesClicker()
       majAffichage()
       afficherFloat(e, '+' + parClic)
@@ -349,8 +367,8 @@
         if (autoClickProgress >= total) {
           autoClickProgress = 0
           const gain = parClic * nbAutoClickers
-          pieces       += gain
-          totalProduit += gain
+          pieces       = Math.min(pieces       + gain, PLAFOND_SUR)
+          totalProduit = Math.min(totalProduit + gain, PLAFOND_SUR)
           verifierBadgesClicker()
           majAffichage()
           planifierSauvegarde()
@@ -378,12 +396,16 @@
       ring.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;`
       area.appendChild(ring)
       ring.addEventListener('animationend', () => ring.remove())
+      setTimeout(() => ring.remove(), 700) // filet de sécurité : si animationend ne se déclenche jamais
+      // (onglet en arrière-plan, prefers-reduced-motion…), l'élément reste en
+      // mémoire pour toujours — en cliquant beaucoup, ça finit par planter la page.
 
       const shock = document.createElement('div')
       shock.className = 'shockwave-ring'
       shock.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;animation-delay:.08s;`
       area.appendChild(shock)
       shock.addEventListener('animationend', () => shock.remove())
+      setTimeout(() => shock.remove(), 700)
     }
 
     function majAffichage() {
@@ -407,6 +429,7 @@
 
     function afficherFloat(e, texte) {
       const area = document.getElementById('click-area')
+      if (area.children.length > 40) return // voir le garde-fou dans animerClic
       const rect = area.getBoundingClientRect()
       const span = document.createElement('span')
       span.className = 'float'
@@ -415,6 +438,7 @@
       span.style.top  = (e.clientY - rect.top  - 20) + 'px'
       area.appendChild(span)
       span.addEventListener('animationend', () => span.remove())
+      setTimeout(() => span.remove(), 1000) // filet de sécurité, voir animerClicAuto
     }
 
     function animerClic(e) {
@@ -431,12 +455,19 @@
       btn.classList.add('clicking')
       btn.addEventListener('animationend', () => btn.classList.remove('clicking'), { once: true })
 
+      // Garde-fou anti-spam : au-delà de 40 effets visuels simultanés (clics
+      // extrêmement rapides, macro, etc.), on n'en crée plus de nouveaux tant
+      // que les précédents ne se sont pas résorbés — le clic compte toujours
+      // pour les pièces, seul l'effet graphique est sauté.
+      if (area.children.length > 40) return
+
       // Anneau ripple principal
       const ring = document.createElement('div')
       ring.className = 'ripple-ring'
       ring.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;`
       area.appendChild(ring)
       ring.addEventListener('animationend', () => ring.remove())
+      setTimeout(() => ring.remove(), 700)
 
       // Anneau shockwave décalé
       const shock = document.createElement('div')
@@ -444,6 +475,7 @@
       shock.style.cssText = `width:${size}px;height:${size}px;left:${cx - size/2}px;top:${cy - size/2}px;animation-delay:.08s;`
       area.appendChild(shock)
       shock.addEventListener('animationend', () => shock.remove())
+      setTimeout(() => shock.remove(), 700)
     }
 
     function planifierSauvegarde() {
@@ -486,16 +518,46 @@
 
     async function sauvegarder() {
       if (!userId) return
+
+      // Garde-fou anti-concurrence : si une sauvegarde est déjà en vol (réseau
+      // lent, clics très rapides qui redéclenchent planifierSauvegarde), on ne
+      // lance pas un second upsert en parallèle — un upsert concurrent sur la
+      // même ligne peut, selon le driver/la latence, créer un doublon ou une
+      // écriture incohérente. On note juste qu'il faudra resauvegarder ensuite.
+      if (sauvegardeEnCours) {
+        sauvegardeRejouer = true
+        return
+      }
+      sauvegardeEnCours = true
+
+      // Clamp + validation : un nombre invalide (NaN/Infinity, par exemple après
+      // un bug de calcul) ou hors limites ne doit jamais partir vers la BDD —
+      // ça provoquerait une erreur d'écriture silencieuse et, au pire, des
+      // lignes corrompues affichant 0 partout après reconnexion.
+      const verifier = (valeur, repli) => {
+        const n = Math.round(Number(valeur))
+        if (!Number.isFinite(n) || n < 0) return repli
+        return Math.min(n, PLAFOND_SUR)
+      }
+
       const payload = {
         user_id:           userId,
-        pieces_actuelles:  pieces,
-        pieces_totales:    totalProduit,
-        total_clics:       totalClics,
-        nb_upgrades:       nbUpgrades,
-        nb_auto_clickers:  nbAutoClickers
+        pieces_actuelles:  verifier(pieces, 0),
+        pieces_totales:    verifier(totalProduit, 0),
+        total_clics:       verifier(totalClics, 0),
+        nb_upgrades:       verifier(nbUpgrades, 0),
+        nb_auto_clickers:  verifier(nbAutoClickers, 0)
       }
+
       const { error } = await db.from('clicker').upsert(payload, { onConflict: 'user_id' })
       document.getElementById('saving-status').textContent = error ? '✗ Erreur de sauvegarde' : '✓ Sauvegardé'
+      if (error) console.error('sauvegarder a échoué :', error)
+
+      sauvegardeEnCours = false
+      if (sauvegardeRejouer) {
+        sauvegardeRejouer = false
+        planifierSauvegarde()
+      }
     }
   </script>
 </body>
