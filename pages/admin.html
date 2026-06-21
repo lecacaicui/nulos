@@ -23,9 +23,9 @@
     } catch(e) {}
   })();
   </script>
-
   <style>body { visibility: hidden; }</style>
   <style>
+    /* ===== Modales ===== */
     .modale-fond {
       display: none;
       position: fixed;
@@ -46,7 +46,7 @@
       width: 100%;
       position: relative;
       box-shadow: 0 8px 30px rgba(0,0,0,.25);
-      margin: 2rem 0;
+      margin: 2rem auto;
     }
     .modale-fermer {
       position: absolute;
@@ -81,14 +81,15 @@
       font-size: .85rem;
     }
     .ligne-composition:last-child { border-bottom: none; }
-    .ligne-composition .infos { display: flex; align-items: center; gap: .5rem; }
+    .ligne-composition .infos { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 
-    /* ===== Onglets d'administration ===== */
+    /* ===== Onglets ===== */
     .admin-onglets {
       display: flex;
       gap: .35rem;
       overflow-x: auto;
       scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
     }
     .onglet {
       display: flex;
@@ -109,10 +110,7 @@
       transition: color .15s, background .15s;
     }
     .onglet:hover { color: var(--couleur-texte); }
-    .onglet.actif {
-      background: var(--couleur-conteneur);
-      color: var(--couleur-texte);
-    }
+    .onglet.actif { background: var(--couleur-conteneur); color: var(--couleur-texte); }
     .onglet.actif::after {
       content: '';
       position: absolute;
@@ -122,16 +120,12 @@
       border-radius: 3px 3px 0 0;
     }
     .onglet-icone { font-size: 1.05rem; line-height: 1; }
-    .onglet-compteur {
-      font-size: .7rem;
-      font-weight: 700;
-      color: var(--couleur-texte-faible);
-      background: var(--couleur-bordure);
-      border-radius: 999px;
-      padding: .05rem .45rem;
+    .onglet-panneau { display: none; }
+    .onglet-panneau.actif { display: block; animation: onglet-apparait .12s ease-out; }
+    @keyframes onglet-apparait {
+      from { opacity: 0; transform: translateY(2px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    .onglet.actif .onglet-compteur { color: var(--couleur-texte); }
-
     .onglet-panneaux {
       background: var(--couleur-conteneur);
       border: 1px solid var(--couleur-bordure);
@@ -140,13 +134,88 @@
       margin-bottom: 2rem;
       transition: background .15s, border-color .15s;
     }
-    .onglet-panneau { display: none; }
-    .onglet-panneau.actif { display: block; animation: onglet-apparait .12s ease-out; }
-    @keyframes onglet-apparait {
-      from { opacity: 0; transform: translateY(2px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
     .onglet-panneau h2 { margin-bottom: .5rem; font-size: 1.1rem; }
+
+    /* ===== Barres de filtres ===== */
+    .filtres-bar {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin: 1rem 0;
+      padding: .9rem 1rem;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+    }
+    .filtres-bar label {
+      margin: 0 0 .2rem;
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--couleur-texte-faible);
+    }
+    .filtre-groupe { display: flex; flex-direction: column; }
+    .filtre-input {
+      padding: .4rem .7rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 7px;
+      font-size: .85rem;
+      background: var(--couleur-conteneur);
+      color: var(--couleur-texte);
+      min-width: 160px;
+    }
+    .filtre-input:focus { outline: none; border-color: var(--couleur-bouton); }
+    .filtre-select {
+      padding: .4rem .6rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 7px;
+      font-size: .85rem;
+      background: var(--couleur-conteneur);
+      color: var(--couleur-texte);
+      cursor: pointer;
+    }
+    .filtre-reset {
+      padding: .4rem .8rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 7px;
+      font-size: .8rem;
+      background: none;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      align-self: flex-end;
+    }
+    .filtre-reset:hover { color: var(--couleur-texte); border-color: var(--couleur-texte); }
+    .filtres-compteur { font-size: .8rem; color: var(--couleur-texte-faible); align-self: flex-end; margin-left: auto; white-space: nowrap; }
+
+    /* ===== En-têtes de tableau triables ===== */
+    .th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+    .th-sort:hover { color: var(--couleur-bouton); }
+    .th-sort .sort-arrow { font-size: .7rem; margin-left: .25rem; opacity: .4; }
+    .th-sort.actif .sort-arrow { opacity: 1; color: var(--couleur-bouton); }
+
+    /* ===== Table responsive ===== */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* ===== Responsive général ===== */
+    @media (max-width: 768px) {
+      .main-admin { padding: 1rem 1rem 5rem; }
+      .page-header { flex-direction: column; align-items: flex-start; gap: .75rem; }
+      .page-header h1 { font-size: 1.4rem; }
+      .onglet { padding: .6rem .9rem; font-size: .8rem; }
+      .onglet-panneaux { padding: 1rem; }
+      .filtres-bar { flex-direction: column; gap: .6rem; }
+      .filtre-input, .filtre-select { width: 100%; min-width: unset; }
+      .filtres-compteur { margin-left: 0; }
+      .row-actions { flex-wrap: wrap; }
+      table { min-width: 480px; }
+      .theme-grid { flex-direction: column; gap: 1rem; }
+      .modale-admin { padding: 1.5rem 1rem; margin: 1rem auto; }
+    }
+    @media (max-width: 480px) {
+      .onglet-icone { display: none; }
+      table { min-width: 400px; }
+      td, th { padding: .5rem .5rem; font-size: .82rem; }
+    }
   </style>
 </head>
 <body>
@@ -164,6 +233,7 @@
         </div>
         <span class="badge" id="badge-role">Admin</span>
       </div>
+
       <div class="admin-onglets" id="admin-onglets">
         <button class="onglet actif" data-onglet="utilisateurs" onclick="ouvrirOnglet('utilisateurs')">
           <span class="onglet-icone">👤</span> Utilisateurs
@@ -181,17 +251,56 @@
 
       <div class="onglet-panneaux">
 
+        <!-- ===== Onglet Utilisateurs ===== -->
         <div class="onglet-panneau actif" data-panneau="utilisateurs">
           <h2>👤 Comptes utilisateurs</h2>
-          <p class="note-verrouille" style="margin-bottom:1rem;">Gérez le niveau d'accès des comptes du site, ou supprimez-en un.</p>
-          <table>
-            <thead>
-              <tr><th>Nom d'utilisateur</th><th>Niveau actuel</th><th>Changer le niveau</th><th>Action</th></tr>
-            </thead>
-            <tbody id="tbody"></tbody>
-          </table>
+          <p class="note-verrouille">Gérez le niveau d'accès des comptes du site, ou supprimez-en un.</p>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="u-filtre-nom" placeholder="Nom d'utilisateur…" oninput="appliquerFiltresUsers()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Niveau</label>
+              <select class="filtre-select" id="u-filtre-niveau" onchange="appliquerFiltresUsers()">
+                <option value="">Tous les niveaux</option>
+                <option value="commun">Commun</option>
+                <option value="plus">Plus</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="u-tri" onchange="appliquerFiltresUsers()">
+                <option value="username-asc">Nom A→Z</option>
+                <option value="username-desc">Nom Z→A</option>
+                <option value="niveau-asc">Niveau ↑</option>
+                <option value="niveau-desc">Niveau ↓</option>
+                <option value="badges-desc">Badges (plus)</option>
+                <option value="badges-asc">Badges (moins)</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresUsers()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="u-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nom d'utilisateur</th>
+                  <th>Niveau actuel</th>
+                  <th>Badges</th>
+                  <th>Changer le niveau</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
         </div>
 
+        <!-- ===== Onglet Thème ===== -->
         <div class="onglet-panneau" data-panneau="theme" id="theme-card">
           <h2>🎨 Thème du site</h2>
           <p class="note-verrouille">Couleurs utilisées sur tout le site. Choisissez un préréglage ou personnalisez chaque couleur, puis cliquez sur "Appliquer" pour enregistrer.</p>
@@ -224,39 +333,113 @@
           </div>
         </div>
 
+        <!-- ===== Onglet Créatures ===== -->
         <div class="onglet-panneau" data-panneau="creatures" id="creatures-card">
           <h2>🐾 Créatures</h2>
-          <p class="note-verrouille">Gérez les créatures obtenables dans les loot box : image, rareté, multiplicateur de production, prix de revente en cas de doublon.</p>
-          <div class="row-actions" style="margin:1rem 0;">
+          <p class="note-verrouille">Gérez les créatures obtenables dans les loot box.</p>
+          <div class="row-actions" style="margin:.75rem 0;">
             <button class="btn-save" onclick="ouvrirFormCreature(null)">+ Nouvelle créature</button>
           </div>
-          <table>
-            <thead>
-              <tr><th>Image</th><th>Nom</th><th>Rareté</th><th>Multiplicateur</th><th>Prix revente</th><th>Statut</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="tbody-creatures"></tbody>
-          </table>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="c-filtre-nom" placeholder="Nom de la créature…" oninput="appliquerFiltresCreatures()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Rareté</label>
+              <select class="filtre-select" id="c-filtre-rarete" onchange="appliquerFiltresCreatures()">
+                <option value="">Toutes</option>
+                <option value="commun">Commun</option>
+                <option value="rare">Rare</option>
+                <option value="epique">Épique</option>
+                <option value="legendaire">Légendaire</option>
+                <option value="cosmique">Cosmique</option>
+                <option value="secret">Secret</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="c-filtre-statut" onchange="appliquerFiltresCreatures()">
+                <option value="">Tous</option>
+                <option value="actif">Active</option>
+                <option value="inactif">Désactivée</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="c-tri" onchange="appliquerFiltresCreatures()">
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="rarete-asc">Rareté ↑</option>
+                <option value="rarete-desc">Rareté ↓</option>
+                <option value="multiplicateur-desc">Multiplicateur ↓</option>
+                <option value="multiplicateur-asc">Multiplicateur ↑</option>
+                <option value="prix_vente-desc">Prix revente ↓</option>
+                <option value="prix_vente-asc">Prix revente ↑</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresCreatures()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="c-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>Rareté</th><th>Multiplicateur</th><th>Prix revente</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-creatures"></tbody>
+            </table>
+          </div>
         </div>
 
+        <!-- ===== Onglet Loot Box ===== -->
         <div class="onglet-panneau" data-panneau="lootbox" id="lootbox-card">
           <h2>🎁 Loot Box</h2>
-          <p class="note-verrouille">Gérez les loot box disponibles : prix, image, et composition (créatures + poids de tirage).</p>
-          <div class="row-actions" style="margin:1rem 0;">
+          <p class="note-verrouille">Gérez les loot box disponibles : prix, image, et composition.</p>
+          <div class="row-actions" style="margin:.75rem 0;">
             <button class="btn-save" onclick="ouvrirFormLootBox(null)">+ Nouvelle loot box</button>
           </div>
-          <table>
-            <thead>
-              <tr><th>Image</th><th>Nom</th><th>Prix</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="tbody-lootboxes"></tbody>
-          </table>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="lb-filtre-nom" placeholder="Nom de la loot box…" oninput="appliquerFiltresLootBoxes()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="lb-filtre-statut" onchange="appliquerFiltresLootBoxes()">
+                <option value="">Tous</option>
+                <option value="actif">Active</option>
+                <option value="inactif">Désactivée</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="lb-tri" onchange="appliquerFiltresLootBoxes()">
+                <option value="ordre-asc">Ordre ↑</option>
+                <option value="ordre-desc">Ordre ↓</option>
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="prix-asc">Prix ↑</option>
+                <option value="prix-desc">Prix ↓</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresLootBoxes()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="lb-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>Prix</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-lootboxes"></tbody>
+            </table>
+          </div>
         </div>
 
       </div>
     </div>
   </main>
 
-  <!-- ===== Modale Créature (création / édition) ===== -->
+  <!-- ===== Modale Créature ===== -->
   <div class="modale-fond" id="modale-creature-fond" onclick="if(event.target===this) fermerModaleCreature()">
     <div class="modale-admin">
       <button class="modale-fermer" onclick="fermerModaleCreature()">✕</button>
@@ -285,7 +468,7 @@
     </div>
   </div>
 
-  <!-- ===== Modale Loot Box (création / édition + composition) ===== -->
+  <!-- ===== Modale Loot Box ===== -->
   <div class="modale-fond" id="modale-lootbox-fond" onclick="if(event.target===this) fermerModaleLootBox()">
     <div class="modale-admin">
       <button class="modale-fermer" onclick="fermerModaleLootBox()">✕</button>
@@ -302,12 +485,11 @@
       <input type="number" id="lb-ordre" step="1" placeholder="1">
       <button class="btn btn-primary btn-full" onclick="sauvegarderLootBox()">Enregistrer</button>
       <div class="msg-inline" id="msg-modale-lootbox"></div>
-
       <div id="composition-lootbox" style="display:none; margin-top:1.5rem; text-align:left;">
         <h3 style="font-size:.95rem; margin-bottom:.5rem;">Composition (créatures de cette boîte)</h3>
         <div id="liste-composition"></div>
-        <div class="row-actions" style="margin-top:.75rem;">
-          <select id="ajout-creature-select" style="flex:1;"></select>
+        <div class="row-actions" style="margin-top:.75rem; flex-wrap:wrap;">
+          <select id="ajout-creature-select" style="flex:1; min-width:140px;"></select>
           <input type="number" id="ajout-creature-poids" value="10" min="0.01" step="0.01" style="width:80px;" placeholder="poids">
           <button class="btn-save" onclick="ajouterCreatureALaBox()">Ajouter</button>
         </div>
@@ -316,6 +498,7 @@
   </div>
 
   <div id="footer-placeholder"></div>
+
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs, invaliderCacheTheme } from '../script/header.js'
@@ -327,6 +510,9 @@
     } from '../script/lootbox.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
+
+    const NIVEAUX_ORDRE = { commun: 0, plus: 1, admin: 2, super_admin: 3 }
+    const RARETES_ORDRE = { commun: 0, rare: 1, epique: 2, legendaire: 3, cosmique: 4, secret: 5 }
 
     const PRESETS = {
       clair:  { couleur_fond: '#f5f5f5', couleur_conteneur: '#ffffff', couleur_bordure: '#e5e7eb', couleur_bouton: '#2563eb' },
@@ -347,10 +533,9 @@
 
     ;(async () => {
       document.body.style.setProperty('visibility', 'visible', 'important')
-      appliquerTheme()  // arrière-plan
+      appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
-
       if (monNiveau !== 'admin' && monNiveau !== 'super_admin') {
         document.getElementById('acces-refuse').style.display = 'block'
       } else {
@@ -402,14 +587,52 @@
       return { modifiable: false, options: [] }
     }
 
+    // ===== Utilisateurs =====
+    let utilisateursCache = []
+    let badgesParUser = {}
+
     async function chargerUtilisateurs() {
       const { data, error } = await db.from('profils').select('*').order('username')
       if (error) return
+      utilisateursCache = data
+
+      const { data: bdg } = await db.from('badges_utilisateurs').select('user_id')
+      badgesParUser = {}
+      bdg?.forEach(b => { badgesParUser[b.user_id] = (badgesParUser[b.user_id] ?? 0) + 1 })
+
+      appliquerFiltresUsers()
+    }
+
+    window.appliquerFiltresUsers = function() {
+      const recherche = document.getElementById('u-filtre-nom').value.trim().toLowerCase()
+      const niveau    = document.getElementById('u-filtre-niveau').value
+      const tri       = document.getElementById('u-tri').value
+
+      let data = utilisateursCache.filter(u => {
+        if (recherche && !u.username.toLowerCase().includes(recherche)) return false
+        if (niveau && u.niveau !== niveau) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'username') { va = a.username.toLowerCase(); vb = b.username.toLowerCase() }
+        else if (champ === 'niveau') { va = NIVEAUX_ORDRE[a.niveau] ?? 0; vb = NIVEAUX_ORDRE[b.niveau] ?? 0 }
+        else if (champ === 'badges') { va = badgesParUser[a.user_id] ?? 0; vb = badgesParUser[b.user_id] ?? 0 }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('u-compteur').textContent = data.length + ' / ' + utilisateursCache.length + ' utilisateur(s)'
+      afficherUtilisateurs(data)
+    }
+
+    function afficherUtilisateurs(data) {
       const tbody = document.getElementById('tbody')
-      tbody.innerHTML = ''
-      data.forEach(u => {
+      tbody.innerHTML = data.map(u => {
         const tagClass = tagClassPour(u.niveau)
         const perm = permissions(u)
+        const nbBadges = badgesParUser[u.user_id] ?? 0
         const cellSelect = perm.modifiable
           ? `<select id="sel-${u.id}">${perm.options.map(o => `<option value="${o}" ${u.niveau === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`
           : `<span class="note-verrouille">— non modifiable —</span>`
@@ -420,14 +643,21 @@
                <span class="msg-inline" id="msg-${u.id}"></span>
              </div>`
           : ''
-        tbody.innerHTML += `
-          <tr>
-            <td>${u.username}</td>
-            <td><span class="tag ${tagClass}">${u.niveau}</span></td>
-            <td>${cellSelect}</td>
-            <td>${cellAction}</td>
-          </tr>`
-      })
+        return `<tr>
+          <td>${u.username}</td>
+          <td><span class="tag ${tagClass}">${u.niveau}</span></td>
+          <td>${nbBadges > 0 ? '🏅 ' + nbBadges : '<span class="note-verrouille">0</span>'}</td>
+          <td>${cellSelect}</td>
+          <td>${cellAction}</td>
+        </tr>`
+      }).join('') || '<tr><td colspan="5" class="note-verrouille">Aucun utilisateur trouvé.</td></tr>'
+    }
+
+    window.resetFiltresUsers = function() {
+      document.getElementById('u-filtre-nom').value = ''
+      document.getElementById('u-filtre-niveau').value = ''
+      document.getElementById('u-tri').value = 'username-asc'
+      appliquerFiltresUsers()
     }
 
     window.sauvegarder = async function(id) {
@@ -446,6 +676,7 @@
       else { chargerUtilisateurs() }
     }
 
+    // ===== Thème =====
     async function chargerTheme() {
       const { data, error } = await db.from('theme')
         .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
@@ -475,34 +706,67 @@
       }
     }
 
-    // ===========================================================================
-    // ===== Gestion des créatures =====
-    // ===========================================================================
+    // ===== Créatures =====
     let creaturesCache = []
-    let creatureEnEdition = null  // id de la créature en cours d'édition, ou null = création
+    let creatureEnEdition = null
 
     async function chargerCreatures() {
       creaturesCache = await adminListerCreatures()
+      appliquerFiltresCreatures()
+    }
+
+    window.appliquerFiltresCreatures = function() {
+      const recherche = document.getElementById('c-filtre-nom').value.trim().toLowerCase()
+      const rarete    = document.getElementById('c-filtre-rarete').value
+      const statut    = document.getElementById('c-filtre-statut').value
+      const tri       = document.getElementById('c-tri').value
+
+      let data = creaturesCache.filter(c => {
+        if (recherche && !c.nom.toLowerCase().includes(recherche)) return false
+        if (rarete && c.rarete !== rarete) return false
+        if (statut === 'actif' && !c.actif) return false
+        if (statut === 'inactif' && c.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'rarete') { va = RARETES_ORDRE[a.rarete] ?? 0; vb = RARETES_ORDRE[b.rarete] ?? 0 }
+        else if (champ === 'multiplicateur') { va = Number(a.multiplicateur); vb = Number(b.multiplicateur) }
+        else if (champ === 'prix_vente') { va = Number(a.prix_vente); vb = Number(b.prix_vente) }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('c-compteur').textContent = data.length + ' / ' + creaturesCache.length + ' créature(s)'
       const tbody = document.getElementById('tbody-creatures')
-      tbody.innerHTML = creaturesCache.map(c => {
+      tbody.innerHTML = data.map(c => {
         const infosRarete = RARETES[c.rarete] ?? { label: c.rarete, couleur: '#9ca3af' }
-        return `
-          <tr>
-            <td><img class="img-mini" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=0.2"></td>
-            <td>${c.nom}</td>
-            <td><span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span></td>
-            <td>x${Number(c.multiplicateur).toFixed(2)}</td>
-            <td>${Number(c.prix_vente).toLocaleString('fr')}</td>
-            <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
-            <td>
-              <div class="row-actions">
-                <button class="btn-save" onclick="ouvrirFormCreature('${c.id}')">Modifier</button>
-                <button class="btn-preset" onclick="toggleActifCreature('${c.id}', ${c.actif})">${c.actif ? 'Désactiver' : 'Activer'}</button>
-                <button class="btn-delete" onclick="supprimerCreature('${c.id}', '${c.nom}')">Supprimer</button>
-              </div>
-            </td>
-          </tr>`
-      }).join('') || '<tr><td colspan="7" class="note-verrouille">Aucune créature pour le moment.</td></tr>'
+        return `<tr>
+          <td><img class="img-mini" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=0.2"></td>
+          <td>${c.nom}</td>
+          <td><span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span></td>
+          <td>x${Number(c.multiplicateur).toFixed(2)}</td>
+          <td>${Number(c.prix_vente).toLocaleString('fr')}</td>
+          <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn-save" onclick="ouvrirFormCreature('${c.id}')">Modifier</button>
+              <button class="btn-preset" onclick="toggleActifCreature('${c.id}', ${c.actif})">${c.actif ? 'Désactiver' : 'Activer'}</button>
+              <button class="btn-delete" onclick="supprimerCreature('${c.id}', '${c.nom}')">Supprimer</button>
+            </div>
+          </td>
+        </tr>`
+      }).join('') || '<tr><td colspan="7" class="note-verrouille">Aucune créature trouvée.</td></tr>'
+    }
+
+    window.resetFiltresCreatures = function() {
+      document.getElementById('c-filtre-nom').value = ''
+      document.getElementById('c-filtre-rarete').value = ''
+      document.getElementById('c-filtre-statut').value = ''
+      document.getElementById('c-tri').value = 'nom-asc'
+      appliquerFiltresCreatures()
     }
 
     window.ouvrirFormCreature = function(id) {
@@ -510,7 +774,7 @@
       const c = id ? creaturesCache.find(x => x.id === id) : null
       document.getElementById('titre-modale-creature').textContent = id ? 'Modifier la créature' : 'Nouvelle créature'
       document.getElementById('c-id').value = c?.id ?? ''
-      document.getElementById('c-id').disabled = !!id  // id non modifiable après création
+      document.getElementById('c-id').disabled = !!id
       document.getElementById('c-nom').value = c?.nom ?? ''
       document.getElementById('c-rarete').value = c?.rarete ?? 'commun'
       document.getElementById('c-multiplicateur').value = c?.multiplicateur ?? '1.10'
@@ -532,21 +796,14 @@
       const image = document.getElementById('c-image').value.trim()
       const prix_vente = parseInt(document.getElementById('c-prix-vente').value) || 0
       const msgEl = document.getElementById('msg-modale-creature')
-
       if (!id || !nom || !image || isNaN(multiplicateur)) {
         msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
         msgEl.className = 'msg-inline err'
         return
       }
-
       const { ok, error } = await adminSauvegarderCreature({ id, nom, rarete, multiplicateur, image, prix_vente, actif: true })
-      if (!ok) {
-        msgEl.textContent = '✗ Erreur : ' + (error?.message ?? '')
-        msgEl.className = 'msg-inline err'
-        return
-      }
-      msgEl.textContent = '✓ Enregistré'
-      msgEl.className = 'msg-inline ok'
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
       await chargerCreatures()
       setTimeout(() => fermerModaleCreature(), 500)
     }
@@ -562,30 +819,59 @@
       await chargerCreatures()
     }
 
-    // ===========================================================================
-    // ===== Gestion des loot box =====
-    // ===========================================================================
+    // ===== Loot Box =====
     let lootBoxesCache = []
     let lootBoxEnEdition = null
 
     async function chargerLootBoxesAdmin() {
       lootBoxesCache = await adminListerLootBoxes()
+      appliquerFiltresLootBoxes()
+    }
+
+    window.appliquerFiltresLootBoxes = function() {
+      const recherche = document.getElementById('lb-filtre-nom').value.trim().toLowerCase()
+      const statut    = document.getElementById('lb-filtre-statut').value
+      const tri       = document.getElementById('lb-tri').value
+
+      let data = lootBoxesCache.filter(b => {
+        if (recherche && !b.nom.toLowerCase().includes(recherche)) return false
+        if (statut === 'actif' && !b.actif) return false
+        if (statut === 'inactif' && b.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'prix') { va = Number(a.prix); vb = Number(b.prix) }
+        else if (champ === 'ordre') { va = Number(a.ordre); vb = Number(b.ordre) }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('lb-compteur').textContent = data.length + ' / ' + lootBoxesCache.length + ' loot box'
       const tbody = document.getElementById('tbody-lootboxes')
-      tbody.innerHTML = lootBoxesCache.map(b => `
-        <tr>
-          <td><img class="img-mini" src="../pictures/${b.image}" alt="${b.nom}" onerror="this.style.opacity=0.2"></td>
-          <td>${b.nom}</td>
-          <td>${Number(b.prix).toLocaleString('fr')}</td>
-          <td>${b.ordre}</td>
-          <td>${b.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
-          <td>
-            <div class="row-actions">
-              <button class="btn-save" onclick="ouvrirFormLootBox('${b.id}')">Modifier</button>
-              <button class="btn-preset" onclick="toggleActifLootBox('${b.id}', ${b.actif})">${b.actif ? 'Désactiver' : 'Activer'}</button>
-              <button class="btn-delete" onclick="supprimerLootBox('${b.id}', '${b.nom}')">Supprimer</button>
-            </div>
-          </td>
-        </tr>`).join('') || '<tr><td colspan="6" class="note-verrouille">Aucune loot box pour le moment.</td></tr>'
+      tbody.innerHTML = data.map(b => `<tr>
+        <td><img class="img-mini" src="../pictures/${b.image}" alt="${b.nom}" onerror="this.style.opacity=0.2"></td>
+        <td>${b.nom}</td>
+        <td>${Number(b.prix).toLocaleString('fr')}</td>
+        <td>${b.ordre}</td>
+        <td>${b.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormLootBox('${b.id}')">Modifier</button>
+            <button class="btn-preset" onclick="toggleActifLootBox('${b.id}', ${b.actif})">${b.actif ? 'Désactiver' : 'Activer'}</button>
+            <button class="btn-delete" onclick="supprimerLootBox('${b.id}', '${b.nom}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="6" class="note-verrouille">Aucune loot box trouvée.</td></tr>'
+    }
+
+    window.resetFiltresLootBoxes = function() {
+      document.getElementById('lb-filtre-nom').value = ''
+      document.getElementById('lb-filtre-statut').value = ''
+      document.getElementById('lb-tri').value = 'ordre-asc'
+      appliquerFiltresLootBoxes()
     }
 
     window.ouvrirFormLootBox = async function(id) {
@@ -599,7 +885,6 @@
       document.getElementById('lb-image').value = b?.image ?? ''
       document.getElementById('lb-ordre').value = b?.ordre ?? (lootBoxesCache.length + 1)
       document.getElementById('msg-modale-lootbox').textContent = ''
-
       const compoEl = document.getElementById('composition-lootbox')
       if (id) {
         compoEl.style.display = 'block'
@@ -608,7 +893,6 @@
       } else {
         compoEl.style.display = 'none'
       }
-
       document.getElementById('modale-lootbox-fond').classList.add('ouverte')
     }
 
@@ -623,28 +907,17 @@
       const image = document.getElementById('lb-image').value.trim()
       const ordre = parseInt(document.getElementById('lb-ordre').value) || 0
       const msgEl = document.getElementById('msg-modale-lootbox')
-
       if (!id || !nom || !image || isNaN(prix)) {
         msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
         msgEl.className = 'msg-inline err'
         return
       }
-
       const nouvelleCreation = !lootBoxEnEdition
       const { ok, error } = await adminSauvegarderLootBox({ id, nom, prix, image, ordre, actif: true })
-      if (!ok) {
-        msgEl.textContent = '✗ Erreur : ' + (error?.message ?? '')
-        msgEl.className = 'msg-inline err'
-        return
-      }
-      msgEl.textContent = '✓ Enregistré'
-      msgEl.className = 'msg-inline ok'
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
       await chargerLootBoxesAdmin()
-
-      if (nouvelleCreation) {
-        // On rouvre directement en mode édition pour permettre d'ajouter des créatures
-        setTimeout(() => ouvrirFormLootBox(id), 400)
-      }
+      if (nouvelleCreation) setTimeout(() => ouvrirFormLootBox(id), 400)
     }
 
     window.toggleActifLootBox = async function(id, actifActuel) {
@@ -658,23 +931,21 @@
       await chargerLootBoxesAdmin()
     }
 
-    // ===== Composition d'une loot box (créatures + poids) =====
     async function rafraichirComposition(lootBoxId) {
       const liaisons = await adminListerLiaisons(lootBoxId)
       const liste = document.getElementById('liste-composition')
       liste.innerHTML = liaisons.map(l => {
         const infosRarete = RARETES[l.creatures?.rarete] ?? { label: l.creatures?.rarete, couleur: '#9ca3af' }
-        return `
-          <div class="ligne-composition">
-            <div class="infos">
-              <img class="img-mini" src="../pictures/${l.creatures?.image}" alt="" onerror="this.style.opacity=0.2">
-              <span>${l.creatures?.nom ?? l.creature_id}</span>
-              <span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
-              <span class="note-verrouille">poids ${l.poids}</span>
-            </div>
-            <button class="btn-delete" onclick="retirerCreatureDeLaBox('${lootBoxId}', '${l.creature_id}')">Retirer</button>
-          </div>`
-      }).join('') || '<p class="note-verrouille">Aucune créature dans cette boîte pour le moment.</p>'
+        return `<div class="ligne-composition">
+          <div class="infos">
+            <img class="img-mini" src="../pictures/${l.creatures?.image}" alt="" onerror="this.style.opacity=0.2">
+            <span>${l.creatures?.nom ?? l.creature_id}</span>
+            <span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
+            <span class="note-verrouille">poids ${l.poids}</span>
+          </div>
+          <button class="btn-delete" onclick="retirerCreatureDeLaBox('${lootBoxId}', '${l.creature_id}')">Retirer</button>
+        </div>`
+      }).join('') || '<p class="note-verrouille">Aucune créature dans cette boîte.</p>'
     }
 
     function remplirSelectCreaturesDispo(lootBoxId) {
