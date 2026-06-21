@@ -223,7 +223,7 @@
     let autoClickProgress = 0
     let saveTimer       = null
     let userId          = null
-    let badgesObtenus   = new Set()
+    let badgesObtenus   = new Map()
     let multiplicateurCreature = 1
     let creatureEquipee = null
     const PLAFOND_SUR = 2_000_000_000 // reste sous la limite int4 de Postgres (~2.147 milliards)
@@ -319,7 +319,7 @@
       ]
       for (const [seuil, badgeId] of PALIERS) {
         if (totalProduit >= seuil && !badgesObtenus.has(badgeId)) {
-          badgesObtenus.add(badgeId)
+          badgesObtenus.set(badgeId, new Date().toISOString())
           debloquerBadge(userId, badgeId)
         }
       }
