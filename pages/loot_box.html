@@ -167,7 +167,10 @@
       <h1>Loot Box</h1>
       <p class="subtitle">Ouvrez des loot box avec vos pièces pour obtenir des créatures qui boostent votre production.</p>
 
-      <div class="lootbox-solde">💰 <span id="solde-pieces">0</span> pièces</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; margin-bottom:1.25rem;">
+        <div class="lootbox-solde">💰 <span id="solde-pieces">0</span> pièces</div>
+        <a href="clicker.html" style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--couleur-bouton);text-decoration:none;padding:.35rem .8rem;border:1px solid var(--couleur-bordure);border-radius:7px;background:var(--couleur-conteneur);transition:filter .12s;" onmouseover="this.style.filter='brightness(.93)'" onmouseout="this.style.filter=''">← Retour au Clicker</a>
+      </div>
 
       <div class="boxes-grille" id="boxes-grille">
         <p class="collection-vide">Chargement des loot box…</p>
