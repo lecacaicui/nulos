@@ -247,6 +247,9 @@
         <button class="onglet" id="onglet-lootbox" data-onglet="lootbox" onclick="ouvrirOnglet('lootbox')" style="display:none">
           <span class="onglet-icone">🎁</span> Loot Box
         </button>
+        <button class="onglet" data-onglet="annonces" onclick="ouvrirOnglet('annonces')">
+          <span class="onglet-icone">📢</span> Annonces
+        </button>
       </div>
 
       <div class="onglet-panneaux">
@@ -435,6 +438,42 @@
           </div>
         </div>
 
+        <!-- ===== Onglet Annonces ===== -->
+        <div class="onglet-panneau" data-panneau="annonces">
+          <h2>📢 Annonces</h2>
+          <p class="note-verrouille">Gérez les messages affichés sur la page d'accueil. Les administrateurs et super administrateurs peuvent en publier.</p>
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormAnnonce(null)">+ Nouvelle annonce</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="a-filtre-titre" placeholder="Titre de l'annonce…" oninput="appliquerFiltresAnnonces()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="a-tri" onchange="appliquerFiltresAnnonces()">
+                <option value="date_publication-desc">Dernière publication ↓</option>
+                <option value="date_publication-asc">Dernière publication ↑</option>
+                <option value="date_creation-desc">Date de création ↓</option>
+                <option value="date_creation-asc">Date de création ↑</option>
+                <option value="titre-asc">Titre A→Z</option>
+                <option value="titre-desc">Titre Z→A</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresAnnonces()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="a-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Titre</th><th>Auteur</th><th>Créée le</th><th>Dernière publication</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-annonces"></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   </main>
@@ -497,6 +536,23 @@
     </div>
   </div>
 
+  <!-- ===== Modale Annonce ===== -->
+  <div class="modale-fond" id="modale-annonce-fond" onclick="if(event.target===this) fermerModaleAnnonce()">
+    <div class="modale-admin">
+      <button class="modale-fermer" onclick="fermerModaleAnnonce()">✕</button>
+      <h2 id="titre-modale-annonce">Nouvelle annonce</h2>
+      <input type="hidden" id="a-id">
+      <label for="a-titre">Titre</label>
+      <input type="text" id="a-titre" placeholder="ex: Maintenance prévue ce week-end">
+      <label for="a-contenu">Contenu</label>
+      <textarea id="a-contenu" rows="5" placeholder="Détails de l'annonce…"
+        style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.9rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:inherit;"></textarea>
+      <p class="note-verrouille" id="a-meta" style="margin-top:.5rem;"></p>
+      <button class="btn btn-primary btn-full" onclick="sauvegarderAnnonce()">Enregistrer</button>
+      <div class="msg-inline" id="msg-modale-annonce"></div>
+    </div>
+  </div>
+
   <div id="footer-placeholder"></div>
 
   <script type="module">
@@ -508,6 +564,9 @@
       adminListerLootBoxes, adminSauvegarderLootBox, adminToggleActifLootBox, adminSupprimerLootBox,
       adminListerLiaisons, adminAjouterCreatureBox, adminRetirerCreatureBox
     } from '../script/lootbox.js'
+    import {
+      adminListerAnnonces, adminSauvegarderAnnonce, adminSupprimerAnnonce
+    } from '../script/annonces.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
@@ -559,6 +618,7 @@
         chargerLootBoxesAdmin()
       }
       chargerUtilisateurs()
+      chargerAnnoncesAdmin()
     }
 
     window.ouvrirOnglet = function(nom) {
@@ -967,6 +1027,102 @@
     window.retirerCreatureDeLaBox = async function(lootBoxId, creatureId) {
       await adminRetirerCreatureBox(lootBoxId, creatureId)
       await rafraichirComposition(lootBoxId)
+    }
+
+    // ===== Annonces =====
+    let annoncesCache = []
+    let annonceEnEdition = null
+
+    async function chargerAnnoncesAdmin() {
+      annoncesCache = await adminListerAnnonces()
+      appliquerFiltresAnnonces()
+    }
+
+    function formaterDate(iso) {
+      if (!iso) return '—'
+      return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    }
+
+    window.appliquerFiltresAnnonces = function() {
+      const recherche = document.getElementById('a-filtre-titre').value.trim().toLowerCase()
+      const tri       = document.getElementById('a-tri').value
+
+      let data = annoncesCache.filter(a => {
+        if (recherche && !a.titre.toLowerCase().includes(recherche)) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'titre') { va = a.titre.toLowerCase(); vb = b.titre.toLowerCase() }
+        else if (champ === 'date_creation') { va = new Date(a.date_creation).getTime(); vb = new Date(b.date_creation).getTime() }
+        else { va = new Date(a.date_publication).getTime(); vb = new Date(b.date_publication).getTime() }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('a-compteur').textContent = data.length + ' / ' + annoncesCache.length + ' annonce(s)'
+      const tbody = document.getElementById('tbody-annonces')
+      tbody.innerHTML = data.map(a => `<tr>
+        <td>${a.titre}</td>
+        <td>${a.auteur_username}</td>
+        <td>${formaterDate(a.date_creation)}</td>
+        <td>${formaterDate(a.date_publication)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormAnnonce('${a.id}')">Modifier</button>
+            <button class="btn-delete" onclick="supprimerAnnonce('${a.id}', '${a.titre.replace(/'/g, "\\'")}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="5" class="note-verrouille">Aucune annonce pour le moment.</td></tr>'
+    }
+
+    window.resetFiltresAnnonces = function() {
+      document.getElementById('a-filtre-titre').value = ''
+      document.getElementById('a-tri').value = 'date_publication-desc'
+      appliquerFiltresAnnonces()
+    }
+
+    window.ouvrirFormAnnonce = function(id) {
+      annonceEnEdition = id
+      const a = id ? annoncesCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-annonce').textContent = id ? "Modifier l'annonce" : 'Nouvelle annonce'
+      document.getElementById('a-id').value = a?.id ?? ''
+      document.getElementById('a-titre').value = a?.titre ?? ''
+      document.getElementById('a-contenu').value = a?.contenu ?? ''
+      document.getElementById('a-meta').textContent = a
+        ? `Créée le ${formaterDate(a.date_creation)} par ${a.auteur_username} — dernière publication le ${formaterDate(a.date_publication)}`
+        : 'La date de création et de publication seront enregistrées automatiquement.'
+      document.getElementById('msg-modale-annonce').textContent = ''
+      document.getElementById('modale-annonce-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleAnnonce = function() {
+      document.getElementById('modale-annonce-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderAnnonce = async function() {
+      const id = document.getElementById('a-id').value.trim() || null
+      const titre = document.getElementById('a-titre').value.trim()
+      const contenu = document.getElementById('a-contenu').value.trim()
+      const msgEl = document.getElementById('msg-modale-annonce')
+      if (!titre || !contenu) {
+        msgEl.textContent = '✗ Veuillez remplir le titre et le contenu.'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      const auteur_username = localStorage.getItem('username') ?? 'admin'
+      const { ok, error } = await adminSauvegarderAnnonce({ id, titre, contenu, auteur_username })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerAnnoncesAdmin()
+      setTimeout(() => fermerModaleAnnonce(), 500)
+    }
+
+    window.supprimerAnnonce = async function(id, titre) {
+      if (!confirm(`Supprimer définitivement l'annonce "${titre}" ? Cette action est irréversible.`)) return
+      await adminSupprimerAnnonce(id)
+      await chargerAnnoncesAdmin()
     }
   </script>
 </body>
