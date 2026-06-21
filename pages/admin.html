@@ -282,6 +282,10 @@
                 <option value="niveau-desc">Niveau ↓</option>
                 <option value="badges-desc">Badges (plus)</option>
                 <option value="badges-asc">Badges (moins)</option>
+                <option value="date_inscription-desc">Inscription (récent)</option>
+                <option value="date_inscription-asc">Inscription (ancien)</option>
+                <option value="derniere_connexion-desc">Connexion (récente)</option>
+                <option value="derniere_connexion-asc">Connexion (ancienne)</option>
               </select>
             </div>
             <button class="filtre-reset" onclick="resetFiltresUsers()">✕ Réinitialiser</button>
@@ -294,6 +298,8 @@
                   <th>Nom d'utilisateur</th>
                   <th>Niveau actuel</th>
                   <th>Badges</th>
+                  <th>Inscription</th>
+                  <th>Dernière connexion</th>
                   <th>Changer le niveau</th>
                   <th>Action</th>
                 </tr>
@@ -663,8 +669,8 @@
     let badgesParUser = {}
 
     async function chargerUtilisateurs() {
-      const { data, error } = await db.from('profils').select('*').order('username')
-      if (error) return
+      const { data, error } = await db.from('profils_avec_dates').select('*').order('username')
+      if (error) { console.error('chargerUtilisateurs :', error); return }
       utilisateursCache = data
 
       const { data: bdg } = await db.from('badges_utilisateurs').select('user_id')
@@ -672,6 +678,13 @@
       bdg?.forEach(b => { badgesParUser[b.user_id] = (badgesParUser[b.user_id] ?? 0) + 1 })
 
       appliquerFiltresUsers()
+    }
+
+    function formaterDate(iso) {
+      if (!iso) return '<span class="note-verrouille">Jamais</span>'
+      const d = new Date(iso)
+      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+        + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     }
 
     window.appliquerFiltresUsers = function() {
@@ -691,6 +704,8 @@
         if (champ === 'username') { va = a.username.toLowerCase(); vb = b.username.toLowerCase() }
         else if (champ === 'niveau') { va = NIVEAUX_ORDRE[a.niveau] ?? 0; vb = NIVEAUX_ORDRE[b.niveau] ?? 0 }
         else if (champ === 'badges') { va = badgesParUser[a.user_id] ?? 0; vb = badgesParUser[b.user_id] ?? 0 }
+        else if (champ === 'date_inscription') { va = a.date_inscription ? new Date(a.date_inscription).getTime() : 0; vb = b.date_inscription ? new Date(b.date_inscription).getTime() : 0 }
+        else if (champ === 'derniere_connexion') { va = a.derniere_connexion ? new Date(a.derniere_connexion).getTime() : 0; vb = b.derniere_connexion ? new Date(b.derniere_connexion).getTime() : 0 }
         return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
       })
 
@@ -718,6 +733,8 @@
           <td>${u.username}</td>
           <td><span class="tag ${tagClass}">${u.niveau}</span></td>
           <td>${nbBadges > 0 ? '🏅 ' + nbBadges : '<span class="note-verrouille">0</span>'}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${formaterDate(u.date_inscription)}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${formaterDate(u.derniere_connexion)}</td>
           <td>${cellSelect}</td>
           <td>${cellAction}</td>
         </tr>`
