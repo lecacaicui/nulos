@@ -442,6 +442,16 @@
         <div class="onglet-panneau" data-panneau="annonces">
           <h2>📢 Annonces</h2>
           <p class="note-verrouille">Gérez les messages affichés sur la page d'accueil. Les administrateurs et super administrateurs peuvent en publier.</p>
+
+          <div class="row-actions" style="margin:.75rem 0 1.25rem; align-items:flex-end; flex-wrap:wrap;">
+            <div class="filtre-groupe" style="min-width:220px;">
+              <label for="mon-pseudo">Mon pseudo (affiché comme auteur des annonces)</label>
+              <input class="filtre-input" type="text" id="mon-pseudo" placeholder="Laisser vide pour utiliser votre nom de compte" maxlength="30" style="width:100%;">
+            </div>
+            <button class="btn-save" onclick="sauvegarderMonPseudo()">Enregistrer le pseudo</button>
+            <span class="msg-inline" id="msg-pseudo"></span>
+          </div>
+
           <div class="row-actions" style="margin:.75rem 0;">
             <button class="btn-save" onclick="ouvrirFormAnnonce(null)">+ Nouvelle annonce</button>
           </div>
@@ -619,6 +629,7 @@
       }
       chargerUtilisateurs()
       chargerAnnoncesAdmin()
+      chargerMonPseudo()
     }
 
     window.ouvrirOnglet = function(nom) {
@@ -1032,6 +1043,25 @@
     // ===== Annonces =====
     let annoncesCache = []
     let annonceEnEdition = null
+    let monPseudo = ''
+
+    async function chargerMonPseudo() {
+      if (!monUserId) return
+      const { data, error } = await db.from('profils').select('pseudo').eq('user_id', monUserId).single()
+      if (error || !data) return
+      monPseudo = data.pseudo ?? ''
+      document.getElementById('mon-pseudo').value = monPseudo
+    }
+
+    window.sauvegarderMonPseudo = async function() {
+      const valeur = document.getElementById('mon-pseudo').value.trim()
+      const msgEl = document.getElementById('msg-pseudo')
+      // null plutôt que chaîne vide : on revient au nom de compte si rien n'est précisé
+      const { error } = await db.from('profils').update({ pseudo: valeur || null }).eq('user_id', monUserId)
+      if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err'; return }
+      monPseudo = valeur
+      msgEl.textContent = '✓ Pseudo enregistré'; msgEl.className = 'msg-inline ok'
+    }
 
     async function chargerAnnoncesAdmin() {
       annoncesCache = await adminListerAnnonces()
@@ -1111,7 +1141,7 @@
         msgEl.className = 'msg-inline err'
         return
       }
-      const auteur_username = localStorage.getItem('username') ?? 'admin'
+      const auteur_username = monPseudo || localStorage.getItem('username') || 'admin'
       const { ok, error } = await adminSauvegarderAnnonce({ id, titre, contenu, auteur_username })
       if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
       msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
