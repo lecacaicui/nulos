@@ -157,7 +157,77 @@
     .msg-inline { font-size: .85rem; margin-top: .5rem; }
     .msg-inline.err { color: #ef4444; }
     .msg-inline.ok  { color: #22c55e; }
-  </style>
+
+    /* ===== Bouton ? sur les cartes ===== */
+    .box-carte { position: relative; }
+    .box-info-btn {
+      position: absolute;
+      top: .6rem; right: .7rem;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+      transition: background .12s, color .12s;
+    }
+    .box-info-btn:hover { background: var(--couleur-bouton); color: white; border-color: var(--couleur-bouton); }
+
+    /* ===== Modale contenu loot box ===== */
+    .modale-pool-fond {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modale-pool-fond.ouverte { display: flex; }
+    .modale-pool {
+      background: var(--couleur-conteneur);
+      border-radius: 16px;
+      padding: 1.75rem 1.5rem;
+      max-width: 480px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    }
+    .modale-pool-fermer {
+      position: absolute; top: .8rem; right: 1rem;
+      background: none; border: none; font-size: 1.3rem;
+      color: var(--couleur-texte-faible); cursor: pointer;
+    }
+    .modale-pool-fermer:hover { color: var(--couleur-texte); }
+    .modale-pool-titre { font-size: 1.1rem; font-weight: 700; margin-bottom: .25rem; }
+    .modale-pool-sous-titre { font-size: .8rem; color: var(--couleur-texte-faible); margin-bottom: 1.25rem; }
+    .pool-ligne {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .6rem 0;
+      border-bottom: 1px solid var(--couleur-bordure);
+    }
+    .pool-ligne:last-child { border-bottom: none; }
+    .pool-img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
+    .pool-infos { flex: 1; min-width: 0; }
+    .pool-nom { font-size: .88rem; font-weight: 600; color: var(--couleur-texte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pool-rarete-multi { font-size: .75rem; color: var(--couleur-texte-faible); margin-top: .1rem; }
+    .pool-chance-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; min-width: 70px; }
+    .pool-chance-pct { font-size: .88rem; font-weight: 700; color: var(--couleur-texte); }
+    .pool-barre-bg { width: 70px; height: 5px; background: var(--couleur-bordure); border-radius: 3px; overflow: hidden; }
+    .pool-barre { height: 100%; border-radius: 3px; transition: width .3s ease; }
+    .tag-rarete-mini {
+      display: inline-block; padding: .15rem .45rem;
+      border-radius: 999px; font-size: .65rem; font-weight: 700; color: white;
+    }
 </head>
 <body>
   <div id="header-placeholder"></div>
@@ -203,12 +273,23 @@
 
   <div id="footer-placeholder"></div>
 
+  <!-- ===== Modale contenu d'une loot box ===== -->
+  <div class="modale-pool-fond" id="modale-pool-fond" onclick="if(event.target===this) fermerModalePool()">
+    <div class="modale-pool">
+      <button class="modale-pool-fermer" onclick="fermerModalePool()">✕</button>
+      <div class="modale-pool-titre" id="modale-pool-titre">Contenu de la boîte</div>
+      <div class="modale-pool-sous-titre" id="modale-pool-sous-titre">Chargement…</div>
+      <div id="modale-pool-liste"></div>
+    </div>
+  </div>
+
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import {
       RARETES,
       chargerLootBoxes,
+      chargerPoolLootBox,
       ouvrirLootBox,
       chargerCollection,
       equiperCreature,
@@ -260,12 +341,58 @@
       }
       grille.innerHTML = lootBoxes.map(b => `
         <div class="box-carte">
+          <button class="box-info-btn" onclick="ouvrirModalePool('${b.id}', '${b.nom.replace(/'/g,"\\'")}')">?</button>
           <img class="box-img" src="../pictures/${b.image}" alt="${b.nom}">
           <div class="box-nom">${b.nom}</div>
           <div class="box-prix">${Number(b.prix).toLocaleString('fr')} pièces</div>
           <button class="btn btn-primary" onclick="acheterBox('${b.id}')">Ouvrir</button>
         </div>
       `).join('')
+    }
+
+    window.ouvrirModalePool = async function(lootBoxId, nom) {
+      document.getElementById('modale-pool-titre').textContent = nom
+      document.getElementById('modale-pool-sous-titre').textContent = 'Chargement du contenu…'
+      document.getElementById('modale-pool-liste').innerHTML = ''
+      document.getElementById('modale-pool-fond').classList.add('ouverte')
+
+      const pool = await chargerPoolLootBox(lootBoxId)
+      if (pool.length === 0) {
+        document.getElementById('modale-pool-sous-titre').textContent = 'Cette boîte ne contient aucune créature configurée.'
+        return
+      }
+
+      const poidsTotal = pool.reduce((s, c) => s + Number(c.poids), 0)
+      const tries = [...pool].sort((a, b) => Number(b.poids) - Number(a.poids))
+
+      document.getElementById('modale-pool-sous-titre').textContent = pool.length + ' créature' + (pool.length > 1 ? 's' : '') + ' possible' + (pool.length > 1 ? 's' : '')
+
+      document.getElementById('modale-pool-liste').innerHTML = tries.map(c => {
+        const infos = RARETES[c.rarete] ?? { label: c.rarete, couleur: '#9ca3af' }
+        const pct   = ((Number(c.poids) / poidsTotal) * 100)
+        const pctAff = pct >= 0.1 ? pct.toFixed(1) : '<0.1'
+        return `
+          <div class="pool-ligne">
+            <img class="pool-img" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=.3">
+            <div class="pool-infos">
+              <div class="pool-nom">${c.nom}</div>
+              <div class="pool-rarete-multi">
+                <span class="tag-rarete-mini" style="background:${infos.couleur}">${infos.label}</span>
+                &nbsp;✕${Number(c.multiplicateur).toFixed(2)}
+              </div>
+            </div>
+            <div class="pool-chance-wrap">
+              <span class="pool-chance-pct">${pctAff}%</span>
+              <div class="pool-barre-bg">
+                <div class="pool-barre" style="width:${Math.min(pct, 100)}%;background:${infos.couleur}"></div>
+              </div>
+            </div>
+          </div>`
+      }).join('')
+    }
+
+    window.fermerModalePool = function() {
+      document.getElementById('modale-pool-fond').classList.remove('ouverte')
     }
 
     window.acheterBox = async function(lootBoxId) {
