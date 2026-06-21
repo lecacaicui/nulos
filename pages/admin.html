@@ -680,13 +680,6 @@
       appliquerFiltresUsers()
     }
 
-    function formaterDate(iso) {
-      if (!iso) return '<span class="note-verrouille">Jamais</span>'
-      const d = new Date(iso)
-      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
-        + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    }
-
     window.appliquerFiltresUsers = function() {
       const recherche = document.getElementById('u-filtre-nom').value.trim().toLowerCase()
       const niveau    = document.getElementById('u-filtre-niveau').value
@@ -734,7 +727,7 @@
           <td><span class="tag ${tagClass}">${u.niveau}</span></td>
           <td>${nbBadges > 0 ? '🏅 ' + nbBadges : '<span class="note-verrouille">0</span>'}</td>
           <td style="font-size:.8rem;white-space:nowrap">${formaterDate(u.date_inscription)}</td>
-          <td style="font-size:.8rem;white-space:nowrap">${formaterDate(u.derniere_connexion)}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${u.derniere_connexion ? formaterDate(u.derniere_connexion) : '<span class="note-verrouille">Jamais</span>'}</td>
           <td>${cellSelect}</td>
           <td>${cellAction}</td>
         </tr>`
