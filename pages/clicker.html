@@ -35,6 +35,15 @@
     @media (max-width: 900px) {
       .clicker-grid { grid-template-columns: 1fr; }
     }
+    @media (max-width: 600px) {
+      .clicker-wrap { padding: 1rem 1rem 6rem; }
+      .upgrade-img { width: 40px !important; height: 40px !important; }
+      .upgrade-cost img { width: 22px !important; height: 22px !important; }
+      .upgrade-name { font-size: .85rem; }
+      .upgrade-desc { font-size: .75rem; }
+      .upgrade-cost { font-size: .82rem; }
+      .stat-value { font-size: 1.1rem; }
+    }
     .classement-titre { font-size: .8rem; font-weight: 600; color: var(--couleur-texte-faible); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .75rem; }
     .classement-ligne { display: flex; align-items: center; gap: .6rem; padding: .4rem 0; border-bottom: 1px solid var(--couleur-bordure); font-size: .85rem; }
     .classement-ligne:last-child { border-bottom: none; }
@@ -59,6 +68,7 @@
     .upgrade-card:hover:not(.disabled) { filter: brightness(.95); }
     .upgrade-card.disabled { opacity: .5; cursor: not-allowed; }
     .upgrade-img { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
+    .piece-icone { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
     .upgrade-info { flex: 1; }
     .upgrade-name { font-size: .95rem; font-weight: 600; color: var(--couleur-texte); }
     .upgrade-desc { font-size: .8rem; color: var(--couleur-texte-faible); margin-top: .15rem; }
@@ -117,7 +127,7 @@
 
           <!-- Amélioration 1 : Boost de rage -->
           <div class="upgrade-card disabled" id="upgrade-card" onclick="acheterUpgrade()">
-            <img class="upgrade-img" src="../pictures/nrv.png" alt="nrv" style="width:100px;height:100px;">
+            <img class="upgrade-img" src="../pictures/nrv.png" alt="nrv">
             <div class="upgrade-info">
               <div class="upgrade-name">Boost de rage</div>
               <div class="upgrade-desc" id="upgrade-desc">+2 pièces / clic</div>
@@ -128,7 +138,7 @@
 
           <!-- Amélioration 2 : Auto-cliqueur -->
           <div class="upgrade-card disabled" id="upgrade-auto-card" onclick="acheterUpgradeAuto()">
-            <img class="upgrade-img" src="../pictures/nrvautomatique.png" alt="nrvauto" style="width:100px;height:100px;">
+            <img class="upgrade-img" src="../pictures/nrvautomatique.png" alt="nrvauto">
             <div class="upgrade-info">
               <div class="upgrade-name">Auto-cliqueur</div>
               <div class="upgrade-desc" id="upgrade-auto-desc">Clique automatiquement toutes les 5s</div>
@@ -414,12 +424,12 @@
       document.getElementById('stat-total').textContent    = totalProduit.toLocaleString('fr')
       document.getElementById('stat-clics').textContent    = totalClics.toLocaleString('fr')
 
-      document.getElementById('upgrade-cost').innerHTML    = coutUpgrade.toLocaleString('fr') + ' <img src="../pictures/pascontentpiece.png" style="width:50px;height:50px;object-fit:contain;vertical-align:middle;">'
+      document.getElementById('upgrade-cost').innerHTML    = coutUpgrade.toLocaleString('fr') + ' <img src="../pictures/pascontentpiece.png" class="piece-icone">'
       document.getElementById('upgrade-desc').textContent  = '+' + bonusUpgrade + ' pièces / clic (total : ' + (parClic + bonusUpgrade) + ')'
       document.getElementById('upgrade-count').textContent = nbUpgrades > 0 ? 'Achetée ' + nbUpgrades + ' fois' : 'Pas encore achetée'
       document.getElementById('upgrade-card').classList.toggle('disabled', pieces < coutUpgrade)
 
-      document.getElementById('upgrade-auto-cost').innerHTML    = coutAutoClicker.toLocaleString('fr') + ' <img src="../pictures/pascontentpiece.png" style="width:50px;height:50px;object-fit:contain;vertical-align:middle;">'
+      document.getElementById('upgrade-auto-cost').innerHTML    = coutAutoClicker.toLocaleString('fr') + ' <img src="../pictures/pascontentpiece.png" class="piece-icone">'
       document.getElementById('upgrade-auto-count').textContent = nbAutoClickers > 0
         ? 'Achetée ' + nbAutoClickers + ' fois — ' + (parClic * nbAutoClickers).toLocaleString('fr') + ' pièces / 5s'
         : 'Pas encore achetée'
@@ -433,7 +443,7 @@
       const rect = area.getBoundingClientRect()
       const span = document.createElement('span')
       span.className = 'float'
-      span.innerHTML = `${texte} <img src="../pictures/pascontentpiece.png" style="width:50px;height:50px;object-fit:contain;vertical-align:middle;">`
+      span.innerHTML = `${texte} <img src="../pictures/pascontentpiece.png" class="piece-icone">`
       span.style.left = (e.clientX - rect.left - 10) + 'px'
       span.style.top  = (e.clientY - rect.top  - 20) + 'px'
       area.appendChild(span)
