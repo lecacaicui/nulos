@@ -228,6 +228,133 @@
       display: inline-block; padding: .15rem .45rem;
       border-radius: 999px; font-size: .65rem; font-weight: 700; color: white;
     }
+
+    /* ===== Bouton Index des créatures ===== */
+    .btn-index {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: .82rem; color: var(--couleur-bouton); text-decoration: none;
+      padding: .35rem .8rem; border: 1px solid var(--couleur-bordure); border-radius: 7px;
+      background: var(--couleur-conteneur); cursor: pointer; transition: filter .12s;
+    }
+    .btn-index:hover { filter: brightness(.93); }
+
+    /* ===== Modale Index des créatures ===== */
+    .modale-index-fond {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modale-index-fond.ouverte { display: flex; }
+    .modale-index {
+      background: var(--couleur-conteneur);
+      border-radius: 16px;
+      padding: 1.75rem 1.5rem;
+      max-width: 900px;
+      width: 100%;
+      max-height: 88vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    }
+    .modale-index-fermer {
+      position: absolute; top: .8rem; right: 1rem;
+      background: none; border: none; font-size: 1.3rem;
+      color: var(--couleur-texte-faible); cursor: pointer;
+    }
+    .modale-index-fermer:hover { color: var(--couleur-texte); }
+    .modale-index-titre { font-size: 1.15rem; font-weight: 700; margin-bottom: .25rem; }
+    .modale-index-sous-titre { font-size: .8rem; color: var(--couleur-texte-faible); margin-bottom: 1rem; }
+
+    .index-filtres {
+      display: flex;
+      gap: .6rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .index-filtres input[type="text"] {
+      flex: 1;
+      min-width: 160px;
+      padding: .5rem .7rem;
+      font-size: .85rem;
+    }
+    .index-filtres select {
+      padding: .5rem .6rem;
+      font-size: .85rem;
+    }
+    .index-reset {
+      font-size: .8rem;
+      color: var(--couleur-texte-faible);
+      background: none;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px;
+      padding: .5rem .8rem;
+      cursor: pointer;
+    }
+    .index-reset:hover { color: var(--couleur-texte); }
+
+    .index-compteur {
+      font-size: .78rem;
+      color: var(--couleur-texte-faible);
+      margin-bottom: .85rem;
+    }
+
+    .index-grille {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: .75rem;
+    }
+    .index-carte {
+      background: var(--couleur-fond);
+      border: 2px solid var(--couleur-bordure);
+      border-radius: 12px;
+      padding: .9rem .6rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .35rem;
+      position: relative;
+      transition: transform .1s, filter .15s;
+    }
+    .index-carte.possedee {
+      cursor: pointer;
+      border-color: var(--couleur-bordure);
+    }
+    .index-carte.possedee:hover { transform: translateY(-2px); filter: brightness(.97); }
+    .index-carte.possedee.equipee { border-color: var(--couleur-bouton); }
+    .index-carte.non-possedee {
+      filter: grayscale(1);
+      opacity: .55;
+      cursor: default;
+    }
+    .index-carte-img { width: 60px; height: 60px; object-fit: contain; }
+    .index-carte-nom { font-size: .78rem; font-weight: 700; }
+    .index-carte-multi { font-size: .7rem; color: var(--couleur-texte-faible); }
+    .index-carte-tag {
+      font-size: .63rem; font-weight: 700; color: white;
+      padding: .1rem .45rem; border-radius: 999px;
+    }
+    .index-carte-equipee-label {
+      font-size: .62rem; font-weight: 700; color: var(--couleur-bouton);
+    }
+    .index-carte-verrou {
+      font-size: .68rem; color: var(--couleur-texte-faible);
+    }
+    .index-vide {
+      grid-column: 1/-1;
+      text-align: center;
+      color: var(--couleur-texte-faible);
+      font-size: .9rem;
+      padding: 2rem 0;
+    }
+    @media (max-width: 560px) {
+      .index-filtres { flex-direction: column; align-items: stretch; }
+    }
   </style>
 </head>
 <body>
@@ -240,7 +367,10 @@
 
       <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; margin-bottom:1.25rem;">
         <div class="lootbox-solde">💰 <span id="solde-pieces">0</span> pièces</div>
-        <a href="clicker.html" style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--couleur-bouton);text-decoration:none;padding:.35rem .8rem;border:1px solid var(--couleur-bordure);border-radius:7px;background:var(--couleur-conteneur);transition:filter .12s;" onmouseover="this.style.filter='brightness(.93)'" onmouseout="this.style.filter=''">← Retour au Clicker</a>
+        <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
+          <button class="btn-index" onclick="ouvrirModaleIndex()">📖 Index des créatures</button>
+          <a href="clicker.html" style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--couleur-bouton);text-decoration:none;padding:.35rem .8rem;border:1px solid var(--couleur-bordure);border-radius:7px;background:var(--couleur-conteneur);transition:filter .12s;" onmouseover="this.style.filter='brightness(.93)'" onmouseout="this.style.filter=''">← Retour au Clicker</a>
+        </div>
       </div>
 
       <div class="boxes-grille" id="boxes-grille">
@@ -284,11 +414,44 @@
     </div>
   </div>
 
+  <!-- ===== Modale Index des créatures ===== -->
+  <div class="modale-index-fond" id="modale-index-fond" onclick="if(event.target===this) fermerModaleIndex()">
+    <div class="modale-index">
+      <button class="modale-index-fermer" onclick="fermerModaleIndex()">✕</button>
+      <div class="modale-index-titre">📖 Index des créatures</div>
+      <div class="modale-index-sous-titre">Cliquez sur une créature possédée pour l'équiper ou la déséquiper.</div>
+
+      <div class="index-filtres">
+        <input type="text" id="index-recherche" placeholder="Rechercher une créature…" oninput="filtrerIndex()">
+        <select id="index-rarete" onchange="filtrerIndex()">
+          <option value="">Toutes les raretés</option>
+        </select>
+        <select id="index-statut" onchange="filtrerIndex()">
+          <option value="">Toutes</option>
+          <option value="possedee">Possédées</option>
+          <option value="non-possedee">Non possédées</option>
+        </select>
+        <select id="index-tri" onchange="filtrerIndex()">
+          <option value="nom">Trier par nom</option>
+          <option value="rarete">Trier par rareté</option>
+          <option value="multiplicateur">Trier par multiplicateur</option>
+        </select>
+        <button class="index-reset" onclick="reinitialiserIndex()">✕ Réinitialiser</button>
+      </div>
+
+      <div class="index-compteur" id="index-compteur">Chargement…</div>
+      <div class="index-grille" id="index-grille">
+        <p class="index-vide">Chargement…</p>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import {
       RARETES,
+      RARETES_VISIBLES,
       chargerLootBoxes,
       chargerPoolLootBox,
       ouvrirLootBox,
@@ -303,6 +466,7 @@
     let pieces = 0
     let lootBoxes = []
     let collectionDetaillee = []  // tableau enrichi : {ligne BDD + infos créature}
+    let toutesCreatures = []      // index complet : {creature, possedee, equipee}
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -321,8 +485,19 @@
       await chargerSoldePieces()
       lootBoxes = await chargerLootBoxes()
       afficherBoxes()
+      remplirSelectRaretes()
       await rafraichirCollection()
     })()
+
+    function remplirSelectRaretes() {
+      const select = document.getElementById('index-rarete')
+      RARETES_VISIBLES.forEach(cle => {
+        const opt = document.createElement('option')
+        opt.value = cle
+        opt.textContent = RARETES[cle].label
+        select.appendChild(opt)
+      })
+    }
 
     async function chargerSoldePieces() {
       const { data } = await db.from('clicker').select('pieces_actuelles').eq('user_id', userId).single()
@@ -466,18 +641,29 @@
         document.getElementById('collection-grille').innerHTML =
           '<p class="collection-vide">Aucune créature pour le moment. Ouvrez une loot box pour commencer !</p>'
         document.getElementById('equipee-info').textContent = 'Aucune créature équipée'
-        return
+      } else {
+        const { data: creaturesInfos } = await db.from('creatures').select('*').in('id', ids)
+        const infosParId = new Map((creaturesInfos ?? []).map(c => [c.id, c]))
+
+        collectionDetaillee = ids.map(id => ({
+          ligne: collection.get(id),
+          creature: infosParId.get(id)
+        })).filter(x => x.creature)
+
+        afficherCollection()
       }
 
-      const { data: creaturesInfos } = await db.from('creatures').select('*').in('id', ids)
-      const infosParId = new Map((creaturesInfos ?? []).map(c => [c.id, c]))
+      // ===== Index complet des créatures (pour la modale Index) =====
+      const { data: toutes } = await db.from('creatures').select('*').eq('actif', true)
+      toutesCreatures = (toutes ?? []).map(c => {
+        const ligne = collection.get(c.id)
+        return { creature: c, possedee: !!ligne, equipee: !!ligne?.equipee }
+      })
 
-      collectionDetaillee = ids.map(id => ({
-        ligne: collection.get(id),
-        creature: infosParId.get(id)
-      })).filter(x => x.creature)
-
-      afficherCollection()
+      // Si la modale Index est ouverte, on la rafraîchit aussi
+      if (document.getElementById('modale-index-fond').classList.contains('ouverte')) {
+        filtrerIndex()
+      }
     }
 
     function afficherCollection() {
@@ -507,6 +693,91 @@
         await equiperCreature(userId, creatureId)
       }
       await rafraichirCollection()
+    }
+
+    // ===== Index des créatures =====
+    window.ouvrirModaleIndex = function() {
+      document.getElementById('modale-index-fond').classList.add('ouverte')
+      filtrerIndex()
+    }
+
+    window.fermerModaleIndex = function() {
+      document.getElementById('modale-index-fond').classList.remove('ouverte')
+    }
+
+    window.reinitialiserIndex = function() {
+      document.getElementById('index-recherche').value = ''
+      document.getElementById('index-rarete').value = ''
+      document.getElementById('index-statut').value = ''
+      document.getElementById('index-tri').value = 'nom'
+      filtrerIndex()
+    }
+
+    window.filtrerIndex = function() {
+      const recherche = document.getElementById('index-recherche').value.trim().toLowerCase()
+      const rarete    = document.getElementById('index-rarete').value
+      const statut    = document.getElementById('index-statut').value
+      const tri       = document.getElementById('index-tri').value
+
+      // Les créatures "secrètes" non possédées restent totalement masquées.
+      let visibles = toutesCreatures.filter(x => x.creature.rarete !== 'secret' || x.possedee)
+
+      if (recherche) {
+        visibles = visibles.filter(x => x.creature.nom.toLowerCase().includes(recherche))
+      }
+      if (rarete) {
+        visibles = visibles.filter(x => x.creature.rarete === rarete)
+      }
+      if (statut === 'possedee') {
+        visibles = visibles.filter(x => x.possedee)
+      } else if (statut === 'non-possedee') {
+        visibles = visibles.filter(x => !x.possedee)
+      }
+
+      visibles.sort((a, b) => {
+        if (tri === 'rarete') {
+          const oa = RARETES[a.creature.rarete]?.ordre ?? 0
+          const ob = RARETES[b.creature.rarete]?.ordre ?? 0
+          return oa - ob || a.creature.nom.localeCompare(b.creature.nom)
+        }
+        if (tri === 'multiplicateur') {
+          return Number(b.creature.multiplicateur) - Number(a.creature.multiplicateur)
+        }
+        return a.creature.nom.localeCompare(b.creature.nom)
+      })
+
+      afficherIndex(visibles)
+    }
+
+    function afficherIndex(liste) {
+      const grille = document.getElementById('index-grille')
+      document.getElementById('index-compteur').textContent =
+        `${liste.length} créature${liste.length > 1 ? 's' : ''} affichée${liste.length > 1 ? 's' : ''} sur ${toutesCreatures.filter(x => x.creature.rarete !== 'secret' || x.possedee).length}`
+
+      if (liste.length === 0) {
+        grille.innerHTML = '<p class="index-vide">Aucune créature ne correspond à ces filtres.</p>'
+        return
+      }
+
+      grille.innerHTML = liste.map(({ creature, possedee, equipee }) => {
+        const infosRarete = RARETES[creature.rarete] ?? { label: creature.rarete, couleur: '#9ca3af' }
+        const classes = 'index-carte ' + (possedee ? 'possedee' : 'non-possedee') + (equipee ? ' equipee' : '')
+        const onclick = possedee ? `onclick="toggleEquipementIndex('${creature.id}', ${equipee})"` : ''
+        return `
+          <div class="${classes}" ${onclick}>
+            <span class="index-carte-tag" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
+            <img class="index-carte-img" src="../pictures/${creature.image}" alt="${creature.nom}">
+            <span class="index-carte-nom">${creature.nom}</span>
+            <span class="index-carte-multi">x${Number(creature.multiplicateur).toFixed(2)}</span>
+            ${equipee ? '<span class="index-carte-equipee-label">✓ Équipée</span>' : ''}
+            ${!possedee ? '<span class="index-carte-verrou">🔒 Non obtenue</span>' : ''}
+          </div>`
+      }).join('')
+    }
+
+    window.toggleEquipementIndex = async function(creatureId, estDejaEquipee) {
+      await toggleEquipement(creatureId, estDejaEquipee)
+      filtrerIndex()
     }
   </script>
 </body>
