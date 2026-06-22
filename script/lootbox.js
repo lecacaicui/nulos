@@ -9,10 +9,10 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 // objet d'affichage tant qu'elle n'est pas utilisée : voir RARETES_VISIBLES.
 export const RARETES = {
   commun:     { label: 'Commun',     couleur: '#9ca3af', ordre: 1 },
-  rare:       { label: 'Rare',       couleur: '#3b82f6', ordre: 2 },
-  epique:     { label: 'Épique',     couleur: '#a855f7', ordre: 3 },
-  legendaire: { label: 'Légendaire', couleur: '#f59e0b', ordre: 4 },
-  cosmique:   { label: 'Cosmique',   couleur: '#06b6d4', ordre: 5 },
+  rare:       { label: 'Rare',       couleur: '#00ff40', ordre: 2 },
+  epique:     { label: 'Épique',     couleur: '#6a00ff', ordre: 3 },
+  legendaire: { label: 'Légendaire', couleur: '#fffb00', ordre: 4 },
+  cosmique:   { label: 'Cosmique',   couleur: '#e200e6', ordre: 5 },
   secret:     { label: '???',        couleur: '#000000', ordre: 99 }
 }
 
