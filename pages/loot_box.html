@@ -859,15 +859,15 @@
       _animBoiteImg  = '../pictures/' + box.image
       _animCouleur   = infosRarete.couleur
 
-      // Prépare les éléments colorés (currentColor n'est pas hérité sur img,
-      // on passe par des propriétés directes)
       const overlay = document.getElementById('anim-overlay')
       overlay.className = 'actif'
 
-      document.getElementById('anim-fond-couleur').style.background = _animCouleur
-      document.getElementById('anim-boite-lueur').style.background  = _animCouleur
-      document.getElementById('anim-anneau').style.color             = _animCouleur
-      document.getElementById('anim-anneau').style.borderColor       = _animCouleur
+      // Phase boîte : couleur neutre (blanc/argenté), la rareté n'est pas encore révélée
+      const COULEUR_NEUTRE = '#a0a0b0'
+      document.getElementById('anim-fond-couleur').style.background = COULEUR_NEUTRE
+      document.getElementById('anim-boite-lueur').style.background  = COULEUR_NEUTRE
+      document.getElementById('anim-anneau').style.color             = COULEUR_NEUTRE
+      document.getElementById('anim-anneau').style.borderColor       = COULEUR_NEUTRE
       document.getElementById('anim-boite-img').src = _animBoiteImg
 
       // Phase 0 → phase d'attente (la boîte apparaît, cliquable)
@@ -933,15 +933,19 @@
       const { creature, estDoublon, gainVente } = _animResultat
       const infosRarete = RARETES[creature.rarete] ?? { label: creature.rarete, couleur: '#9ca3af' }
 
-      document.getElementById('anim-creature-lueur').style.background = infosRarete.couleur
-      document.getElementById('anim-creature-img').src   = '../pictures/' + creature.image
-      document.getElementById('anim-creature-img').alt   = creature.nom
-      document.getElementById('anim-creature-img').style.color = infosRarete.couleur
-      document.getElementById('anim-creature-rarete').textContent  = infosRarete.label
-      document.getElementById('anim-creature-rarete').style.background = infosRarete.couleur
-      document.getElementById('anim-creature-rarete').style.color      = infosRarete.texte
-      document.getElementById('anim-creature-nom').textContent    = creature.nom
-      document.getElementById('anim-creature-multi').textContent  = '✕ ' + Number(creature.multiplicateur).toFixed(2) + ' production'
+      // Révèle la couleur de rareté maintenant que la créature est dévoilée
+      document.getElementById('anim-fond-couleur').style.transition = 'background .5s ease, opacity .6s'
+      document.getElementById('anim-fond-couleur').style.background = infosRarete.couleur
+
+      document.getElementById('anim-creature-lueur').style.background      = infosRarete.couleur
+      document.getElementById('anim-creature-img').src                      = '../pictures/' + creature.image
+      document.getElementById('anim-creature-img').alt                      = creature.nom
+      document.getElementById('anim-creature-img').style.color              = infosRarete.couleur
+      document.getElementById('anim-creature-rarete').textContent           = infosRarete.label
+      document.getElementById('anim-creature-rarete').style.background      = infosRarete.couleur
+      document.getElementById('anim-creature-rarete').style.color           = infosRarete.texte
+      document.getElementById('anim-creature-nom').textContent              = creature.nom
+      document.getElementById('anim-creature-multi').textContent            = '✕ ' + Number(creature.multiplicateur).toFixed(2) + ' production'
 
       const elDoublon = document.getElementById('anim-creature-doublon')
       if (estDoublon) {
@@ -953,13 +957,15 @@
 
       document.getElementById('anim-overlay').classList.add('phase-creature')
 
-      // 2e vague de particules légères à la révélation
+      // 2e vague de particules légères à la révélation (avec couleur de rareté)
       setTimeout(lancerParticules, 50)
     }
 
     window.fermerAnimation = async function() {
       const overlay = document.getElementById('anim-overlay')
       overlay.className = '' // retire tout
+      // Réinitialise la transition pour que le prochain fond neutre s'applique sans délai
+      document.getElementById('anim-fond-couleur').style.transition = 'none'
       _animResultat = null
       if (_animOuverteCallback) {
         await _animOuverteCallback()
