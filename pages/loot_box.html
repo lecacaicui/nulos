@@ -362,7 +362,228 @@
     @media (max-width: 560px) {
       .index-filtres { flex-direction: column; align-items: stretch; }
     }
-  </style>
+
+    /* ========================================================
+       ANIMATION D'OUVERTURE DE LOOT BOX
+    ======================================================== */
+    #anim-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: rgba(0,0,0,.88);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      overflow: hidden;
+    }
+    #anim-overlay.actif { display: flex; }
+
+    /* Fond coloré qui pulse selon la rareté */
+    #anim-fond-couleur {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity .6s;
+      pointer-events: none;
+    }
+    #anim-overlay.phase-ouverture #anim-fond-couleur { opacity: .18; }
+    #anim-overlay.phase-creature  #anim-fond-couleur { opacity: .25; }
+
+    /* ===== Phase 1 : boîte en attente ===== */
+    #anim-phase-boite {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      position: relative;
+    }
+    #anim-overlay.phase-creature #anim-phase-boite { display: none; }
+
+    #anim-boite-lueur {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 220px; height: 220px;
+      border-radius: 50%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .5s;
+      filter: blur(40px);
+    }
+    #anim-overlay.phase-ouverture #anim-boite-lueur { opacity: .7; }
+
+    #anim-boite-img {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      cursor: pointer;
+      position: relative;
+      z-index: 1;
+      filter: drop-shadow(0 0 0px transparent);
+      transition: filter .4s;
+    }
+    #anim-overlay.phase-ouverture #anim-boite-img {
+      filter: drop-shadow(0 0 28px currentColor);
+      animation: anim-secousse .15s ease-in-out 0s 6 alternate;
+    }
+    @keyframes anim-secousse {
+      0%   { transform: rotate(-6deg) scale(1.05); }
+      100% { transform: rotate(6deg)  scale(1.08); }
+    }
+
+    /* Anneau qui pulse autour de la boîte en phase ouverture */
+    #anim-anneau {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      width: 210px; height: 210px;
+      border-radius: 50%;
+      border: 3px solid currentColor;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #anim-overlay.phase-ouverture #anim-anneau {
+      animation: anim-anneau-pulse .6s ease-out forwards;
+    }
+    @keyframes anim-anneau-pulse {
+      0%   { transform: translate(-50%,-50%) scale(.6); opacity: .8; }
+      100% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; }
+    }
+
+    .anim-hint {
+      color: rgba(255,255,255,.65);
+      font-size: .9rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      animation: anim-pulse-opacity 1.4s ease-in-out infinite;
+    }
+    @keyframes anim-pulse-opacity {
+      0%,100% { opacity: .45; }
+      50%      { opacity: 1; }
+    }
+    #anim-overlay.phase-ouverture .anim-hint { display: none; }
+
+    /* ===== Particules ===== */
+    .anim-particule {
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .anim-particule.lancee {
+      animation: anim-particule-vol var(--dur, .8s) ease-out forwards;
+    }
+    @keyframes anim-particule-vol {
+      0%   { transform: translate(0,0) scale(1);   opacity: 1; }
+      70%  { opacity: .8; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(.2); opacity: 0; }
+    }
+
+    /* ===== Phase 2 : révélation créature ===== */
+    #anim-phase-creature {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: .9rem;
+      position: relative;
+      text-align: center;
+      padding: 0 1.5rem;
+    }
+    #anim-overlay.phase-creature #anim-phase-creature {
+      display: flex;
+      animation: anim-creature-apparait .45s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes anim-creature-apparait {
+      0%   { opacity: 0; transform: scale(.4) translateY(30px); }
+      100% { opacity: 1; transform: scale(1)  translateY(0); }
+    }
+
+    #anim-creature-lueur {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      filter: blur(50px);
+      opacity: .5;
+      pointer-events: none;
+      animation: anim-lueur-pulse 2s ease-in-out infinite;
+    }
+    @keyframes anim-lueur-pulse {
+      0%,100% { opacity: .4; transform: translate(-50%,-50%) scale(1); }
+      50%      { opacity: .7; transform: translate(-50%,-50%) scale(1.1); }
+    }
+
+    #anim-creature-img {
+      width: 180px;
+      height: 180px;
+      object-fit: contain;
+      position: relative;
+      z-index: 1;
+      filter: drop-shadow(0 0 18px currentColor);
+    }
+
+    #anim-creature-rarete {
+      display: inline-block;
+      padding: .3rem 1rem;
+      border-radius: 999px;
+      font-size: .78rem;
+      font-weight: 700;
+      color: white;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    #anim-creature-nom {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: white;
+      text-shadow: 0 2px 18px rgba(0,0,0,.6);
+    }
+    #anim-creature-multi {
+      font-size: .95rem;
+      color: rgba(255,255,255,.7);
+    }
+    #anim-creature-doublon {
+      font-size: .9rem;
+      color: #f59e0b;
+      font-weight: 600;
+    }
+    #anim-btn-continuer {
+      margin-top: .5rem;
+      padding: .75rem 2.5rem;
+      background: rgba(255,255,255,.15);
+      color: white;
+      border: 1.5px solid rgba(255,255,255,.35);
+      border-radius: 10px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: background .15s, border-color .15s;
+    }
+    #anim-btn-continuer:hover {
+      background: rgba(255,255,255,.25);
+      border-color: rgba(255,255,255,.6);
+    }
+
+    /* Flash blanc au moment de l'ouverture */
+    #anim-flash {
+      position: absolute;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #anim-flash.actif { animation: anim-flash .35s ease-out forwards; }
+    @keyframes anim-flash {
+      0%   { opacity: .95; }
+      100% { opacity: 0; }
+    }
 </head>
 <body>
   <div id="header-placeholder"></div>
@@ -384,20 +605,7 @@
         <p class="collection-vide">Chargement des loot box…</p>
       </div>
 
-      <!-- Résultat du dernier tirage.
-           Point d'extension : remplacer affichageImmediat() par une fonction
-           d'animation (coffre qui s'ouvre, etc.) qui appelle ensuite
-           afficherResultat() une fois l'animation terminée. -->
-      <div class="resultat-tirage" id="resultat-tirage">
-        <img class="resultat-img" id="resultat-img" src="" alt="">
-        <div>
-          <span class="resultat-rarete" id="resultat-rarete">—</span>
-        </div>
-        <div class="resultat-nom" id="resultat-nom">—</div>
-        <div class="resultat-multi" id="resultat-multi">—</div>
-        <div class="resultat-doublon" id="resultat-doublon" style="display:none"></div>
-        <button class="btn btn-secondary" onclick="fermerResultat()">Fermer</button>
-      </div>
+      <!-- ===== Overlay d'animation d'ouverture ===== -->
 
       <div class="collection-titre">
         <h2>Ma collection</h2>
@@ -410,6 +618,27 @@
   </main>
 
   <div id="footer-placeholder"></div>
+
+  <!-- ===== Overlay animation ouverture loot box ===== -->
+  <div id="anim-overlay">
+    <div id="anim-fond-couleur"></div>
+    <div id="anim-flash"></div>
+    <div id="anim-phase-boite">
+      <div id="anim-boite-lueur"></div>
+      <div id="anim-anneau"></div>
+      <img id="anim-boite-img" src="" alt="" onclick="ouvrirBoite()">
+      <p class="anim-hint">✦ Cliquez pour ouvrir ✦</p>
+    </div>
+    <div id="anim-phase-creature">
+      <div id="anim-creature-lueur"></div>
+      <img id="anim-creature-img" src="" alt="">
+      <span id="anim-creature-rarete"></span>
+      <div id="anim-creature-nom"></div>
+      <div id="anim-creature-multi"></div>
+      <div id="anim-creature-doublon"></div>
+      <button id="anim-btn-continuer" onclick="fermerAnimation()">Continuer →</button>
+    </div>
+  </div>
 
   <!-- ===== Modale contenu d'une loot box ===== -->
   <div class="modale-pool-fond" id="modale-pool-fond" onclick="if(event.target===this) fermerModalePool()">
@@ -581,6 +810,14 @@
       document.getElementById('modale-pool-fond').classList.remove('ouverte')
     }
 
+    // ===================================================================
+    // ===== ANIMATION D'OUVERTURE =====
+    // ===================================================================
+    let _animResultat   = null  // résultat en attente de révélation
+    let _animBoiteImg   = ''    // image de la boîte en cours d'animation
+    let _animCouleur    = '#9ca3af'
+    let _animOuverteCallback = null
+
     window.acheterBox = async function(lootBoxId) {
       const box = lootBoxes.find(b => b.id === lootBoxId)
       if (!box) return
@@ -588,6 +825,9 @@
         alert('Pas assez de pièces pour ouvrir cette loot box.')
         return
       }
+
+      // Désactive tous les boutons pendant le tirage
+      document.querySelectorAll('.box-carte .btn').forEach(b => b.disabled = true)
 
       pieces -= Number(box.prix)
 
@@ -597,50 +837,132 @@
       } catch (e) {
         console.error(e)
         alert("Erreur lors de l'ouverture de la loot box.")
-        pieces += Number(box.prix) // on annule le débit en cas d'échec
+        pieces += Number(box.prix)
+        document.querySelectorAll('.box-carte .btn').forEach(b => b.disabled = false)
         return
       }
 
-      if (resultat.estDoublon) {
-        pieces += Number(resultat.gainVente)
-      }
-
+      if (resultat.estDoublon) pieces += Number(resultat.gainVente)
       document.getElementById('solde-pieces').textContent = pieces.toLocaleString('fr')
       await sauvegarderSoldePieces()
       afficherBoxes()
 
-      // Point d'extension future animation : appeler ici une fonction
-      // d'ouverture animée, puis afficherResultat(resultat) en callback.
-      afficherResultat(resultat)
-      await rafraichirCollection()
+      // Lance l'animation — rafraîchit la collection après fermeture
+      _animOuverteCallback = () => rafraichirCollection()
+      lancerAnimation(box, resultat)
     }
 
-    function afficherResultat(resultat) {
-      const { creature, estDoublon, gainVente } = resultat
+    function lancerAnimation(box, resultat) {
+      const infosRarete = RARETES[resultat.creature.rarete] ?? { label: resultat.creature.rarete, couleur: '#9ca3af' }
+      _animResultat  = resultat
+      _animBoiteImg  = '../pictures/' + box.image
+      _animCouleur   = infosRarete.couleur
+
+      // Prépare les éléments colorés (currentColor n'est pas hérité sur img,
+      // on passe par des propriétés directes)
+      const overlay = document.getElementById('anim-overlay')
+      overlay.className = 'actif'
+
+      document.getElementById('anim-fond-couleur').style.background = _animCouleur
+      document.getElementById('anim-boite-lueur').style.background  = _animCouleur
+      document.getElementById('anim-anneau').style.color             = _animCouleur
+      document.getElementById('anim-anneau').style.borderColor       = _animCouleur
+      document.getElementById('anim-boite-img').src = _animBoiteImg
+
+      // Phase 0 → phase d'attente (la boîte apparaît, cliquable)
+      setTimeout(() => overlay.classList.add('phase-ouverture'), 80)
+    }
+
+    // Appelé quand l'utilisateur clique sur la boîte
+    window.ouvrirBoite = function() {
+      const overlay = document.getElementById('anim-overlay')
+      if (!overlay.classList.contains('phase-ouverture')) return
+
+      // Flash blanc
+      const flash = document.getElementById('anim-flash')
+      flash.classList.add('actif')
+
+      // Particules
+      lancerParticules()
+
+      // Après le flash, on passe à la révélation
+      setTimeout(() => {
+        flash.classList.remove('actif')
+        afficherCreatureAnim()
+      }, 350)
+    }
+
+    function lancerParticules() {
+      const overlay = document.getElementById('anim-overlay')
+      const cx = overlay.clientWidth  / 2
+      const cy = overlay.clientHeight / 2
+      const N  = 26
+      const couleurs = [_animCouleur, '#ffffff', '#fffbe6', _animCouleur, '#ffffff']
+
+      for (let i = 0; i < N; i++) {
+        const el = document.createElement('div')
+        el.className = 'anim-particule'
+
+        const angle  = (Math.PI * 2 * i / N) + (Math.random() - .5) * .6
+        const dist   = 150 + Math.random() * 220
+        const tx     = Math.cos(angle) * dist
+        const ty     = Math.sin(angle) * dist
+        const taille = 6 + Math.random() * 12
+        const dur    = .5 + Math.random() * .55
+
+        el.style.cssText = `
+          left:${cx}px; top:${cy}px;
+          width:${taille}px; height:${taille}px;
+          background:${couleurs[i % couleurs.length]};
+          --tx:${tx}px; --ty:${ty}px;
+          --dur:${dur}s;
+          border-radius:${Math.random() > .4 ? '50%' : '3px'};
+          box-shadow: 0 0 6px 2px ${couleurs[i % couleurs.length]};
+        `
+        overlay.appendChild(el)
+        // Force reflow avant d'ajouter la classe pour déclencher l'animation
+        el.getBoundingClientRect()
+        el.classList.add('lancee')
+        setTimeout(() => el.remove(), dur * 1000 + 100)
+      }
+    }
+
+    function afficherCreatureAnim() {
+      if (!_animResultat) return
+      const { creature, estDoublon, gainVente } = _animResultat
       const infosRarete = RARETES[creature.rarete] ?? { label: creature.rarete, couleur: '#9ca3af' }
 
-      document.getElementById('resultat-img').src = '../pictures/' + creature.image
-      document.getElementById('resultat-img').alt = creature.nom
-      const tagRarete = document.getElementById('resultat-rarete')
-      tagRarete.textContent = infosRarete.label
-      tagRarete.style.background = infosRarete.couleur
+      document.getElementById('anim-creature-lueur').style.background = infosRarete.couleur
+      document.getElementById('anim-creature-img').src   = '../pictures/' + creature.image
+      document.getElementById('anim-creature-img').alt   = creature.nom
+      document.getElementById('anim-creature-img').style.color = infosRarete.couleur
+      document.getElementById('anim-creature-rarete').textContent  = infosRarete.label
+      document.getElementById('anim-creature-rarete').style.background = infosRarete.couleur
+      document.getElementById('anim-creature-nom').textContent    = creature.nom
+      document.getElementById('anim-creature-multi').textContent  = '✕ ' + Number(creature.multiplicateur).toFixed(2) + ' production'
 
-      document.getElementById('resultat-nom').textContent = creature.nom
-      document.getElementById('resultat-multi').textContent = 'Multiplicateur de production : x' + Number(creature.multiplicateur).toFixed(2)
-
-      const elDoublon = document.getElementById('resultat-doublon')
+      const elDoublon = document.getElementById('anim-creature-doublon')
       if (estDoublon) {
+        elDoublon.textContent = `Déjà possédée — revendue pour ${Number(gainVente).toLocaleString('fr')} 💰`
         elDoublon.style.display = 'block'
-        elDoublon.textContent = `Déjà possédée — revendue automatiquement pour ${Number(gainVente).toLocaleString('fr')} pièces`
       } else {
         elDoublon.style.display = 'none'
       }
 
-      document.getElementById('resultat-tirage').classList.add('visible')
+      document.getElementById('anim-overlay').classList.add('phase-creature')
+
+      // 2e vague de particules légères à la révélation
+      setTimeout(lancerParticules, 50)
     }
 
-    window.fermerResultat = function() {
-      document.getElementById('resultat-tirage').classList.remove('visible')
+    window.fermerAnimation = async function() {
+      const overlay = document.getElementById('anim-overlay')
+      overlay.className = '' // retire tout
+      _animResultat = null
+      if (_animOuverteCallback) {
+        await _animOuverteCallback()
+        _animOuverteCallback = null
+      }
     }
 
     async function rafraichirCollection() {
