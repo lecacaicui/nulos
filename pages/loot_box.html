@@ -695,17 +695,17 @@
     /* Main droite — arrive du bord droit, miroir horizontal */
     #anim-main-droite {
       left: 50%;
-      transform: translate(calc(-50% + 280px), -40%) scaleX(-1);
+      transform: translate(calc(-50% + 280px), -40%);
     }
     #anim-main-droite.entree {
       opacity: 1;
       transition: transform .5s cubic-bezier(.6,0,.4,1), opacity .2s;
-      transform: translate(calc(-50% + 80px), -40%) scaleX(-1);
+      transform: translate(calc(-50% + 80px), -40%);
     }
     #anim-main-droite.emporte {
       opacity: 1;
       transition: transform .6s cubic-bezier(.7,0,.3,1), opacity .3s .3s;
-      transform: translate(calc(-50% + 320px), -40%) scaleX(-1) rotate(-10deg);
+      transform: translate(calc(-50% + 320px), -40%) rotate(-10deg);
       opacity: 0;
     }
 
@@ -1087,8 +1087,10 @@
       // Réinitialise les mains
       mainG.className = 'anim-main'
       mainD.className = 'anim-main'
+      mainG.style.display = ''
+      mainD.style.display = ''
       boule.className = ''
-      boule.style.opacity = '0'
+      boule.style.opacity = ''
       document.getElementById('anim-boite-img').style.visibility = 'visible'
       document.getElementById('anim-boite-img').style.transform  = ''
       document.getElementById('anim-boite-img').style.opacity    = ''
