@@ -665,34 +665,46 @@
       opacity: 0;
     }
 
-    /* ===== Deux mains (gauche + droite) ===== */
+    /* ===== Deux mains (gauche + droite), découpées depuis main.png ===== */
     .anim-main {
       position: absolute;
       top: 50%;
-      width: 160px;
-      height: auto;
+      width: 190px;
+      height: 156px;
+      overflow: hidden;
       z-index: 5;
       opacity: 0;
       pointer-events: none;
       filter: drop-shadow(0 6px 18px rgba(0,0,0,.85));
     }
+    .anim-main img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 380px;
+      height: 156px;
+      display: block;
+    }
+    /* Main droite = moitié droite de l'image, décalée pour qu'elle s'aligne dans le masque */
+    #anim-main-droite img { left: -190px; }
+
     /* Main gauche — arrive du bord gauche */
     #anim-main-gauche {
       left: 50%;
-      transform: translate(calc(-50% - 280px), -40%) scaleX(1);
+      transform: translate(calc(-50% - 280px), -40%);
     }
     #anim-main-gauche.entree {
       opacity: 1;
       transition: transform .5s cubic-bezier(.6,0,.4,1), opacity .2s;
-      transform: translate(calc(-50% - 80px), -40%) scaleX(1);
+      transform: translate(calc(-50% - 80px), -40%);
     }
     #anim-main-gauche.emporte {
       opacity: 1;
       transition: transform .6s cubic-bezier(.7,0,.3,1), opacity .3s .3s;
-      transform: translate(calc(-50% - 320px), -40%) scaleX(1) rotate(10deg);
+      transform: translate(calc(-50% - 320px), -40%) rotate(10deg);
       opacity: 0;
     }
-    /* Main droite — arrive du bord droit, miroir horizontal */
+    /* Main droite — arrive du bord droit */
     #anim-main-droite {
       left: 50%;
       transform: translate(calc(-50% + 280px), -40%);
@@ -785,8 +797,8 @@
       <div id="anim-anneau"></div>
       <img id="anim-boite-img" src="" alt="" onclick="ouvrirBoite()">
       <p class="anim-hint">✦ Cliquez pour ouvrir ✦</p>
-      <img id="anim-main-gauche" class="anim-main anim-main-gauche" src="../pictures/main_gauche.png" alt="">
-      <img id="anim-main-droite" class="anim-main anim-main-droite" src="../pictures/main_droite.png" alt="">
+      <div id="anim-main-gauche" class="anim-main"><img src="../pictures/main.png" alt=""></div>
+      <div id="anim-main-droite" class="anim-main"><img src="../pictures/main.png" alt=""></div>
       <div id="anim-boule-noire"></div>
     </div>
     <div id="anim-phase-creature">
