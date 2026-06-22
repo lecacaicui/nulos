@@ -773,15 +773,20 @@
       document.getElementById('modale-pool-fond').classList.add('ouverte')
 
       const pool = await chargerPoolLootBox(lootBoxId)
-      if (pool.length === 0) {
+      // Les créatures de rareté "secret" ne doivent jamais apparaître dans cette
+      // liste de probabilités (effet de surprise) : on les retire avant tout
+      // calcul, pour qu'elles ne faussent pas non plus le total des poids.
+      const poolVisible = pool.filter(c => c.rarete !== 'secret')
+
+      if (poolVisible.length === 0) {
         document.getElementById('modale-pool-sous-titre').textContent = 'Cette boîte ne contient aucune créature configurée.'
         return
       }
 
-      const poidsTotal = pool.reduce((s, c) => s + Number(c.poids), 0)
-      const tries = [...pool].sort((a, b) => Number(b.poids) - Number(a.poids))
+      const poidsTotal = poolVisible.reduce((s, c) => s + Number(c.poids), 0)
+      const tries = [...poolVisible].sort((a, b) => Number(b.poids) - Number(a.poids))
 
-      document.getElementById('modale-pool-sous-titre').textContent = pool.length + ' créature' + (pool.length > 1 ? 's' : '') + ' possible' + (pool.length > 1 ? 's' : '')
+      document.getElementById('modale-pool-sous-titre').textContent = poolVisible.length + ' créature' + (poolVisible.length > 1 ? 's' : '') + ' possible' + (poolVisible.length > 1 ? 's' : '')
 
       document.getElementById('modale-pool-liste').innerHTML = tries.map(c => {
         const infos = RARETES[c.rarete] ?? { label: c.rarete, couleur: '#9ca3af' }
