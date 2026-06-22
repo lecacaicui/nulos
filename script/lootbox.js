@@ -8,12 +8,12 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 // 'secret' existe dans le schéma mais reste volontairement absente de cet
 // objet d'affichage tant qu'elle n'est pas utilisée : voir RARETES_VISIBLES.
 export const RARETES = {
-  commun:     { label: 'Commun',     couleur: '#9ca3af', ordre: 1 },
-  rare:       { label: 'Rare',       couleur: '#00ff40', ordre: 2 },
-  epique:     { label: 'Épique',     couleur: '#6a00ff', ordre: 3 },
-  legendaire: { label: 'Légendaire', couleur: '#fffb00', ordre: 4 },
-  cosmique:   { label: 'Cosmique',   couleur: '#e200e6', ordre: 5 },
-  secret:     { label: '???',        couleur: '#000000', ordre: 99 }
+  commun:     { label: 'Commun',     couleur: '#9ca3af', texte: '#000000', ordre: 1 },
+  rare:       { label: 'Rare',       couleur: '#00ff40', texte: '#000000', ordre: 2 },
+  epique:     { label: 'Épique',     couleur: '#6a00ff', texte: '#000000', ordre: 3 },
+  legendaire: { label: 'Légendaire', couleur: '#fffb00', texte: '#000000', ordre: 4 },
+  cosmique:   { label: 'Cosmique',   couleur: '#e200e6', texte: '#000000', ordre: 5 },
+  secret:     { label: '???',        couleur: '#000000', texte: '#000000', ordre: 99 }
 }
 
 // Raretés affichées dans les interfaces (légendes, filtres...).
