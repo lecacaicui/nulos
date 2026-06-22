@@ -827,7 +827,7 @@
         return `<tr>
           <td><img class="img-mini" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=0.2"></td>
           <td>${c.nom}</td>
-          <td><span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span></td>
+          <td><span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span></td>
           <td>x${Number(c.multiplicateur).toFixed(2)}</td>
           <td>${Number(c.prix_vente).toLocaleString('fr')}</td>
           <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
@@ -1021,7 +1021,7 @@
           <div class="infos">
             <img class="img-mini" src="../pictures/${l.creatures?.image}" alt="" onerror="this.style.opacity=0.2">
             <span>${l.creatures?.nom ?? l.creature_id}</span>
-            <span class="tag-rarete" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
+            <span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
             <span class="note-verrouille">poids ${l.poids}</span>
           </div>
           <button class="btn-delete" onclick="retirerCreatureDeLaBox('${lootBoxId}', '${l.creature_id}')">Retirer</button>
