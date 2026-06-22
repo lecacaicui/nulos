@@ -939,6 +939,7 @@
       document.getElementById('anim-creature-img').style.color = infosRarete.couleur
       document.getElementById('anim-creature-rarete').textContent  = infosRarete.label
       document.getElementById('anim-creature-rarete').style.background = infosRarete.couleur
+      document.getElementById('anim-creature-rarete').style.color      = infosRarete.texte
       document.getElementById('anim-creature-nom').textContent    = creature.nom
       document.getElementById('anim-creature-multi').textContent  = '✕ ' + Number(creature.multiplicateur).toFixed(2) + ' production'
 
@@ -1006,7 +1007,7 @@
         const infosRarete = RARETES[creature.rarete] ?? { label: creature.rarete, couleur: '#9ca3af' }
         return `
           <div class="creature-carte ${ligne.equipee ? 'equipee' : ''}" onclick="toggleEquipement('${creature.id}', ${ligne.equipee})">
-            <span class="creature-carte-tag" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
+            <span class="creature-carte-tag" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
             <img class="creature-carte-img" src="../pictures/${creature.image}" alt="${creature.nom}">
             <span class="creature-carte-nom">${creature.nom}</span>
             <span class="creature-carte-multi">x${Number(creature.multiplicateur).toFixed(2)}</span>
@@ -1099,7 +1100,7 @@
         const onclick = possedee ? `onclick="toggleEquipementIndex('${creature.id}', ${equipee})"` : ''
         return `
           <div class="${classes}" ${onclick}>
-            <span class="index-carte-tag" style="background:${infosRarete.couleur}">${infosRarete.label}</span>
+            <span class="index-carte-tag" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
             <img class="index-carte-img" src="../pictures/${creature.image}" alt="${creature.nom}">
             <span class="index-carte-nom">${creature.nom}</span>
             <span class="index-carte-multi">x${Number(creature.multiplicateur).toFixed(2)}</span>
