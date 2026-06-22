@@ -13,7 +13,7 @@ export const RARETES = {
   epique:     { label: 'Épique',     couleur: '#6a00ff', texte: '#000000', ordre: 3 },
   legendaire: { label: 'Légendaire', couleur: '#fffb00', texte: '#000000', ordre: 4 },
   cosmique:   { label: 'Cosmique',   couleur: '#e200e6', texte: '#000000', ordre: 5 },
-  secret:     { label: '???',        couleur: '#000000', texte: '#000000', ordre: 99 }
+  secret:     { label: '???',        couleur: '#000000', texte: '#e6e6e6', ordre: 99 }
 }
 
 // Raretés affichées dans les interfaces (légendes, filtres...).
