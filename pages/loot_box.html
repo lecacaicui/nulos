@@ -660,49 +660,62 @@
       filter: drop-shadow(0 0 24px #000) drop-shadow(0 0 10px currentColor);
     }
     #anim-overlay.secret-emporte #anim-boite-img {
-      transition: transform .55s cubic-bezier(.7,0,.3,1), opacity .25s .3s;
-      transform: translateX(-220%) rotate(-14deg);
+      transition: transform .6s cubic-bezier(.7,0,.3,1), opacity .3s .3s;
+      transform: translateX(-260%) rotate(-18deg);
       opacity: 0;
     }
-    #anim-main-noire {
+
+    /* ===== Deux mains (gauche + droite) ===== */
+    .anim-main {
       position: absolute;
       top: 50%;
-      left: 50%;
-      font-size: 4.5rem;
-      line-height: 1;
+      width: 160px;
+      height: auto;
       z-index: 5;
       opacity: 0;
       pointer-events: none;
-      transform: translate(180%, -50%) rotate(15deg) scaleX(-1);
-      filter: drop-shadow(0 4px 12px rgba(0,0,0,.7));
+      filter: drop-shadow(0 6px 18px rgba(0,0,0,.85));
     }
-    #anim-main-noire.entree {
+    /* Main gauche — arrive du bord gauche */
+    #anim-main-gauche {
+      left: 50%;
+      transform: translate(calc(-50% - 280px), -40%) scaleX(1);
+    }
+    #anim-main-gauche.entree {
       opacity: 1;
-      transition: transform .45s cubic-bezier(.6,0,.4,1);
-      transform: translate(20%, -50%) rotate(0deg) scaleX(-1);
+      transition: transform .5s cubic-bezier(.6,0,.4,1), opacity .2s;
+      transform: translate(calc(-50% - 80px), -40%) scaleX(1);
     }
-    #anim-main-noire.emporte {
+    #anim-main-gauche.emporte {
       opacity: 1;
-      transition: transform .55s cubic-bezier(.7,0,.3,1);
-      transform: translate(-220%, -50%) rotate(-10deg) scaleX(-1);
-    }
-    #anim-main-noire.retour {
-      opacity: 1;
-      transition: transform .45s ease-out;
-      transform: translate(0%, -50%) rotate(0deg) scaleX(-1);
-    }
-    #anim-main-noire.sortie {
-      transition: transform .4s ease-in, opacity .4s ease-in;
-      transform: translate(20%, -160%) rotate(0deg) scaleX(-1);
+      transition: transform .6s cubic-bezier(.7,0,.3,1), opacity .3s .3s;
+      transform: translate(calc(-50% - 320px), -40%) scaleX(1) rotate(10deg);
       opacity: 0;
     }
+    /* Main droite — arrive du bord droit, miroir horizontal */
+    #anim-main-droite {
+      left: 50%;
+      transform: translate(calc(-50% + 280px), -40%) scaleX(-1);
+    }
+    #anim-main-droite.entree {
+      opacity: 1;
+      transition: transform .5s cubic-bezier(.6,0,.4,1), opacity .2s;
+      transform: translate(calc(-50% + 80px), -40%) scaleX(-1);
+    }
+    #anim-main-droite.emporte {
+      opacity: 1;
+      transition: transform .6s cubic-bezier(.7,0,.3,1), opacity .3s .3s;
+      transform: translate(calc(-50% + 320px), -40%) scaleX(-1) rotate(-10deg);
+      opacity: 0;
+    }
+
     #anim-boule-noire {
       position: absolute;
       top: 50%; left: 50%;
-      width: 70px; height: 70px;
+      width: 110px; height: 110px;
       border-radius: 50%;
-      background: radial-gradient(circle at 35% 30%, #3a3a3a, #000 70%);
-      box-shadow: 0 0 30px 8px currentColor;
+      background: radial-gradient(circle at 35% 30%, #2a2a2a, #000 70%);
+      box-shadow: 0 0 0px 0px #000;
       transform: translate(-50%,-50%) scale(0);
       opacity: 0;
       pointer-events: none;
@@ -710,21 +723,22 @@
     }
     #anim-boule-noire.apparait {
       opacity: 1;
-      animation: anim-boule-pulse .9s ease-in-out forwards;
+      animation: anim-boule-pulse 1s ease-in-out forwards;
     }
     @keyframes anim-boule-pulse {
-      0%   { transform: translate(-50%,-50%) scale(0); }
-      30%  { transform: translate(-50%,-50%) scale(1.15); }
-      55%  { transform: translate(-50%,-50%) scale(.9); }
-      80%  { transform: translate(-50%,-50%) scale(1.05); }
-      100% { transform: translate(-50%,-50%) scale(1); }
+      0%   { transform: translate(-50%,-50%) scale(0);    box-shadow: 0 0 0px   0px rgba(0,0,0,0); }
+      20%  { transform: translate(-50%,-50%) scale(1.2);  box-shadow: 0 0 60px 30px rgba(0,0,0,.9); }
+      50%  { transform: translate(-50%,-50%) scale(.88);  box-shadow: 0 0 90px 45px rgba(0,0,0,.8); }
+      75%  { transform: translate(-50%,-50%) scale(1.06); box-shadow: 0 0 70px 35px rgba(0,0,0,.85); }
+      100% { transform: translate(-50%,-50%) scale(1);    box-shadow: 0 0 80px 40px rgba(0,0,0,.9); }
     }
     #anim-boule-noire.explose {
-      animation: anim-boule-explose .35s ease-in forwards;
+      animation: anim-boule-explose .4s ease-in forwards;
     }
     @keyframes anim-boule-explose {
-      0%   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
-      100% { transform: translate(-50%,-50%) scale(2.8);  opacity: 0; }
+      0%   { transform: translate(-50%,-50%) scale(1);   opacity: 1; box-shadow: 0 0 80px 40px rgba(0,0,0,.9); }
+      50%  { transform: translate(-50%,-50%) scale(2);   opacity: .8; }
+      100% { transform: translate(-50%,-50%) scale(3.5); opacity: 0; box-shadow: 0 0 0px 0px rgba(0,0,0,0); }
     }
   </style>
 </head>
@@ -771,7 +785,8 @@
       <div id="anim-anneau"></div>
       <img id="anim-boite-img" src="" alt="" onclick="ouvrirBoite()">
       <p class="anim-hint">✦ Cliquez pour ouvrir ✦</p>
-      <div id="anim-main-noire">🖐️</div>
+      <img id="anim-main-gauche" class="anim-main" src="../pictures/main.png" alt="">
+      <img id="anim-main-droite" class="anim-main" src="../pictures/main.png" alt="">
       <div id="anim-boule-noire"></div>
     </div>
     <div id="anim-phase-creature">
@@ -1055,50 +1070,98 @@
     }
 
     /**
-     * Séquence spéciale pour la rareté secrète :
-     * 1) la boîte frise violemment
-     * 2) une main noire entre et saisit la boîte
-     * 3) elle l'emporte hors de l'écran
-     * 4) elle revient seule
-     * 5) elle dépose une boule noire et ressort
-     * 6) la boule explose et révèle la créature
+     * Séquence secrète :
+     * 1) Frisson violent de la boîte
+     * 2) Les deux mains arrivent des côtés et saisissent la boîte
+     * 3) Elles l'emportent hors écran ensemble
+     * 4) L'orbe noire (grosse, aura sombre) apparaît de nulle part au centre
+     * 5) L'orbe pulse puis explose → révélation créature
      */
     function lancerSequenceSecrete() {
       const overlay = document.getElementById('anim-overlay')
-      const main     = document.getElementById('anim-main-noire')
-      const boule    = document.getElementById('anim-boule-noire')
-      boule.style.color = _animCouleur // alimente le box-shadow (currentColor)
+      const mainG   = document.getElementById('anim-main-gauche')
+      const mainD   = document.getElementById('anim-main-droite')
+      const boule   = document.getElementById('anim-boule-noire')
 
+      // Réinitialise les mains
+      mainG.className = 'anim-main'
+      mainD.className = 'anim-main'
+      boule.className = ''
+      boule.style.opacity = '0'
+      document.getElementById('anim-boite-img').style.visibility = 'visible'
+      document.getElementById('anim-boite-img').style.transform  = ''
+      document.getElementById('anim-boite-img').style.opacity    = ''
+
+      // 1) Frisson
       overlay.classList.add('secret-frisson')
 
+      // 2) Les deux mains entrent simultanément (500ms après le frisson)
       setTimeout(() => {
-        main.classList.add('entree')
+        mainG.classList.add('entree')
+        mainD.classList.add('entree')
 
+        // 3) Elles emportent la boîte (600ms après l'entrée)
         setTimeout(() => {
           overlay.classList.add('secret-emporte')
-          main.classList.remove('entree')
-          main.classList.add('emporte')
+          mainG.classList.remove('entree'); mainG.classList.add('emporte')
+          mainD.classList.remove('entree'); mainD.classList.add('emporte')
 
+          // 4) Cacher la boîte + les mains disparaissent, l'orbe surgit de nulle part
           setTimeout(() => {
             document.getElementById('anim-boite-img').style.visibility = 'hidden'
-            main.classList.remove('emporte')
-            main.classList.add('retour')
+            mainG.style.display = 'none'
+            mainD.style.display = 'none'
 
+            // Petite pause dramatique avant l'orbe
             setTimeout(() => {
               boule.classList.add('apparait')
-              main.classList.remove('retour')
-              main.classList.add('sortie')
 
+              // 5) L'orbe explose après sa pulsation
               setTimeout(() => {
                 boule.classList.add('explose')
-                lancerParticules() // éclat à l'explosion, dans la couleur de la rareté
+                lancerParticulesSombres()
 
-                setTimeout(() => afficherCreatureAnim(), 280)
-              }, 900)
-            }, 450)
-          }, 450)
-        }, 550)
-      }, 550)
+                setTimeout(() => afficherCreatureAnim(), 320)
+              }, 1000)
+            }, 200)
+          }, 550)
+        }, 600)
+      }, 500)
+    }
+
+    // Particules noires/violettes pour l'explosion de l'orbe secrète
+    function lancerParticulesSombres() {
+      const overlay = document.getElementById('anim-overlay')
+      const cx = overlay.clientWidth  / 2
+      const cy = overlay.clientHeight / 2
+      const N  = 32
+      const couleurs = ['#000000', '#1a001a', '#0d000d', '#111', _animCouleur, '#000']
+
+      for (let i = 0; i < N; i++) {
+        const el = document.createElement('div')
+        el.className = 'anim-particule'
+
+        const angle  = (Math.PI * 2 * i / N) + (Math.random() - .5) * .5
+        const dist   = 120 + Math.random() * 260
+        const tx     = Math.cos(angle) * dist
+        const ty     = Math.sin(angle) * dist
+        const taille = 8 + Math.random() * 16
+        const dur    = .5 + Math.random() * .65
+
+        el.style.cssText = `
+          left:${cx}px; top:${cy}px;
+          width:${taille}px; height:${taille}px;
+          background:${couleurs[i % couleurs.length]};
+          --tx:${tx}px; --ty:${ty}px;
+          --dur:${dur}s;
+          border-radius:${Math.random() > .4 ? '50%' : '3px'};
+          box-shadow: 0 0 10px 4px ${couleurs[i % couleurs.length]};
+        `
+        overlay.appendChild(el)
+        el.getBoundingClientRect()
+        el.classList.add('lancee')
+        setTimeout(() => el.remove(), dur * 1000 + 100)
+      }
     }
 
     function lancerParticules() {
