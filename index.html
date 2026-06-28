@@ -130,6 +130,17 @@
 
   <script type="module">
   import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
+
+  // Protège contre les injections XSS : échappe les caractères HTML spéciaux
+  // avant d'insérer du contenu provenant de la BDD dans le DOM via innerHTML.
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
   import { chargerAnnonces } from './script/annonces.js'
 
   ;(async () => {
@@ -156,10 +167,10 @@
       <div class="annonces-liste-scroll">
         ${annonces.map(a => `
           <div class="annonce-carte">
-            <div class="annonce-titre">${a.titre}</div>
-            <div class="annonce-contenu">${a.contenu}</div>
+            <div class="annonce-titre">${esc(a.titre)}</div>
+            <div class="annonce-contenu">${esc(a.contenu)}</div>
             <div class="annonce-meta">
-              <span>Par ${a.auteur_username}</span>
+              <span>Par ${esc(a.auteur_username)}</span>
               <span>· Créée le ${formaterDateAnnonce(a.date_creation)}</span>
               <span>· Publiée le ${formaterDateAnnonce(a.date_publication)}</span>
             </div>
