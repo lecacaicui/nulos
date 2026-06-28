@@ -574,6 +574,16 @@
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs, invaliderCacheTheme } from '../script/header.js'
+
+    // Protège contre les injections XSS
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
     import {
       RARETES,
       adminListerCreatures, adminSauvegarderCreature, adminToggleActifCreature, adminSupprimerCreature,
@@ -603,7 +613,8 @@
       appliquerCouleurs(p)
     }
 
-    const monNiveau = localStorage.getItem('niveau')
+    // monNiveau est déterminé côté serveur (BDD) et non depuis localStorage
+    let monNiveau = null
     let monUserId = null
 
     ;(async () => {
@@ -611,6 +622,20 @@
       appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
+
+      // Vérification côté serveur : on récupère le niveau depuis la BDD
+      // (le localStorage peut être falsifié par n'importe qui)
+      const { data: session } = await db.auth.getUser()
+      monUserId = session?.user?.id ?? null
+
+      if (monUserId) {
+        const { data: profil } = await db.from('profils')
+          .select('niveau')
+          .eq('user_id', monUserId)
+          .single()
+        monNiveau = profil?.niveau ?? null
+      }
+
       if (monNiveau !== 'admin' && monNiveau !== 'super_admin') {
         document.getElementById('acces-refuse').style.display = 'block'
       } else {
@@ -620,8 +645,6 @@
     })()
 
     async function init() {
-      const { data: session } = await db.auth.getUser()
-      monUserId = session?.user?.id ?? null
       const badge = document.getElementById('badge-role')
       if (monNiveau === 'super_admin') {
         badge.textContent = 'Super Admin'
@@ -718,12 +741,12 @@
         const cellAction = perm.modifiable
           ? `<div class="row-actions">
                <button class="btn-save" onclick="sauvegarder('${u.id}')">Sauvegarder</button>
-               <button class="btn-delete" onclick="supprimer('${u.id}', '${u.username}')">Supprimer</button>
+               <button class="btn-delete" onclick="supprimer('${esc(u.id)}', '${esc(u.username)}')">Supprimer</button>
                <span class="msg-inline" id="msg-${u.id}"></span>
              </div>`
           : ''
         return `<tr>
-          <td>${u.username}</td>
+          <td>${esc(u.username)}</td>
           <td><span class="tag ${tagClass}">${u.niveau}</span></td>
           <td>${nbBadges > 0 ? '🏅 ' + nbBadges : '<span class="note-verrouille">0</span>'}</td>
           <td style="font-size:.8rem;white-space:nowrap">${formaterDate(u.date_inscription)}</td>
@@ -825,8 +848,8 @@
       tbody.innerHTML = data.map(c => {
         const infosRarete = RARETES[c.rarete] ?? { label: c.rarete, couleur: '#9ca3af' }
         return `<tr>
-          <td><img class="img-mini" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=0.2"></td>
-          <td>${c.nom}</td>
+          <td><img class="img-mini" src="../pictures/${esc(c.image)}" alt="${esc(c.nom)}" onerror="this.style.opacity=0.2"></td>
+          <td>${esc(c.nom)}</td>
           <td><span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span></td>
           <td>x${Number(c.multiplicateur).toFixed(2)}</td>
           <td>${Number(c.prix_vente).toLocaleString('fr')}</td>
@@ -835,7 +858,7 @@
             <div class="row-actions">
               <button class="btn-save" onclick="ouvrirFormCreature('${c.id}')">Modifier</button>
               <button class="btn-preset" onclick="toggleActifCreature('${c.id}', ${c.actif})">${c.actif ? 'Désactiver' : 'Activer'}</button>
-              <button class="btn-delete" onclick="supprimerCreature('${c.id}', '${c.nom}')">Supprimer</button>
+              <button class="btn-delete" onclick="supprimerCreature('${esc(c.id)}', '${esc(c.nom)}')">Supprimer</button>
             </div>
           </td>
         </tr>`
@@ -933,8 +956,8 @@
       document.getElementById('lb-compteur').textContent = data.length + ' / ' + lootBoxesCache.length + ' loot box'
       const tbody = document.getElementById('tbody-lootboxes')
       tbody.innerHTML = data.map(b => `<tr>
-        <td><img class="img-mini" src="../pictures/${b.image}" alt="${b.nom}" onerror="this.style.opacity=0.2"></td>
-        <td>${b.nom}</td>
+        <td><img class="img-mini" src="../pictures/${esc(b.image)}" alt="${esc(b.nom)}" onerror="this.style.opacity=0.2"></td>
+        <td>${esc(b.nom)}</td>
         <td>${Number(b.prix).toLocaleString('fr')}</td>
         <td>${b.ordre}</td>
         <td>${b.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
@@ -942,7 +965,7 @@
           <div class="row-actions">
             <button class="btn-save" onclick="ouvrirFormLootBox('${b.id}')">Modifier</button>
             <button class="btn-preset" onclick="toggleActifLootBox('${b.id}', ${b.actif})">${b.actif ? 'Désactiver' : 'Activer'}</button>
-            <button class="btn-delete" onclick="supprimerLootBox('${b.id}', '${b.nom}')">Supprimer</button>
+            <button class="btn-delete" onclick="supprimerLootBox('${esc(b.id)}', '${esc(b.nom)}')">Supprimer</button>
           </div>
         </td>
       </tr>`).join('') || '<tr><td colspan="6" class="note-verrouille">Aucune loot box trouvée.</td></tr>'
@@ -1019,8 +1042,8 @@
         const infosRarete = RARETES[l.creatures?.rarete] ?? { label: l.creatures?.rarete, couleur: '#9ca3af' }
         return `<div class="ligne-composition">
           <div class="infos">
-            <img class="img-mini" src="../pictures/${l.creatures?.image}" alt="" onerror="this.style.opacity=0.2">
-            <span>${l.creatures?.nom ?? l.creature_id}</span>
+            <img class="img-mini" src="../pictures/${esc(l.creatures?.image ?? '')}" alt="" onerror="this.style.opacity=0.2">
+            <span>${esc(l.creatures?.nom ?? l.creature_id)}</span>
             <span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
             <span class="note-verrouille">poids ${l.poids}</span>
           </div>
@@ -1033,7 +1056,7 @@
       const select = document.getElementById('ajout-creature-select')
       select.innerHTML = creaturesCache
         .filter(c => c.actif)
-        .map(c => `<option value="${c.id}">${c.nom} (${RARETES[c.rarete]?.label ?? c.rarete})</option>`)
+        .map(c => `<option value="${esc(c.id)}">${esc(c.nom)} (${RARETES[c.rarete]?.label ?? c.rarete})</option>`)
         .join('')
     }
 
@@ -1104,8 +1127,8 @@
       document.getElementById('a-compteur').textContent = data.length + ' / ' + annoncesCache.length + ' annonce(s)'
       const tbody = document.getElementById('tbody-annonces')
       tbody.innerHTML = data.map(a => `<tr>
-        <td>${a.titre}</td>
-        <td>${a.auteur_username}</td>
+        <td>${esc(a.titre)}</td>
+        <td>${esc(a.auteur_username)}</td>
         <td>${formaterDate(a.date_creation)}</td>
         <td>${formaterDate(a.date_publication)}</td>
         <td>
@@ -1131,7 +1154,7 @@
       document.getElementById('a-titre').value = a?.titre ?? ''
       document.getElementById('a-contenu').value = a?.contenu ?? ''
       document.getElementById('a-meta').textContent = a
-        ? `Créée le ${formaterDate(a.date_creation)} par ${a.auteur_username} — dernière publication le ${formaterDate(a.date_publication)}`
+        ? `Créée le ${formaterDate(a.date_creation)} par ${esc(a.auteur_username)} — dernière publication le ${formaterDate(a.date_publication)}`
         : 'La date de création et de publication seront enregistrées automatiquement.'
       document.getElementById('msg-modale-annonce').textContent = ''
       document.getElementById('modale-annonce-fond').classList.add('ouverte')
@@ -1151,7 +1174,7 @@
         msgEl.className = 'msg-inline err'
         return
       }
-      const auteur_username = monPseudo || localStorage.getItem('username') || 'admin'
+      const auteur_username = monPseudo || localStorage.getItem('username') || '?'
       const { ok, error } = await adminSauvegarderAnnonce({ id, titre, contenu, auteur_username })
       if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
       msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
