@@ -297,11 +297,24 @@
         if (this.perdu) return
         if (this.revelees[y][x]) return
         if (this.marquees[y][x]) {
+          // Retrait du drapeau : la case redevient inconnue
           this.marquees[y][x] = false
           this.nbMarques--
+          this.nbInconnues++
         } else {
-          this.marquees[y][x] = true
-          this.nbMarques++
+          // Pose du drapeau : la case n'est plus inconnue
+          // (mais on ne peut pas descendre sous le nombre de mines restantes
+          //  pour éviter de bloquer la condition de victoire)
+          if (this.nbInconnues > this.getNbMines()) {
+            this.marquees[y][x] = true
+            this.nbMarques++
+            this.nbInconnues--
+          } else {
+            // Toutes les cases inconnues restantes sont des mines :
+            // on pose quand même le drapeau mais sans toucher à nbInconnues
+            this.marquees[y][x] = true
+            this.nbMarques++
+          }
         }
       }
 
