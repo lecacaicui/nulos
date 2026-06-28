@@ -297,24 +297,13 @@
         if (this.perdu) return
         if (this.revelees[y][x]) return
         if (this.marquees[y][x]) {
-          // Retrait du drapeau : la case redevient inconnue
           this.marquees[y][x] = false
           this.nbMarques--
           this.nbInconnues++
         } else {
-          // Pose du drapeau : la case n'est plus inconnue
-          // (mais on ne peut pas descendre sous le nombre de mines restantes
-          //  pour éviter de bloquer la condition de victoire)
-          if (this.nbInconnues > this.getNbMines()) {
-            this.marquees[y][x] = true
-            this.nbMarques++
-            this.nbInconnues--
-          } else {
-            // Toutes les cases inconnues restantes sont des mines :
-            // on pose quand même le drapeau mais sans toucher à nbInconnues
-            this.marquees[y][x] = true
-            this.nbMarques++
-          }
+          this.marquees[y][x] = true
+          this.nbMarques++
+          this.nbInconnues--
         }
       }
 
@@ -360,7 +349,13 @@
 
       // Victoire = toutes les cases sans mine sont révélées
       estGagne() {
-        return !this.perdu && this.nbInconnues === this.getNbMines()
+        // Victoire = toutes les cases non révélées sont des mines
+        // (qu'elles soient marquées ou non, nbInconnues ne compte
+        //  que les cases ni révélées ni marquées)
+        if (this.perdu) return false
+        // Nombre total de cases non révélées = nbInconnues (non marquées) + nbMarques
+        const nonRevelees = this.nbInconnues + this.nbMarques
+        return nonRevelees === this.getNbMines()
       }
     }
 
