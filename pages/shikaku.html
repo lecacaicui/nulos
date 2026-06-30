@@ -97,6 +97,23 @@
     .victoire-titre { font-size: 1.4rem; font-weight: 700; margin-bottom: .5rem; }
     .victoire-sous { font-size: .9rem; color: var(--couleur-texte-faible); margin-bottom: 1.5rem; }
     .victoire-btns { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+
+    /* ===== Tooltip dimensions (drag & drop) ===== */
+    #drag-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(20, 20, 30, 0.88);
+      color: #fff;
+      font-size: .78rem;
+      font-weight: 600;
+      padding: .25rem .55rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      display: none;
+      z-index: 9999;
+      transform: translate(14px, -110%);
+      letter-spacing: .02em;
+    }
   </style>
 </head>
 <body>
@@ -141,6 +158,8 @@
       </div>
     </div>
   </div>
+
+  <div id="drag-tooltip"></div>
 
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
@@ -381,6 +400,46 @@
   }
 
   // ─────────────────────────────────────────────────────────────
+  // TOOLTIP DIMENSIONS (drag & drop)
+  // ─────────────────────────────────────────────────────────────
+  const tooltip = document.getElementById('drag-tooltip')
+
+  function afficherTooltip(e, d) {
+    if (!d) { masquerTooltip(); return }
+    const cols = d.c2 - d.c1 + 1
+    const rows = d.r2 - d.r1 + 1
+    const aire = cols * rows
+    tooltip.textContent = `${cols}×${rows}  |  ${aire}`
+    tooltip.style.display = 'block'
+    positionnerTooltip(e)
+  }
+
+  function positionnerTooltip(e) {
+    let x, y
+    if (e.touches) {
+      x = e.touches[0].clientX
+      y = e.touches[0].clientY
+    } else {
+      x = e.clientX
+      y = e.clientY
+    }
+    // Évite le débordement à droite de l'écran
+    const tw = tooltip.offsetWidth
+    const marge = 14
+    if (x + marge + tw > window.innerWidth) {
+      tooltip.style.transform = `translate(${-(tw + marge)}px, -110%)`
+    } else {
+      tooltip.style.transform = `translate(${marge}px, -110%)`
+    }
+    tooltip.style.left = x + 'px'
+    tooltip.style.top  = y + 'px'
+  }
+
+  function masquerTooltip() {
+    tooltip.style.display = 'none'
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // ÉVÉNEMENTS
   // ─────────────────────────────────────────────────────────────
   function cellDepuis(e) {
@@ -427,19 +486,21 @@
       const cell = cellDepuis(e)
       dessin = norm(startCell.r, startCell.c, cell.r, cell.c)
       dessiner()
+      afficherTooltip(e, dessin)
     }
     canvas.onmouseup = e => {
       if (!startCell) return
       const cell = cellDepuis(e)
       poserRectangle(norm(startCell.r, startCell.c, cell.r, cell.c))
       startCell = null; dessin = null
+      masquerTooltip()
     }
-    canvas.onmouseleave = () => { startCell = null; dessin = null; dessiner() }
+    canvas.onmouseleave = () => { startCell = null; dessin = null; dessiner(); masquerTooltip() }
     canvas.oncontextmenu = e => { e.preventDefault() }
 
-    canvas.ontouchstart = e => { e.preventDefault(); startCell = cellDepuis(e); dessin = { r1: startCell.r, c1: startCell.c, r2: startCell.r, c2: startCell.c }; dessiner() }
-    canvas.ontouchmove  = e => { e.preventDefault(); if (!startCell) return; const c = cellDepuis(e); dessin = norm(startCell.r, startCell.c, c.r, c.c); dessiner() }
-    canvas.ontouchend   = e => { e.preventDefault(); if (!startCell || !dessin) return; poserRectangle(dessin); startCell = null; dessin = null }
+    canvas.ontouchstart = e => { e.preventDefault(); startCell = cellDepuis(e); dessin = { r1: startCell.r, c1: startCell.c, r2: startCell.r, c2: startCell.c }; dessiner(); afficherTooltip(e, dessin) }
+    canvas.ontouchmove  = e => { e.preventDefault(); if (!startCell) return; const c = cellDepuis(e); dessin = norm(startCell.r, startCell.c, c.r, c.c); dessiner(); afficherTooltip(e, dessin) }
+    canvas.ontouchend   = e => { e.preventDefault(); if (!startCell || !dessin) return; poserRectangle(dessin); startCell = null; dessin = null; masquerTooltip() }
   }
 
   // ─────────────────────────────────────────────────────────────
