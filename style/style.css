@@ -295,12 +295,14 @@ a.retour:hover { text-decoration: underline; }
 }
 
 /* ===== Tableau de pages (tuiles, page d'accueil connecté) ===== */
-.card-pages { max-width: 80vw; width: 80vw; }
-@media (min-width: 1400px) { .card-pages { max-width: 1100px; } }
+.card-pages {
+  max-width: min(1200px, 92vw);
+  width: min(1200px, 92vw);
+}
 .card-pages h2 { font-size: 1rem; color: var(--couleur-texte-faible); margin-bottom: 1.5rem; font-weight: 600; }
 .pages-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1rem;
 }
 .page-tile {
@@ -328,7 +330,7 @@ a.retour:hover { text-decoration: underline; }
   pointer-events: none;
   opacity: .4;
 }
-@media (max-width: 560px) {
+@media (max-width: 400px) {
   .pages-grid { grid-template-columns: repeat(2, 1fr); }
   .page-tile-vide { display: none; }
 }
