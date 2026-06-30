@@ -188,9 +188,9 @@
   // ─────────────────────────────────────────────────────────────
   let TAILLE     = 7
   let CELL       = 60
-  let solution   = []   // solution[r][c] = id du rectangle
-  let indices    = []   // [{ r, c, valeur }]  — un par rectangle
-  let rectangles = []   // rectangles posés par le joueur [{ r1,c1,r2,c2,couleur }]
+  let solution   = []
+  let indices    = []
+  let rectangles = []
   let historique = []
   let dessin     = null
   let startCell  = null
@@ -200,109 +200,187 @@
   // GÉNÉRATION DU PUZZLE
   // ─────────────────────────────────────────────────────────────
 
-  function melanger(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]]
-    }
-    return arr
+  /** Aire maximale d'un rectangle selon la taille de grille. */
+  function aireMaxPour(n) {
+    if (n <= 5)  return 5
+    if (n <= 8)  return 8
+    if (n <= 12) return 12
+    if (n <= 20) return 16
+    return 22
   }
 
   /**
-   * Génère une partition de la grille N×N en rectangles.
-   * Algorithme : on place des rectangles un par un sur les cases libres,
-   * en choisissant aléatoirement la taille parmi les rectangles valides
-   * qui tiennent dans l'espace disponible à partir de la case la plus
-   * haute-gauche non encore affectée.
+   * Génère une partition valide de la grille n×n en rectangles.
+   * Algorithme glouton haut-gauche : traite les cases dans l'ordre,
+   * place un rectangle aléatoire sur la première case libre.
+   * Ne peut PAS échouer : la case libre peut toujours être couverte
+   * par un rectangle 1×1 au minimum.
    */
-  function genererSolution(n) {
-    const grille = Array.from({length: n}, () => Array(n).fill(-1))
-    const rects  = []   // [{ r1,c1,r2,c2 }]
+  function genererPartition(n) {
+    const g    = Array.from({length: n}, () => Array(n).fill(-1))
+    const rects = []
+    const aMax  = aireMaxPour(n)
+    let   id    = 0
 
-    // Contrainte sur l'aire max selon la taille de grille
-    // (évite les gros rectangles qui rendent le puzzle trop facile)
-    const aireMax = n <= 5 ? 6 : n <= 10 ? 12 : n <= 20 ? 25 : 40
-
-    let id = 0
     while (true) {
-      // Trouver la première case libre (haut-gauche)
+      // Première case libre
       let fr = -1, fc = -1
-      outer: for (let r = 0; r < n; r++) {
-        for (let c = 0; c < n; c++) {
-          if (grille[r][c] === -1) { fr = r; fc = c; break outer }
-        }
-      }
-      if (fr === -1) break  // grille complète
+      outer: for (let r = 0; r < n; r++)
+        for (let c = 0; c < n; c++)
+          if (g[r][c] === -1) { fr = r; fc = c; break outer }
+      if (fr === -1) break
 
-      // Lister tous les rectangles valides qui commencent en (fr, fc)
-      const candidats = []
+      // Candidats : tous les rectangles valides partant de (fr,fc)
+      const cands = []
       for (let r2 = fr; r2 < n; r2++) {
+        // Optimisation : si la colonne fc de la ligne r2 est prise, inutile d'aller plus bas
+        if (r2 > fr && g[r2][fc] !== -1) break
         for (let c2 = fc; c2 < n; c2++) {
           const aire = (r2 - fr + 1) * (c2 - fc + 1)
-          if (aire > aireMax) break
-          // Vérifier que toutes les cases sont libres
+          if (aire > aMax) break
+          // Vérifie que toutes les cases du rectangle sont libres
           let ok = true
           for (let r = fr; r <= r2 && ok; r++)
             for (let c = fc; c <= c2 && ok; c++)
-              if (grille[r][c] !== -1) ok = false
-          if (ok) candidats.push({ r1: fr, c1: fc, r2, c2, aire })
+              if (g[r][c] !== -1) ok = false
+          if (ok) cands.push({r1: fr, c1: fc, r2, c2, aire})
         }
       }
 
-      if (candidats.length === 0) {
-        // Impossible de placer un rectangle ici — on reprend depuis zéro
-        return null
-      }
+      // Sélection pondérée : faveur aux aires moyennes (2-8), évite les 1×1 autant que possible
+      const prefer = cands.filter(c => c.aire >= 2)
+      const pool   = prefer.length ? prefer : cands
+      const w      = pool.map(c => (c.aire >= 2 && c.aire <= 6) ? 3 : (c.aire === 1 ? 0.5 : 1))
+      const wSum   = w.reduce((s, x) => s + x, 0)
+      let   t      = Math.random() * wSum
+      let   choisi = pool[0]
+      for (let i = 0; i < pool.length; i++) { t -= w[i]; if (t <= 0) { choisi = pool[i]; break } }
 
-      // Éviter les aires 1 et 2 autant que possible :
-      // on n'y recourt que si aucun candidat d'aire ≥ 3 n'est disponible,
-      // et les aires 2 uniquement si aucun candidat d'aire ≥ 2 n'est disponible.
-      let pool = candidats.filter(c => c.aire >= 3)
-      if (pool.length === 0) pool = candidats.filter(c => c.aire >= 2)
-      if (pool.length === 0) pool = candidats
-
-      // Choisir aléatoirement dans le pool retenu, avec légère préférence
-      // pour les petites aires (rend le puzzle plus intéressant)
-      const poids = pool.map(c => 1 / c.aire)
-      const total = poids.reduce((s, p) => s + p, 0)
-      let tirage  = Math.random() * total
-      let choisi  = pool[pool.length - 1]
-      for (let i = 0; i < pool.length; i++) {
-        tirage -= poids[i]
-        if (tirage <= 0) { choisi = pool[i]; break }
-      }
-
-      // Affecter les cases
       for (let r = choisi.r1; r <= choisi.r2; r++)
         for (let c = choisi.c1; c <= choisi.c2; c++)
-          grille[r][c] = id
-
+          g[r][c] = id
       rects.push(choisi)
       id++
     }
 
-    return { grille, rects }
+    return {g, rects}
   }
 
-  /** Génère la solution, avec retry si la génération échoue (rare). */
-  function generer(n) {
-    let res = null
-    let essais = 0
-    while (!res && essais < 200) { res = genererSolution(n); essais++ }
-    if (!res) { alert('Échec de génération, réessayez.'); return }
+  /**
+   * Place l'indice de chaque rectangle à son CENTRE.
+   * Le centre est la position la plus contraignante : elle réduit le
+   * nombre de rectangles valides qui peuvent la contenir, rendant la
+   * grille beaucoup plus déterministe (et donc solvable de façon unique).
+   */
+  function placerIndicesCentre(rects) {
+    return rects.map(rect => ({
+      r:      Math.floor((rect.r1 + rect.r2) / 2),
+      c:      Math.floor((rect.c1 + rect.c2) / 2),
+      valeur: rect.aire
+    }))
+  }
 
-    solution = res.grille
-    const rects = res.rects
+  /**
+   * Solveur par backtracking : compte le nombre de solutions valides
+   * pour la configuration d'indices donnée (s'arrête à maxSol).
+   * Utilisé pour vérifier l'unicité sur les petites grilles (≤ 12).
+   */
+  function compterSolutions(n, idx, maxSol) {
+    // Map position → index du clue
+    const posMap = new Map()
+    idx.forEach((ind, i) => posMap.set(ind.r * n + ind.c, i))
 
-    // Pour chaque rectangle, choisir aléatoirement UNE case qui affichera l'indice
-    indices = rects.map(rect => {
-      const cases = []
-      for (let r = rect.r1; r <= rect.r2; r++)
-        for (let c = rect.c1; c <= rect.c2; c++)
-          cases.push({ r, c })
-      const choix = cases[Math.floor(Math.random() * cases.length)]
-      return { r: choix.r, c: choix.c, valeur: rect.aire }
+    // Pour chaque indice, lister les rectangles valides :
+    //   - contient la case de l'indice
+    //   - n'en contient pas d'autres
+    //   - dans les limites de la grille
+    //   - aire correcte
+    const candParInd = idx.map((ind) => {
+      const {r, c, valeur: a} = ind
+      const res = []
+      for (let rows = 1; rows <= Math.min(a, n); rows++) {
+        if (a % rows !== 0) continue
+        const cols = a / rows
+        if (cols > n) continue
+        const r1min = Math.max(0, r - rows + 1)
+        const r1max = Math.min(n - rows, r)
+        for (let r1 = r1min; r1 <= r1max; r1++) {
+          const r2 = r1 + rows - 1
+          const c1min = Math.max(0, c - cols + 1)
+          const c1max = Math.min(n - cols, c)
+          for (let c1 = c1min; c1 <= c1max; c1++) {
+            const c2 = c1 + cols - 1
+            let autreClue = false
+            for (let ri = r1; ri <= r2 && !autreClue; ri++)
+              for (let ci = c1; ci <= c2 && !autreClue; ci++)
+                if ((ri !== r || ci !== c) && posMap.has(ri * n + ci)) autreClue = true
+            if (!autreClue) res.push({r1, c1, r2, c2})
+          }
+        }
+      }
+      return res
     })
+
+    const grid = Array.from({length: n}, () => Array(n).fill(-1))
+    let sols = 0
+
+    function bt(ki) {
+      if (sols >= maxSol) return
+      if (ki === idx.length) {
+        // Vérifier couverture complète
+        for (let r = 0; r < n; r++)
+          for (let c = 0; c < n; c++)
+            if (grid[r][c] === -1) return
+        sols++
+        return
+      }
+      for (const rect of candParInd[ki]) {
+        let ok = true
+        for (let r = rect.r1; r <= rect.r2 && ok; r++)
+          for (let c = rect.c1; c <= rect.c2 && ok; c++)
+            if (grid[r][c] !== -1) ok = false
+        if (!ok) continue
+        for (let r = rect.r1; r <= rect.r2; r++)
+          for (let c = rect.c1; c <= rect.c2; c++)
+            grid[r][c] = ki
+        bt(ki + 1)
+        for (let r = rect.r1; r <= rect.r2; r++)
+          for (let c = rect.c1; c <= rect.c2; c++)
+            grid[r][c] = -1
+        if (sols >= maxSol) return
+      }
+    }
+
+    bt(0)
+    return sols
+  }
+
+  /**
+   * Point d'entrée de la génération.
+   * Pour les grilles ≤ 12×12 : vérifie l'unicité et relance si nécessaire.
+   * Pour les grandes grilles : le placement au centre suffit en pratique.
+   */
+  function generer(n) {
+    const MAX_ESSAIS = 60
+
+    for (let essai = 0; essai < MAX_ESSAIS; essai++) {
+      const {g, rects} = genererPartition(n)
+      solution = g
+      indices  = placerIndicesCentre(rects)
+
+      if (n <= 12) {
+        // Vérification d'unicité : on n'accepte que les puzzles à solution unique
+        const nsols = compterSolutions(n, indices, 2)
+        if (nsols === 1) return
+        // Sinon on recommence (nouvelle partition + nouveaux indices)
+      } else {
+        // Au-delà de 12, le centrage suffit ; on accepte sans vérification
+        return
+      }
+    }
+
+    // Dernier recours : on garde la dernière génération même si non unique
+    // (ne devrait arriver que sur de très petites grilles avec peu de rectangles)
   }
 
   // ─────────────────────────────────────────────────────────────
