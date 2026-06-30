@@ -124,9 +124,8 @@
         <h1>Shikaku</h1>
         <div class="niveau-btns">
           <button class="niveau-btn" onclick="demarrer(5)">5×5</button>
-          <button class="niveau-btn" onclick="demarrer(7)">7×7</button>
-          <button class="niveau-btn" onclick="demarrer(9)">9×9</button>
-          <button class="niveau-btn" onclick="demarrer(11)">11×11</button>
+          <button class="niveau-btn" onclick="demarrer(20)">20×20</button>
+          <button class="niveau-btn" onclick="demarrer(40)">40×40</button>
         </div>
       </div>
       <p class="shikaku-info">
@@ -222,7 +221,7 @@
 
     // Contrainte sur l'aire max selon la taille de grille
     // (évite les gros rectangles qui rendent le puzzle trop facile)
-    const aireMax = n <= 5 ? 6 : n <= 7 ? 9 : 12
+    const aireMax = n <= 5 ? 6 : n <= 10 ? 12 : n <= 20 ? 25 : 40
 
     let id = 0
     while (true) {
@@ -255,15 +254,22 @@
         return null
       }
 
-      // Choisir aléatoirement parmi les candidats, avec légère préférence
+      // Éviter les aires 1 et 2 autant que possible :
+      // on n'y recourt que si aucun candidat d'aire ≥ 3 n'est disponible,
+      // et les aires 2 uniquement si aucun candidat d'aire ≥ 2 n'est disponible.
+      let pool = candidats.filter(c => c.aire >= 3)
+      if (pool.length === 0) pool = candidats.filter(c => c.aire >= 2)
+      if (pool.length === 0) pool = candidats
+
+      // Choisir aléatoirement dans le pool retenu, avec légère préférence
       // pour les petites aires (rend le puzzle plus intéressant)
-      const poids = candidats.map(c => 1 / c.aire)
+      const poids = pool.map(c => 1 / c.aire)
       const total = poids.reduce((s, p) => s + p, 0)
       let tirage  = Math.random() * total
-      let choisi  = candidats[candidats.length - 1]
-      for (let i = 0; i < candidats.length; i++) {
+      let choisi  = pool[pool.length - 1]
+      for (let i = 0; i < pool.length; i++) {
         tirage -= poids[i]
-        if (tirage <= 0) { choisi = candidats[i]; break }
+        if (tirage <= 0) { choisi = pool[i]; break }
       }
 
       // Affecter les cases
@@ -319,8 +325,8 @@
 
     canvas = document.getElementById('canvas')
     ctx    = canvas.getContext('2d')
-    const maxW = Math.min(window.innerWidth - 40, 520)
-    CELL = Math.floor(maxW / TAILLE)
+    const maxW = Math.min(window.innerWidth - 40, 720)
+    CELL = Math.max(2, Math.floor(maxW / TAILLE))
     canvas.width  = TAILLE * CELL
     canvas.height = TAILLE * CELL
 
