@@ -118,11 +118,35 @@
     .mda-carte.defaussee { opacity: .35; pointer-events: none; }
     .carte-valeur  { font-size: 1rem; }
     .carte-couleur { font-size: 1.1rem; }
-    /* Couleurs des symboles */
-    .soleil { color: #f59e0b; }
-    .pierre  { color: #6b7280; }
-    .lune    { color: #6366f1; }
-    .feu     { color: #ef4444; }
+    .carte-couleur { width: 22px; height: 22px; object-fit: contain; display: block; }
+    /* Teintes des icônes selon la couleur */
+    .soleil  { filter: sepia(1) saturate(4) hue-rotate(5deg)   brightness(1.1); }
+    .pierre  { filter: grayscale(1) brightness(.75); }
+    .lune    { filter: sepia(1) saturate(3) hue-rotate(200deg) brightness(.9); }
+    .feu     { filter: sepia(1) saturate(5) hue-rotate(330deg) brightness(1); }
+
+    /* ── Tri de la main ── */
+    .mda-tri {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .6rem;
+      flex-wrap: wrap;
+    }
+    .mda-tri-label { font-size: .75rem; color: var(--couleur-texte-faible); font-weight: 600; }
+    .btn-tri {
+      padding: .25rem .7rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px;
+      background: var(--couleur-fond);
+      color: var(--couleur-texte);
+      font-size: .78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .12s, border-color .12s;
+    }
+    .btn-tri:hover { background: var(--couleur-conteneur); }
+    .btn-tri.actif { background: var(--couleur-bouton); color: white; border-color: var(--couleur-bouton); }
 
     /* ── Combo détecté ── */
     .mda-combo-zone {
@@ -215,6 +239,14 @@
       <!-- Log -->
       <div class="mda-log" id="mda-log"></div>
 
+      <!-- Tri de la main -->
+      <div class="mda-tri">
+        <span class="mda-tri-label">Trier par :</span>
+        <button class="btn-tri" id="tri-couleur" onclick="trierMain('couleur')">🎨 Couleur</button>
+        <button class="btn-tri" id="tri-valeur"  onclick="trierMain('valeur')">🔢 Valeur</button>
+        <button class="btn-tri" id="tri-reset"   onclick="trierMain('aucun')">↺ Original</button>
+      </div>
+
       <!-- Main du joueur -->
       <div class="mda-main-titre">Votre main — cliquez pour sélectionner (1 à 5 cartes)</div>
       <div class="mda-main" id="mda-main"></div>
@@ -260,10 +292,10 @@
     // ══════════════════════════════════════════════
 
     const COULEURS = [
-      { id: 'soleil', symbole: '☀️', classe: 'soleil' },
-      { id: 'pierre', symbole: '🪨', classe: 'pierre' },
-      { id: 'lune',   symbole: '🌙', classe: 'lune'   },
-      { id: 'feu',    symbole: '🔥', classe: 'feu'     },
+      { id: 'soleil', image: 'heart.png',   classe: 'soleil', label: 'Cœur'   },
+      { id: 'pierre', image: 'spade.png',   classe: 'pierre', label: 'Pique'  },
+      { id: 'lune',   image: 'club.png',    classe: 'lune',   label: 'Trèfle' },
+      { id: 'feu',    image: 'diamond.png', classe: 'feu',    label: 'Carreau'},
     ]
 
     // Valeurs numériques des cartes (J/Q/K/A valent 10 chacun)
@@ -383,8 +415,9 @@
     // ══════════════════════════════════════════════
 
     let pvJoueur, pvEnnemi, tour, defaussesRestantes
-    let deck, main, selection
+    let deck, main, mainAffichee, selection
     let partieTerminee
+    let triActif = 'aucun'
 
     // Config de la manche (sera extensible avec les sceaux)
     const CONFIG = {
@@ -479,15 +512,16 @@
     function renderMain() {
       const conteneur = document.getElementById('mda-main')
       conteneur.innerHTML = ''
-      main.forEach((carte, i) => {
+      mainAffichee.forEach((carte, i) => {
+        const idxReel = mainAffichee === main ? i : main.indexOf(carte)
         const couleurInfo = COULEURS.find(c => c.id === carte.couleur)
         const div = document.createElement('div')
-        div.className = 'mda-carte' + (selection.has(i) ? ' selectionnee' : '')
+        div.className = 'mda-carte' + (selection.has(idxReel) ? ' selectionnee' : '')
         div.innerHTML = `
           <span class="carte-valeur">${carte.rang}</span>
-          <span class="carte-couleur ${couleurInfo.classe}">${couleurInfo.symbole}</span>
+          <img class="carte-couleur ${couleurInfo.classe}" src="../pictures/${couleurInfo.image}" alt="${couleurInfo.label}" title="${couleurInfo.label}">
         `
-        div.onclick = () => toggleSelection(i)
+        div.onclick = () => toggleSelection(idxReel)
         conteneur.appendChild(div)
       })
       majStatuts()
@@ -586,6 +620,7 @@
         log(`🃏 Nouvelle main de ${nb} cartes. Défausses réinitialisées.`, 'log-info')
       }
 
+      appliquerTri()
       renderMain()
     }
 
@@ -624,6 +659,7 @@
 
       if (pvJoueur <= 0) { finPartie(false); return }
 
+      appliquerTri()
       renderMain()
     }
 
@@ -631,8 +667,40 @@
     //  GESTION DE LA PARTIE
     // ══════════════════════════════════════════════
 
+    const ORDRE_COULEUR = ['soleil', 'pierre', 'lune', 'feu']
+    const ORDRE_RANG    = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
+
+    window.trierMain = function(mode) {
+      triActif = mode
+      // Mise à jour visuelle des boutons
+      ;['couleur','valeur','aucun'].forEach(m => {
+        const btn = document.getElementById('tri-' + (m === 'aucun' ? 'reset' : m))
+        if (btn) btn.classList.toggle('actif', m === mode)
+      })
+      appliquerTri()
+      renderMain()
+    }
+
+    function appliquerTri() {
+      if (triActif === 'couleur') {
+        mainAffichee = [...main].sort((a, b) => {
+          const dc = ORDRE_COULEUR.indexOf(a.couleur) - ORDRE_COULEUR.indexOf(b.couleur)
+          if (dc !== 0) return dc
+          return ORDRE_RANG.indexOf(a.rang) - ORDRE_RANG.indexOf(b.rang)
+        })
+      } else if (triActif === 'valeur') {
+        mainAffichee = [...main].sort((a, b) => {
+          const dv = ORDRE_RANG.indexOf(b.rang) - ORDRE_RANG.indexOf(a.rang)
+          if (dv !== 0) return dv
+          return ORDRE_COULEUR.indexOf(a.couleur) - ORDRE_COULEUR.indexOf(b.couleur)
+        })
+      } else {
+        mainAffichee = main
+      }
+    }
+
     function symboleC(couleurId) {
-      return COULEURS.find(c => c.id === couleurId)?.symbole ?? ''
+      return COULEURS.find(c => c.id === couleurId)?.label ?? ''
     }
 
     function finPartie(victoire) {
@@ -674,12 +742,15 @@
       document.getElementById('mda-log').innerHTML  = ''
       document.getElementById('mda-fin').classList.remove('visible')
       document.getElementById('btn-rejouer').style.display = 'none'
+      triActif = 'aucun'
+      ;['tri-couleur','tri-valeur','tri-reset'].forEach(id => document.getElementById(id)?.classList.remove('actif'))
 
       log('═══ Nouvelle partie ═══', 'log-info')
       log(`✦ Vous affrontez un ennemi avec ${CONFIG.pvEnnemi} PV.`, 'log-info')
       log(`⚠ Il attaque tous les ${CONFIG.ennemiFréquence} tours pour ${CONFIG.ennemiDegats} dégât.`, 'log-ennemi')
       log(`🃏 ${CONFIG.cartesParManche} cartes piochées. ${CONFIG.defaussesParManche} défausses disponibles.`, 'log-info')
 
+      appliquerTri()
       renderMain()
     }
   </script>
