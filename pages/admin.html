@@ -247,6 +247,9 @@
         <button class="onglet" id="onglet-lootbox" data-onglet="lootbox" onclick="ouvrirOnglet('lootbox')" style="display:none">
           <span class="onglet-icone">🎁</span> Loot Box
         </button>
+        <button class="onglet" id="onglet-mda" data-onglet="mda" onclick="ouvrirOnglet('mda')" style="display:none">
+          <span class="onglet-icone">😇</span> Ennemis MDA
+        </button>
         <button class="onglet" data-onglet="annonces" onclick="ouvrirOnglet('annonces')">
           <span class="onglet-icone">📢</span> Annonces
         </button>
@@ -444,6 +447,52 @@
           </div>
         </div>
 
+        <!-- ===== Onglet Ennemis MDA ===== -->
+        <div class="onglet-panneau" data-panneau="mda" id="mda-card">
+          <h2>😇 Ennemis — Main de l'Ange</h2>
+          <p class="note-verrouille">Gérez les ennemis affrontables sur la page Main de l'Ange : PV, dégâts d'attaque, délai d'attaque (tous les N tours) et effet spécial (théorique pour l'instant, pas encore actif en jeu).</p>
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormEnnemiMDA(null)">+ Nouvel ennemi</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="m-filtre-nom" placeholder="Nom de l'ennemi…" oninput="appliquerFiltresEnnemisMDA()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="m-filtre-statut" onchange="appliquerFiltresEnnemisMDA()">
+                <option value="">Tous</option>
+                <option value="actif">Actif</option>
+                <option value="inactif">Désactivé</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="m-tri" onchange="appliquerFiltresEnnemisMDA()">
+                <option value="ordre-asc">Ordre ↑</option>
+                <option value="ordre-desc">Ordre ↓</option>
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="pv-desc">PV ↓</option>
+                <option value="pv-asc">PV ↑</option>
+                <option value="degats_attaque-desc">Dégâts ↓</option>
+                <option value="degats_attaque-asc">Dégâts ↑</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresEnnemisMDA()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="m-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>PV</th><th>Dégâts</th><th>Délai (tours)</th><th>Effet spécial</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-mda"></tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- ===== Onglet Annonces ===== -->
         <div class="onglet-panneau" data-panneau="annonces">
           <h2>📢 Annonces</h2>
@@ -552,6 +601,32 @@
     </div>
   </div>
 
+  <!-- ===== Modale Ennemi MDA ===== -->
+  <div class="modale-fond" id="modale-mda-fond" onclick="if(event.target===this) fermerModaleEnnemiMDA()">
+    <div class="modale-admin">
+      <button class="modale-fermer" onclick="fermerModaleEnnemiMDA()">✕</button>
+      <h2 id="titre-modale-mda">Nouvel ennemi</h2>
+      <label for="m-id">Identifiant unique (texte, ex: charb)</label>
+      <input type="text" id="m-id" placeholder="ex: charb">
+      <label for="m-nom">Nom affiché</label>
+      <input type="text" id="m-nom" placeholder="ex: Charb">
+      <label for="m-image">Nom du fichier image (dans /pictures/)</label>
+      <input type="text" id="m-image" placeholder="ex: charb.png">
+      <label for="m-pv">Points de vie (PV)</label>
+      <input type="number" id="m-pv" min="1" step="1" placeholder="10">
+      <label for="m-degats">Dégâts d'attaque</label>
+      <input type="number" id="m-degats" min="0" step="1" placeholder="1">
+      <label for="m-delai">Délai d'attaque (attaque tous les N tours)</label>
+      <input type="number" id="m-delai" min="1" step="1" placeholder="4">
+      <label for="m-effet">Effet spécial (optionnel — théorique, pas encore actif en jeu)</label>
+      <input type="text" id="m-effet" placeholder="Aucun pour l'instant">
+      <label for="m-ordre">Ordre d'affichage</label>
+      <input type="number" id="m-ordre" step="1" placeholder="1">
+      <button class="btn btn-primary btn-full" onclick="sauvegarderEnnemiMDA()">Enregistrer</button>
+      <div class="msg-inline" id="msg-modale-mda"></div>
+    </div>
+  </div>
+
   <!-- ===== Modale Annonce ===== -->
   <div class="modale-fond" id="modale-annonce-fond" onclick="if(event.target===this) fermerModaleAnnonce()">
     <div class="modale-admin">
@@ -593,6 +668,9 @@
     import {
       adminListerAnnonces, adminSauvegarderAnnonce, adminSupprimerAnnonce
     } from '../script/annonces.js'
+    import {
+      adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
+    } from '../script/mda.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
@@ -652,9 +730,11 @@
         document.getElementById('onglet-theme').style.display = 'flex'
         document.getElementById('onglet-creatures').style.display = 'flex'
         document.getElementById('onglet-lootbox').style.display = 'flex'
+        document.getElementById('onglet-mda').style.display = 'flex'
         chargerTheme()
         chargerCreatures()
         chargerLootBoxesAdmin()
+        chargerEnnemisMDA()
       }
       chargerUtilisateurs()
       chargerAnnoncesAdmin()
@@ -1071,6 +1151,118 @@
     window.retirerCreatureDeLaBox = async function(lootBoxId, creatureId) {
       await adminRetirerCreatureBox(lootBoxId, creatureId)
       await rafraichirComposition(lootBoxId)
+    }
+
+    // ===== Ennemis MDA =====
+    let ennemisMDACache = []
+    let ennemiMDAEnEdition = null
+
+    async function chargerEnnemisMDA() {
+      ennemisMDACache = await adminListerEnnemisMDA()
+      appliquerFiltresEnnemisMDA()
+    }
+
+    window.appliquerFiltresEnnemisMDA = function() {
+      const recherche = document.getElementById('m-filtre-nom').value.trim().toLowerCase()
+      const statut    = document.getElementById('m-filtre-statut').value
+      const tri       = document.getElementById('m-tri').value
+
+      let data = ennemisMDACache.filter(m => {
+        if (recherche && !m.nom.toLowerCase().includes(recherche)) return false
+        if (statut === 'actif' && !m.actif) return false
+        if (statut === 'inactif' && m.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'ordre') { va = Number(a.ordre); vb = Number(b.ordre) }
+        else if (champ === 'pv') { va = Number(a.pv); vb = Number(b.pv) }
+        else if (champ === 'degats_attaque') { va = Number(a.degats_attaque); vb = Number(b.degats_attaque) }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('m-compteur').textContent = data.length + ' / ' + ennemisMDACache.length + ' ennemi(s)'
+      const tbody = document.getElementById('tbody-mda')
+      tbody.innerHTML = data.map(m => `<tr>
+        <td><img class="img-mini" src="../pictures/${esc(m.image)}" alt="${esc(m.nom)}" onerror="this.style.opacity=0.2"></td>
+        <td>${esc(m.nom)}</td>
+        <td>${Number(m.pv).toLocaleString('fr')}</td>
+        <td>${Number(m.degats_attaque).toLocaleString('fr')}</td>
+        <td>${m.delai_attaque}</td>
+        <td>${m.effet_special ? esc(m.effet_special) : '<span class="note-verrouille">Aucun</span>'}</td>
+        <td>${m.actif ? '<span class="msg-inline ok">Actif</span>' : '<span class="msg-inline err">Désactivé</span>'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormEnnemiMDA('${m.id}')">Modifier</button>
+            <button class="btn-preset" onclick="toggleActifEnnemiMDA('${m.id}', ${m.actif})">${m.actif ? 'Désactiver' : 'Activer'}</button>
+            <button class="btn-delete" onclick="supprimerEnnemiMDA('${esc(m.id)}', '${esc(m.nom)}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="8" class="note-verrouille">Aucun ennemi trouvé.</td></tr>'
+    }
+
+    window.resetFiltresEnnemisMDA = function() {
+      document.getElementById('m-filtre-nom').value = ''
+      document.getElementById('m-filtre-statut').value = ''
+      document.getElementById('m-tri').value = 'ordre-asc'
+      appliquerFiltresEnnemisMDA()
+    }
+
+    window.ouvrirFormEnnemiMDA = function(id) {
+      ennemiMDAEnEdition = id
+      const m = id ? ennemisMDACache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-mda').textContent = id ? "Modifier l'ennemi" : 'Nouvel ennemi'
+      document.getElementById('m-id').value = m?.id ?? ''
+      document.getElementById('m-id').disabled = !!id
+      document.getElementById('m-nom').value = m?.nom ?? ''
+      document.getElementById('m-image').value = m?.image ?? ''
+      document.getElementById('m-pv').value = m?.pv ?? '10'
+      document.getElementById('m-degats').value = m?.degats_attaque ?? '1'
+      document.getElementById('m-delai').value = m?.delai_attaque ?? '4'
+      document.getElementById('m-effet').value = m?.effet_special ?? ''
+      document.getElementById('m-ordre').value = m?.ordre ?? (ennemisMDACache.length + 1)
+      document.getElementById('msg-modale-mda').textContent = ''
+      document.getElementById('modale-mda-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleEnnemiMDA = function() {
+      document.getElementById('modale-mda-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderEnnemiMDA = async function() {
+      const id = document.getElementById('m-id').value.trim()
+      const nom = document.getElementById('m-nom').value.trim()
+      const image = document.getElementById('m-image').value.trim()
+      const pv = parseInt(document.getElementById('m-pv').value)
+      const degats_attaque = parseInt(document.getElementById('m-degats').value)
+      const delai_attaque = parseInt(document.getElementById('m-delai').value)
+      const effet_special = document.getElementById('m-effet').value.trim() || null
+      const ordre = parseInt(document.getElementById('m-ordre').value) || 0
+      const msgEl = document.getElementById('msg-modale-mda')
+      if (!id || !nom || !image || isNaN(pv) || isNaN(degats_attaque) || isNaN(delai_attaque) || pv < 1 || delai_attaque < 1) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (PV ≥ 1, délai ≥ 1).'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      const { ok, error } = await adminSauvegarderEnnemiMDA({ id, nom, image, pv, degats_attaque, delai_attaque, effet_special, ordre, actif: true })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerEnnemisMDA()
+      setTimeout(() => fermerModaleEnnemiMDA(), 500)
+    }
+
+    window.toggleActifEnnemiMDA = async function(id, actifActuel) {
+      await adminToggleActifEnnemiMDA(id, !actifActuel)
+      await chargerEnnemisMDA()
+    }
+
+    window.supprimerEnnemiMDA = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement l'ennemi "${nom}" ? Cette action est irréversible.`)) return
+      await adminSupprimerEnnemiMDA(id)
+      await chargerEnnemisMDA()
     }
 
     // ===== Annonces =====
