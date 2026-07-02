@@ -395,15 +395,26 @@
     }
     .modale-fermer:hover { color: var(--couleur-texte); }
 
-    /* Grille de la pile restante */
+    /* Grille de la pile restante — une ligne par couleur */
     .pile-grille {
       display: flex;
-      flex-wrap: wrap;
-      gap: .5rem;
+      flex-direction: column;
+      gap: .9rem;
     }
+    .pile-ligne { display: flex; flex-direction: column; gap: .4rem; }
+    .pile-ligne-titre {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--couleur-texte-faible);
+    }
+    .pile-ligne-titre img { width: 16px; height: 16px; object-fit: contain; }
+    .pile-ligne-cartes { display: flex; flex-wrap: wrap; gap: .4rem; }
     .pile-carte {
-      width: 54px;
-      min-height: 76px;
+      width: 44px;
+      min-height: 62px;
       background: var(--couleur-fond);
       border: 2px solid var(--couleur-bordure);
       border-radius: 8px;
@@ -414,6 +425,11 @@
       gap: .12rem;
       font-size: .78rem;
       font-weight: 700;
+      transition: opacity .15s, filter .15s;
+    }
+    .pile-carte.sortie {
+      opacity: .3;
+      filter: grayscale(1);
     }
 
     /* Liste des combos */
@@ -1094,22 +1110,28 @@
       const grille = document.getElementById('pile-grille')
       document.getElementById('pile-count').textContent = deck.length
 
-      if (deck.length === 0) {
-        grille.innerHTML = '<span class="log-info">La pile est vide — elle sera régénérée à la prochaine pioche.</span>'
-      } else {
-        const triee = [...deck].sort((a, b) => {
-          const dc = ORDRE_COULEUR.indexOf(a.couleur) - ORDRE_COULEUR.indexOf(b.couleur)
-          return dc !== 0 ? dc : ORDRE_RANG.indexOf(a.rang) - ORDRE_RANG.indexOf(b.rang)
-        })
-        grille.innerHTML = triee.map(c => {
-          const info = COULEURS.find(x => x.id === c.couleur)
+      // Cartes encore présentes dans la pile, indexées par "couleur-rang"
+      const presentes = new Set(deck.map(c => c.couleur + '-' + c.rang))
+
+      grille.innerHTML = COULEURS.map(couleur => {
+        const cartes = ORDRE_RANG.map(rang => {
+          const dansLaPile = presentes.has(couleur.id + '-' + rang)
           return `
-            <div class="pile-carte">
-              <span class="carte-valeur">${c.rang}</span>
-              <img class="carte-couleur" src="../pictures/${info.image}" alt="${info.label}" title="${info.label}">
+            <div class="pile-carte${dansLaPile ? '' : ' sortie'}">
+              <span class="carte-valeur">${rang}</span>
+              <img class="carte-couleur" src="../pictures/${couleur.image}" alt="${couleur.label}" title="${couleur.label}">
             </div>`
         }).join('')
-      }
+
+        return `
+          <div class="pile-ligne">
+            <div class="pile-ligne-titre">
+              <img src="../pictures/${couleur.image}" alt="">
+              <span>${couleur.label}</span>
+            </div>
+            <div class="pile-ligne-cartes">${cartes}</div>
+          </div>`
+      }).join('')
 
       document.getElementById('modale-pile').classList.add('ouverte')
     }
