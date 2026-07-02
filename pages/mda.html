@@ -571,6 +571,7 @@
 
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    import { chargerEnnemisMDA } from '../script/mda.js'
 
     ;(async () => {
       if (!localStorage.getItem('username')) { window.location.href = 'connexion.html'; return }
@@ -603,48 +604,26 @@
     // Cartes de commandement (pour la Main de l'Ange)
     const CARTES_COMMANDEMENT = new Set(['J', 'Q', 'K', 'A', '10'])
 
-    // Liste des adversaires sélectionnables. `image` (dossier /pictures/) est
-    // prioritaire ; à défaut, `emoji` sert de visuel de repli.
-    const ENNEMIS = [
-      {
-        id: 'charb',
-        nom: 'Charb',
-        image: 'charb.png',
-        difficulte: 'Facile',
-        pv: 10,
-        degats: 1,
-        frequence: 4
-      },
-      {
-        id: 'gremlin',
-        nom: 'Gremlin Vorace',
-        emoji: '👹',
-        difficulte: 'Moyen',
-        pv: 16,
-        degats: 2,
-        frequence: 3
-      },
-      {
-        id: 'spectre',
-        nom: 'Spectre Hurlant',
-        emoji: '👻',
-        difficulte: 'Difficile',
-        pv: 22,
-        degats: 2,
-        frequence: 2
-      },
-      {
-        id: 'colosse',
-        nom: 'Colosse de Pierre',
-        emoji: '🗿',
-        difficulte: 'Très difficile',
-        pv: 30,
-        degats: 3,
-        frequence: 2
-      }
-    ]
+    // Liste des adversaires sélectionnables : chargée depuis la BDD
+    // (table `mda_ennemis`, voir script/mda.js). Aucun ennemi codé en dur ici.
+    // Champs BDD -> champs utilisés en jeu : degats_attaque -> degats,
+    // delai_attaque -> frequence.
+    let ENNEMIS = []
+    let ennemiActuel = null
 
-    let ennemiActuel = ENNEMIS[0]
+    async function chargerListeEnnemis() {
+      const donnees = await chargerEnnemisMDA()
+      ENNEMIS = donnees.map(e => ({
+        id: e.id,
+        nom: e.nom,
+        image: e.image,
+        pv: e.pv,
+        degats: e.degats_attaque,
+        frequence: e.delai_attaque,
+        effet_special: e.effet_special
+      }))
+      return ENNEMIS
+    }
 
     const COMBOS = [
       // Ordre décroissant de priorité
@@ -1175,38 +1154,52 @@
     //  SÉLECTION DE L'ADVERSAIRE
     // ══════════════════════════════════════════════
 
-    window.afficherEcranSelection = function() {
+    window.afficherEcranSelection = async function() {
+      document.getElementById('ecran-selection').style.display = 'block'
+      document.getElementById('ecran-jeu').style.display = 'none'
+
       const grille = document.getElementById('ennemis-grille')
-      grille.innerHTML = ENNEMIS.map(e => `
+      grille.innerHTML = '<p class="log-info">Chargement des adversaires…</p>'
+
+      const liste = await chargerListeEnnemis()
+
+      if (liste.length === 0) {
+        grille.innerHTML = '<p class="log-info">Aucun adversaire disponible pour le moment.</p>'
+        return
+      }
+
+      grille.innerHTML = liste.map(e => `
         <div class="ennemi-tile" onclick="choisirEnnemi('${e.id}')">
           <div class="ennemi-tile-visuel">
-            ${e.image ? `<img src="../pictures/${e.image}" alt="${e.nom}">` : e.emoji}
+            <img src="../pictures/${e.image}" alt="${e.nom}">
           </div>
           <div class="ennemi-tile-nom">${e.nom}</div>
-          <span class="ennemi-tile-diff">${e.difficulte}</span>
           <div class="ennemi-tile-stats">
             <span>❤ ${e.pv} PV</span>
             <span>🗡 ${e.degats} dégât(s) tous les ${e.frequence} tours</span>
           </div>
         </div>
       `).join('')
-
-      document.getElementById('ecran-selection').style.display = 'block'
-      document.getElementById('ecran-jeu').style.display = 'none'
     }
 
     window.choisirEnnemi = function(id) {
-      ennemiActuel = ENNEMIS.find(e => e.id === id) ?? ENNEMIS[0]
+      ennemiActuel = ENNEMIS.find(e => e.id === id)
+      if (!ennemiActuel) return
       document.getElementById('ecran-selection').style.display = 'none'
       document.getElementById('ecran-jeu').style.display = 'block'
       demarrerPartie()
     }
 
     window.changerAdversaire = function() {
-      if (!partieTerminee && (pvJoueur > 0 && pvEnnemi > 0) && tour > 1) {
+      // Revenir à l'écran de sélection remet systématiquement le combat à
+      // zéro : la partie en cours est abandonnée (aucun état n'est conservé),
+      // et choisirEnnemi() relance demarrerPartie() depuis le début lors du
+      // prochain choix.
+      if (!partieTerminee && ennemiActuel && pvJoueur > 0 && pvEnnemi > 0 && tour > 1) {
         const confirmation = confirm("Changer d'adversaire abandonnera le combat en cours. Continuer ?")
         if (!confirmation) return
       }
+      ennemiActuel = null
       afficherEcranSelection()
     }
 
@@ -1225,11 +1218,9 @@
       selection         = new Set()
       partieTerminee    = false
 
-      // Visuel de l'ennemi (image si disponible, sinon emoji de repli)
+      // Visuel de l'ennemi (image toujours fournie par la BDD)
       const visuel = document.getElementById('ennemi-visuel')
-      visuel.innerHTML = ennemiActuel.image
-        ? `<img class="mda-ennemi-img" src="../pictures/${ennemiActuel.image}" alt="${ennemiActuel.nom}">`
-        : `<span class="mda-ennemi-emoji">${ennemiActuel.emoji}</span>`
+      visuel.innerHTML = `<img class="mda-ennemi-img" src="../pictures/${ennemiActuel.image}" alt="${ennemiActuel.nom}">`
       document.getElementById('ennemi-nom').textContent = ennemiActuel.nom
 
       document.getElementById('mda-log').innerHTML  = ''
