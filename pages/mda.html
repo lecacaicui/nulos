@@ -117,13 +117,8 @@
     }
     .mda-carte.defaussee { opacity: .35; pointer-events: none; }
     .carte-valeur  { font-size: 1rem; }
-    .carte-couleur { font-size: 1.1rem; }
-    .carte-couleur { width: 22px; height: 22px; object-fit: contain; display: block; }
-    /* Teintes des icônes selon la couleur */
-    .soleil  { filter: sepia(1) saturate(4) hue-rotate(5deg)   brightness(1.1); }
-    .pierre  { filter: grayscale(1) brightness(.75); }
-    .lune    { filter: sepia(1) saturate(3) hue-rotate(200deg) brightness(.9); }
-    .feu     { filter: sepia(1) saturate(5) hue-rotate(330deg) brightness(1); }
+    /* Icônes de couleur — pas de filtre, on garde les couleurs natives des PNG */
+    .carte-couleur { width: 28px; height: 28px; object-fit: contain; display: block; }
 
     /* ── Tri de la main ── */
     .mda-tri {
@@ -292,10 +287,10 @@
     // ══════════════════════════════════════════════
 
     const COULEURS = [
-      { id: 'soleil', image: 'heart.png',   classe: 'soleil', label: 'Cœur'   },
-      { id: 'pierre', image: 'spade.png',   classe: 'pierre', label: 'Pique'  },
-      { id: 'lune',   image: 'club.png',    classe: 'lune',   label: 'Trèfle' },
-      { id: 'feu',    image: 'diamond.png', classe: 'feu',    label: 'Carreau'},
+      { id: 'soleil', image: 'heart.png',   label: 'Cœur'   },
+      { id: 'pierre', image: 'spade.png',   label: 'Pique'  },
+      { id: 'lune',   image: 'club.png',    label: 'Trèfle' },
+      { id: 'feu',    image: 'diamond.png', label: 'Carreau'},
     ]
 
     // Valeurs numériques des cartes (J/Q/K/A valent 10 chacun)
@@ -512,14 +507,14 @@
     function renderMain() {
       const conteneur = document.getElementById('mda-main')
       conteneur.innerHTML = ''
-      mainAffichee.forEach((carte, i) => {
-        const idxReel = mainAffichee === main ? i : main.indexOf(carte)
+      mainAffichee.forEach((carte) => {
+        const idxReel = main.indexOf(carte)
         const couleurInfo = COULEURS.find(c => c.id === carte.couleur)
         const div = document.createElement('div')
         div.className = 'mda-carte' + (selection.has(idxReel) ? ' selectionnee' : '')
         div.innerHTML = `
           <span class="carte-valeur">${carte.rang}</span>
-          <img class="carte-couleur ${couleurInfo.classe}" src="../pictures/${couleurInfo.image}" alt="${couleurInfo.label}" title="${couleurInfo.label}">
+          <img class="carte-couleur" src="../pictures/${couleurInfo.image}" alt="${couleurInfo.label}" title="${couleurInfo.label}">
         `
         div.onclick = () => toggleSelection(idxReel)
         conteneur.appendChild(div)
@@ -667,12 +662,15 @@
     //  GESTION DE LA PARTIE
     // ══════════════════════════════════════════════
 
+    function symboleC(couleurId) {
+      return COULEURS.find(c => c.id === couleurId)?.label ?? ''
+    }
+
     const ORDRE_COULEUR = ['soleil', 'pierre', 'lune', 'feu']
     const ORDRE_RANG    = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
 
     window.trierMain = function(mode) {
       triActif = mode
-      // Mise à jour visuelle des boutons
       ;['couleur','valeur','aucun'].forEach(m => {
         const btn = document.getElementById('tri-' + (m === 'aucun' ? 'reset' : m))
         if (btn) btn.classList.toggle('actif', m === mode)
@@ -685,22 +683,16 @@
       if (triActif === 'couleur') {
         mainAffichee = [...main].sort((a, b) => {
           const dc = ORDRE_COULEUR.indexOf(a.couleur) - ORDRE_COULEUR.indexOf(b.couleur)
-          if (dc !== 0) return dc
-          return ORDRE_RANG.indexOf(a.rang) - ORDRE_RANG.indexOf(b.rang)
+          return dc !== 0 ? dc : ORDRE_RANG.indexOf(a.rang) - ORDRE_RANG.indexOf(b.rang)
         })
       } else if (triActif === 'valeur') {
         mainAffichee = [...main].sort((a, b) => {
           const dv = ORDRE_RANG.indexOf(b.rang) - ORDRE_RANG.indexOf(a.rang)
-          if (dv !== 0) return dv
-          return ORDRE_COULEUR.indexOf(a.couleur) - ORDRE_COULEUR.indexOf(b.couleur)
+          return dv !== 0 ? dv : ORDRE_COULEUR.indexOf(a.couleur) - ORDRE_COULEUR.indexOf(b.couleur)
         })
       } else {
         mainAffichee = main
       }
-    }
-
-    function symboleC(couleurId) {
-      return COULEURS.find(c => c.id === couleurId)?.label ?? ''
     }
 
     function finPartie(victoire) {
