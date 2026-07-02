@@ -229,89 +229,86 @@
     .fin-victoire { color: #22c55e; }
     .fin-defaite  { color: #ef4444; }
 
-    /* ── Écran de sélection d'ennemi ── */
-    .mda-selection-wrap {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 2rem 1rem 6rem;
+    /* ── Bouton secondaire (pile / combos) ── */
+    .btn-secondaire { background: var(--couleur-bordure); color: var(--couleur-texte); }
+
+    /* ── Modales (pile restante / combos) ── */
+    .modale-fond {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
     }
-    .mda-selection-wrap h1 { margin-bottom: .25rem; }
-    .mda-selection-wrap .subtitle { margin-bottom: 1.5rem; }
-    .ennemis-grille {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 1rem;
-    }
-    .ennemi-select-carte {
+    .modale-fond.ouverte { display: flex; }
+    .modale-carte-liste {
       background: var(--couleur-conteneur);
-      border: 1px solid var(--couleur-bordure);
       border-radius: 14px;
-      padding: 1.5rem 1rem;
-      text-align: center;
+      padding: 1.75rem;
+      max-width: 640px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    }
+    .modale-carte-liste h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+    .modale-fermer {
+      position: absolute;
+      top: .9rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modale-fermer:hover { color: var(--couleur-texte); }
+
+    /* Grille de la pile restante */
+    .pile-grille {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .pile-carte {
+      width: 54px;
+      min-height: 76px;
+      background: var(--couleur-fond);
+      border: 2px solid var(--couleur-bordure);
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: .5rem;
-    }
-    .ennemi-select-img { width: 88px; height: 88px; object-fit: contain; }
-    .ennemi-select-nom { font-weight: 700; font-size: 1rem; }
-    .ennemi-select-stats {
-      display: flex;
-      gap: .5rem;
-      flex-wrap: wrap;
       justify-content: center;
+      gap: .12rem;
       font-size: .78rem;
-      color: var(--couleur-texte-faible);
-      margin-bottom: .3rem;
+      font-weight: 700;
     }
-    .ennemi-select-stats span {
+
+    /* Liste des combos */
+    .combos-liste { display: flex; flex-direction: column; gap: .9rem; }
+    .combo-item {
       background: var(--couleur-fond);
       border: 1px solid var(--couleur-bordure);
-      border-radius: 999px;
-      padding: .2rem .6rem;
+      border-radius: 10px;
+      padding: .8rem 1rem;
     }
-    .ennemi-select-effet {
-      font-size: .74rem;
-      color: var(--couleur-texte-faible);
-      font-style: italic;
-      min-height: 1.1em;
-    }
-    .ennemi-select-carte .btn { width: 100%; margin-top: .3rem; }
-    .mda-selection-vide {
-      color: var(--couleur-texte-faible);
-      font-size: .9rem;
-      text-align: center;
-      padding: 2rem 0;
-    }
-    .lien-changer-ennemi {
-      display: inline-block;
-      margin-bottom: 1rem;
-      font-size: .85rem;
-      color: var(--couleur-bouton);
-      text-decoration: none;
-      cursor: pointer;
-      background: none;
-      border: none;
-      padding: 0;
-    }
-    .lien-changer-ennemi:hover { text-decoration: underline; }
+    .combo-item-nom { font-weight: 700; color: #a855f7; margin-bottom: .25rem; }
+    .combo-item-desc { font-size: .85rem; margin-bottom: .3rem; }
+    .combo-item-formule { font-size: .8rem; color: var(--couleur-texte-faible); font-weight: 600; }
   </style>
 </head>
 <body>
   <div id="header-placeholder"></div>
 
   <main>
-    <!-- Écran de sélection d'ennemi -->
-    <div class="mda-selection-wrap" id="mda-selection-wrap">
+    <div class="mda-wrap">
       <h1>Main de l'Ange</h1>
-      <p class="subtitle">Choisissez l'ennemi que vous souhaitez affronter.</p>
-      <div class="ennemis-grille" id="ennemis-grille">
-        <div class="mda-selection-vide">Chargement des ennemis…</div>
-      </div>
-    </div>
-
-    <div class="mda-wrap" id="mda-wrap" style="display:none">
-      <button class="lien-changer-ennemi" onclick="retourSelection()">← Changer d'ennemi</button>
       <p class="subtitle">Sélectionnez vos cartes, formez des combos, détruisez l'ennemi.</p>
 
       <!-- Ennemi -->
@@ -348,6 +345,10 @@
           <span class="mda-status-label">Cartes sélect.</span>
           <span class="mda-status-val" id="stat-select">0</span>
         </div>
+        <div class="mda-status-box">
+          <span class="mda-status-label">Cartes en pile</span>
+          <span class="mda-status-val" id="stat-pile">0</span>
+        </div>
       </div>
 
       <!-- Log -->
@@ -375,6 +376,8 @@
         <button class="mda-btn btn-attaquer"  id="btn-attaquer"  onclick="attaquer()"  disabled>⚔ Attaquer</button>
         <button class="mda-btn btn-defausser" id="btn-defausser" onclick="defausser()" disabled>↩ Défausser (0/5)</button>
         <button class="mda-btn btn-deselect"  id="btn-deselect"  onclick="toutDeselectionner()">✕ Désélectionner</button>
+        <button class="mda-btn btn-secondaire" onclick="ouvrirModalePile()">🂠 Voir la pile</button>
+        <button class="mda-btn btn-secondaire" onclick="ouvrirModaleCombos()">📖 Combinaisons</button>
         <button class="mda-btn btn-rejouer"   id="btn-rejouer"   onclick="nouvelleManche()" style="display:none">↺ Rejouer</button>
       </div>
 
@@ -387,21 +390,28 @@
     </div>
   </main>
 
+  <!-- Modale : cartes restantes dans la pile -->
+  <div class="modale-fond" id="modale-pile" onclick="if(event.target===this) fermerModale('modale-pile')">
+    <div class="modale-carte-liste">
+      <button class="modale-fermer" onclick="fermerModale('modale-pile')">✕</button>
+      <h2>Cartes restantes dans la pile (<span id="pile-count">0</span>)</h2>
+      <div class="pile-grille" id="pile-grille"></div>
+    </div>
+  </div>
+
+  <!-- Modale : liste des combinaisons possibles -->
+  <div class="modale-fond" id="modale-combos" onclick="if(event.target===this) fermerModale('modale-combos')">
+    <div class="modale-carte-liste">
+      <button class="modale-fermer" onclick="fermerModale('modale-combos')">✕</button>
+      <h2>Combinaisons possibles</h2>
+      <div class="combos-liste" id="combos-liste"></div>
+    </div>
+  </div>
+
   <div id="footer-placeholder"></div>
 
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
-    import { chargerEnnemisMDA } from '../script/mda.js'
-
-    // Protège contre les injections XSS
-    function esc(str) {
-      return String(str ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-    }
 
     ;(async () => {
       if (!localStorage.getItem('username')) { window.location.href = 'connexion.html'; return }
@@ -409,63 +419,8 @@
       appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
-      await afficherSelectionEnnemis()
-    })()
-
-    // ══════════════════════════════════════════════
-    //  SÉLECTION DE L'ENNEMI (avant le combat)
-    // ══════════════════════════════════════════════
-
-    // Ennemi par défaut si la BDD ne contient encore aucun ennemi configuré.
-    const ENNEMI_PAR_DEFAUT = {
-      id: 'charb', nom: 'Charb', image: 'charb.png',
-      pv: 10, degats_attaque: 1, delai_attaque: 4, effet_special: null
-    }
-
-    let ennemisDispo = []
-    let ennemiChoisi = null
-
-    async function afficherSelectionEnnemis() {
-      document.getElementById('mda-wrap').style.display = 'none'
-      document.getElementById('mda-selection-wrap').style.display = 'block'
-
-      ennemisDispo = await chargerEnnemisMDA()
-      if (ennemisDispo.length === 0) ennemisDispo = [ENNEMI_PAR_DEFAUT]
-
-      const grille = document.getElementById('ennemis-grille')
-      grille.innerHTML = ennemisDispo.map(e => `
-        <div class="ennemi-select-carte">
-          <img class="ennemi-select-img" src="../pictures/${esc(e.image)}" alt="${esc(e.nom)}" onerror="this.style.opacity=0.2">
-          <span class="ennemi-select-nom">${esc(e.nom)}</span>
-          <div class="ennemi-select-stats">
-            <span>❤ ${e.pv} PV</span>
-            <span>⚔ ${e.degats_attaque} dégâts</span>
-            <span>⏱ tous les ${e.delai_attaque} tours</span>
-          </div>
-          <div class="ennemi-select-effet">${e.effet_special ? esc(e.effet_special) : ''}</div>
-          <button class="btn btn-primary" onclick="choisirEnnemi('${esc(e.id)}')">Combattre</button>
-        </div>`).join('')
-    }
-
-    window.choisirEnnemi = function(id) {
-      ennemiChoisi = ennemisDispo.find(e => e.id === id) ?? ENNEMI_PAR_DEFAUT
-      CONFIG.pvEnnemi        = Number(ennemiChoisi.pv)
-      CONFIG.ennemiDegats    = Number(ennemiChoisi.degats_attaque)
-      CONFIG.ennemiFréquence = Number(ennemiChoisi.delai_attaque)
-
-      document.getElementById('ennemi-img').src = '../pictures/' + ennemiChoisi.image
-      document.getElementById('ennemi-img').alt = ennemiChoisi.nom
-      document.getElementById('ennemi-nom').textContent = ennemiChoisi.nom
-
-      document.getElementById('mda-selection-wrap').style.display = 'none'
-      document.getElementById('mda-wrap').style.display = 'block'
-
       demarrerPartie()
-    }
-
-    window.retourSelection = function() {
-      afficherSelectionEnnemis()
-    }
+    })()
 
     // ══════════════════════════════════════════════
     //  CONSTANTES ET CONFIGURATION
@@ -494,6 +449,8 @@
       {
         nom: "Main de l'Ange",
         priorite: 10,
+        description: "5 cartes de la même couleur, toutes des cartes de commandement (10, J, Q, K, A).",
+        formule: "somme des valeurs × 12",
         tester: cartes => {
           if (cartes.length !== 5) return false
           const couleur = cartes[0].couleur
@@ -504,6 +461,8 @@
       {
         nom: 'Défilé de la horde',
         priorite: 9,
+        description: "5 cartes consécutives, toutes de la même couleur (suite couleur).",
+        formule: "somme des valeurs × 6",
         tester: cartes => {
           if (cartes.length !== 5) return false
           const couleur = cartes[0].couleur
@@ -515,6 +474,8 @@
       {
         nom: 'Grand régiment',
         priorite: 8,
+        description: "Un brelan (3 cartes de même rang) + une paire (2 cartes de même rang) — un « full ».",
+        formule: "somme des valeurs × 5",
         tester: cartes => {
           if (cartes.length !== 5) return false
           const groupes = groupesParRang(cartes)
@@ -526,6 +487,8 @@
       {
         nom: 'Horde',
         priorite: 7,
+        description: "5 cartes de la même couleur, sans autre contrainte.",
+        formule: "somme des valeurs × 3",
         tester: cartes => {
           if (cartes.length !== 5) return false
           const couleur = cartes[0].couleur
@@ -536,6 +499,8 @@
       {
         nom: 'Défilé',
         priorite: 6,
+        description: "5 cartes de rangs consécutifs, couleurs mélangées (suite).",
+        formule: "somme des valeurs × 3",
         tester: cartes => {
           if (cartes.length !== 5) return false
           return estConsecutif(cartes)
@@ -545,6 +510,8 @@
       {
         nom: 'Tétrade',
         priorite: 5,
+        description: "4 cartes du même rang (carré).",
+        formule: "somme des valeurs × 8",
         tester: cartes => {
           if (cartes.length !== 4) return false
           return Object.values(groupesParRang(cartes)).some(g => g.length === 4)
@@ -554,6 +521,8 @@
       {
         nom: 'Triade',
         priorite: 4,
+        description: "3 cartes du même rang (brelan).",
+        formule: "somme des valeurs × 4",
         tester: cartes => {
           if (cartes.length !== 3) return false
           return Object.values(groupesParRang(cartes)).some(g => g.length === 3)
@@ -563,6 +532,8 @@
       {
         nom: 'Série de dyades',
         priorite: 3,
+        description: "2 paires de rangs différents (double paire).",
+        formule: "somme des valeurs × 3",
         tester: cartes => {
           if (cartes.length !== 4) return false
           const tailles = Object.values(groupesParRang(cartes)).map(g => g.length).sort((a,b)=>b-a)
@@ -573,6 +544,8 @@
       {
         nom: 'Dyade',
         priorite: 2,
+        description: "2 cartes du même rang (paire).",
+        formule: "somme des valeurs × 2",
         tester: cartes => {
           if (cartes.length !== 2) return false
           return cartes[0].rang === cartes[1].rang
@@ -582,6 +555,8 @@
       {
         nom: 'Solo',
         priorite: 1,
+        description: "1 carte seule, jouée sans combinaison.",
+        formule: "valeur de la carte",
         tester: cartes => cartes.length === 1,
         degats: cartes => cartes[0].valeur
       },
@@ -637,6 +612,38 @@
       return null
     }
 
+    // Génère tous les sous-ensembles non vides (via masque binaire) d'une liste
+    // de cartes accompagnées de leur index réel dans `main`.
+    function tousLesSousEnsembles(cartesAvecIndex) {
+      const n = cartesAvecIndex.length
+      const resultats = []
+      for (let masque = 1; masque < (1 << n); masque++) {
+        const sous = []
+        for (let i = 0; i < n; i++) {
+          if (masque & (1 << i)) sous.push(cartesAvecIndex[i])
+        }
+        resultats.push(sous)
+      }
+      return resultats
+    }
+
+    // Cherche, parmi TOUTES les sous-combinaisons de la sélection, celle qui
+    // rapporte le plus de dégâts. Comme « Solo » (1 carte) est toujours valide,
+    // un résultat existe dès qu'au moins une carte est sélectionnée. Les cartes
+    // sélectionnées qui ne font pas partie du sous-ensemble gagnant sont
+    // considérées comme automatiquement défaussées.
+    function meilleurCombo(cartesAvecIndex) {
+      if (cartesAvecIndex.length === 0) return null
+      let meilleur = null
+      for (const sous of tousLesSousEnsembles(cartesAvecIndex)) {
+        const combo = detecterCombo(sous.map(s => s.carte))
+        if (combo && (!meilleur || combo.degats > meilleur.combo.degats)) {
+          meilleur = { combo, sous }
+        }
+      }
+      return meilleur
+    }
+
     function creerDeck() {
       const d = []
       COULEURS.forEach(couleur => {
@@ -658,6 +665,23 @@
         cartes.push(deck.pop())
       }
       return cartes
+    }
+
+    // Repioche `n` cartes pour remplacer celles qui viennent de quitter la
+    // main (attaque ou défausse), en régénérant le paquet dès qu'il est vide
+    // — les cartes déjà utilisées ne réapparaissent donc jamais tant que le
+    // paquet n'est pas entièrement épuisé.
+    function reapprovisionnerMain(n) {
+      let restant = n
+      while (restant > 0) {
+        if (deck.length === 0) {
+          log('♻ Pile épuisée — nouveau paquet mélangé.', 'log-info')
+          deck = creerDeck()
+        }
+        const dispo = Math.min(restant, deck.length)
+        main.push(...piocher(dispo))
+        restant -= dispo
+      }
     }
 
     function log(texte, classe = '') {
@@ -683,6 +707,7 @@
       document.getElementById('stat-defausses').textContent  = defaussesRestantes
       document.getElementById('stat-cartes').textContent     = main.length
       document.getElementById('stat-select').textContent     = selection.size
+      document.getElementById('stat-pile').textContent       = deck.length
     }
 
     // ══════════════════════════════════════════════
@@ -710,25 +735,29 @@
     }
 
     function renderCombo() {
-      const cartesSel = [...selection].map(i => main[i])
+      const cartesSel = [...selection].map(i => ({ carte: main[i], idx: i }))
       const zone = document.getElementById('mda-combo-zone')
       if (cartesSel.length === 0) {
         zone.innerHTML = '<span class="log-info">Sélectionnez des cartes pour voir le combo détecté.</span>'
         return
       }
-      const combo = detecterCombo(cartesSel)
-      if (combo) {
-        zone.innerHTML = `<span class="combo-nom">${combo.nom}</span> — <span class="combo-degats">${combo.degats} dégâts</span>`
+      const meilleur = meilleurCombo(cartesSel)
+      if (meilleur) {
+        const { combo, sous } = meilleur
+        const nbExtra = cartesSel.length - sous.length
+        let html = `<span class="combo-nom">${combo.nom}</span> — <span class="combo-degats">${combo.degats} dégâts</span>`
+        if (nbExtra > 0) {
+          html += ` <span class="log-info">(+${nbExtra} carte${nbExtra > 1 ? 's' : ''} défaussée${nbExtra > 1 ? 's' : ''} automatiquement)</span>`
+        }
+        zone.innerHTML = html
       } else {
         zone.innerHTML = `<span class="log-info">Aucun combo valide pour cette sélection (${cartesSel.length} carte${cartesSel.length > 1 ? 's' : ''}).</span>`
       }
     }
 
     function majBoutons() {
-      const cartesSel = [...selection].map(i => main[i])
-      const combo = detecterCombo(cartesSel)
-      document.getElementById('btn-attaquer').disabled  = !combo || partieTerminee
       const nbSel = selection.size
+      document.getElementById('btn-attaquer').disabled  = nbSel === 0 || partieTerminee
       document.getElementById('btn-defausser').disabled =
         nbSel === 0 || nbSel > CONFIG.defaussesMax || defaussesRestantes <= 0 || partieTerminee
       document.getElementById('btn-defausser').textContent =
@@ -760,26 +789,38 @@
 
     window.attaquer = function() {
       if (partieTerminee) return
-      const cartesSel = [...selection].map(i => main[i])
-      const combo = detecterCombo(cartesSel)
-      if (!combo) return
+      if (selection.size === 0) return
+
+      const cartesSel = [...selection].map(i => ({ carte: main[i], idx: i }))
+      const meilleur = meilleurCombo(cartesSel)
+      if (!meilleur) return // ne devrait pas arriver : « Solo » couvre déjà toute sélection d'1 carte
+      const { combo, sous } = meilleur
+
+      const indicesUtilises = new Set(sous.map(s => s.idx))
+      const indicesExtra = [...selection].filter(i => !indicesUtilises.has(i))
 
       log(`── Tour ${tour} ──────────────`, 'log-info')
-      log(`▶ Vous jouez : ${cartesSel.map(c => c.rang + symboleC(c.couleur)).join(' ')}`, '')
+      log(`▶ Vous jouez : ${sous.map(s => s.carte.rang + symboleC(s.carte.couleur)).join(' ')}`, '')
+      if (indicesExtra.length > 0) {
+        log(`↩ Cartes non utilisées, défaussées automatiquement : ${indicesExtra.map(i => main[i].rang + symboleC(main[i].couleur)).join(' ')}`, 'log-info')
+      }
       log(`✦ Combo : ${combo.nom} → ${combo.degats} dégâts`, 'log-combo')
 
       pvEnnemi = Math.max(0, pvEnnemi - combo.degats)
-      log(`☠ ${ennemiChoisi.nom} perd ${combo.degats} PV → ${pvEnnemi} PV restants`, 'log-combat')
+      log(`☠ Charb perd ${combo.degats} PV → ${pvEnnemi} PV restants`, 'log-combat')
 
-      // Retirer les cartes jouées de la main
+      // Retirer TOUTES les cartes sélectionnées de la main (celles jouées dans
+      // le combo + celles en trop, considérées comme défaussées automatiquement
+      // — sans toucher au compteur de défausses).
       const indicesSel = [...selection].sort((a, b) => b - a)
+      const nbARemplacer = indicesSel.length
       indicesSel.forEach(i => main.splice(i, 1))
       selection.clear()
 
       // Attaque de l'ennemi (tous les N tours)
       if (tour % CONFIG.ennemiFréquence === 0) {
         pvJoueur = Math.max(0, pvJoueur - CONFIG.ennemiDegats)
-        log(`🔴 ${ennemiChoisi.nom} attaque ! Vous perdez ${CONFIG.ennemiDegats} PV → ${pvJoueur} PV restants`, 'log-ennemi')
+        log(`🔴 Charb attaque ! Vous perdez ${CONFIG.ennemiDegats} PV → ${pvJoueur} PV restants`, 'log-ennemi')
       }
 
       tour++
@@ -788,17 +829,10 @@
       if (pvEnnemi <= 0) { finPartie(true); return }
       if (pvJoueur <= 0) { finPartie(false); return }
 
-      // Repioche si la main est vide
-      if (main.length === 0) {
-        if (deck.length === 0) {
-          log('♻ Deck épuisé — nouveau deck créé.', 'log-info')
-          deck = creerDeck()
-        }
-        const nb = Math.min(CONFIG.cartesParManche, deck.length)
-        main = piocher(nb)
-        defaussesRestantes = CONFIG.defaussesParManche
-        log(`🃏 Nouvelle main de ${nb} cartes. Défausses réinitialisées.`, 'log-info')
-      }
+      // Les cartes jouées/défaussées sont immédiatement remplacées (le paquet
+      // se régénère automatiquement s'il est épuisé).
+      reapprovisionnerMain(nbARemplacer)
+      log(`🃏 ${nbARemplacer} nouvelle(s) carte(s) piochée(s) pour compléter la main.`, 'log-info')
 
       appliquerTri()
       renderMain()
@@ -813,18 +847,12 @@
       log(`── Tour ${tour} (défausse) ──────`, 'log-info')
       log(`↩ Défausse : ${cartesSel.map(c => c.rang + symboleC(c.couleur)).join(' ')}`, 'log-info')
 
-      // Retirer, repioche immédiate
+      // Retirer, repioche immédiate (le paquet se régénère si besoin)
       const indicesSel = [...selection].sort((a,b) => b-a)
       indicesSel.forEach(i => main.splice(i, 1))
       selection.clear()
 
-      const nbARepiquer = Math.min(nbSel, deck.length)
-      if (nbARepiquer === 0) {
-        log('♻ Deck épuisé — nouveau deck créé.', 'log-info')
-        deck = creerDeck()
-      }
-      const nouvelles = piocher(nbSel)
-      main.push(...nouvelles)
+      reapprovisionnerMain(nbSel)
       defaussesRestantes--
 
       log(`🃏 ${nbSel} nouvelle(s) carte(s) piochée(s). Défausses restantes : ${defaussesRestantes}`, 'log-info')
@@ -832,7 +860,7 @@
       // L'ennemi attaque aussi sur les défausses (consomme le tour)
       if (tour % CONFIG.ennemiFréquence === 0) {
         pvJoueur = Math.max(0, pvJoueur - CONFIG.ennemiDegats)
-        log(`🔴 ${ennemiChoisi.nom} attaque pendant votre défausse ! -${CONFIG.ennemiDegats} PV → ${pvJoueur} PV`, 'log-ennemi')
+        log(`🔴 Charb attaque pendant votre défausse ! -${CONFIG.ennemiDegats} PV → ${pvJoueur} PV`, 'log-ennemi')
       }
 
       tour++
@@ -880,6 +908,50 @@
       }
     }
 
+    // ══════════════════════════════════════════════
+    //  MODALES : PILE RESTANTE & COMBINAISONS
+    // ══════════════════════════════════════════════
+
+    window.ouvrirModalePile = function() {
+      const grille = document.getElementById('pile-grille')
+      document.getElementById('pile-count').textContent = deck.length
+
+      if (deck.length === 0) {
+        grille.innerHTML = '<span class="log-info">La pile est vide — elle sera régénérée à la prochaine pioche.</span>'
+      } else {
+        const triee = [...deck].sort((a, b) => {
+          const dc = ORDRE_COULEUR.indexOf(a.couleur) - ORDRE_COULEUR.indexOf(b.couleur)
+          return dc !== 0 ? dc : ORDRE_RANG.indexOf(a.rang) - ORDRE_RANG.indexOf(b.rang)
+        })
+        grille.innerHTML = triee.map(c => {
+          const info = COULEURS.find(x => x.id === c.couleur)
+          return `
+            <div class="pile-carte">
+              <span class="carte-valeur">${c.rang}</span>
+              <img class="carte-couleur" src="../pictures/${info.image}" alt="${info.label}" title="${info.label}">
+            </div>`
+        }).join('')
+      }
+
+      document.getElementById('modale-pile').classList.add('ouverte')
+    }
+
+    window.ouvrirModaleCombos = function() {
+      const liste = document.getElementById('combos-liste')
+      liste.innerHTML = COMBOS.map(c => `
+        <div class="combo-item">
+          <div class="combo-item-nom">${c.nom}</div>
+          <div class="combo-item-desc">${c.description}</div>
+          <div class="combo-item-formule">Dégâts : ${c.formule}</div>
+        </div>
+      `).join('')
+      document.getElementById('modale-combos').classList.add('ouverte')
+    }
+
+    window.fermerModale = function(id) {
+      document.getElementById(id).classList.remove('ouverte')
+    }
+
     function finPartie(victoire) {
       partieTerminee = true
       document.getElementById('mda-fin').classList.add('visible')
@@ -888,7 +960,7 @@
       if (victoire) {
         titre.textContent = '🎉 Victoire !'
         titre.className = 'fin-titre fin-victoire'
-        detail.textContent = `Vous avez vaincu ${ennemiChoisi.nom} en ${tour - 1} tour${tour > 2 ? 's' : ''}.`
+        detail.textContent = `Vous avez vaincu Charb en ${tour - 1} tour${tour > 2 ? 's' : ''}.`
         log('═══ VICTOIRE ═══', 'log-gain')
       } else {
         titre.textContent = '💀 Défaite'
@@ -923,7 +995,7 @@
       ;['tri-couleur','tri-valeur','tri-reset'].forEach(id => document.getElementById(id)?.classList.remove('actif'))
 
       log('═══ Nouvelle partie ═══', 'log-info')
-      log(`✦ Vous affrontez ${ennemiChoisi.nom} (${CONFIG.pvEnnemi} PV).`, 'log-info')
+      log(`✦ Vous affrontez Charb (${CONFIG.pvEnnemi} PV).`, 'log-info')
       log(`⚠ Il attaque tous les ${CONFIG.ennemiFréquence} tours pour ${CONFIG.ennemiDegats} dégât.`, 'log-ennemi')
       log(`🃏 ${CONFIG.cartesParManche} cartes piochées. ${CONFIG.defaussesParManche} défausses disponibles.`, 'log-info')
       document.getElementById('ennemi-pv-max').textContent = CONFIG.pvEnnemi
