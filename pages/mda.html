@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Main du Démon</title>
+  <title>Main de l'Ange</title>
   <link rel="stylesheet" href="../style/style.css">
   <script>
   (function(){
@@ -179,6 +179,41 @@
     .btn-deselect  { background: var(--couleur-bordure); color: var(--couleur-texte); }
     .btn-rejouer   { background: var(--couleur-bouton); color: white; }
 
+    /* ── Ennemi ── */
+    .mda-ennemi {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: .75rem 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .mda-ennemi-img {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .mda-ennemi-info { display: flex; flex-direction: column; gap: .15rem; }
+    .mda-ennemi-nom  { font-weight: 700; font-size: 1rem; }
+    .mda-ennemi-pv   { font-size: .82rem; color: var(--couleur-texte-faible); }
+    .mda-ennemi-barre-fond {
+      width: 160px; height: 8px;
+      background: var(--couleur-bordure);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: .25rem;
+    }
+    .mda-ennemi-barre {
+      height: 100%;
+      background: #ef4444;
+      border-radius: 999px;
+      transition: width .3s ease;
+    }
+
     /* ── Fin de partie ── */
     .mda-fin {
       display: none;
@@ -200,18 +235,26 @@
 
   <main>
     <div class="mda-wrap">
-      <h1>Main du Démon</h1>
+      <h1>Main de l'Ange</h1>
       <p class="subtitle">Sélectionnez vos cartes, formez des combos, détruisez l'ennemi.</p>
+
+      <!-- Ennemi -->
+      <div class="mda-ennemi">
+        <img class="mda-ennemi-img" src="../pictures/charb.png" alt="Charb" id="ennemi-img">
+        <div class="mda-ennemi-info">
+          <span class="mda-ennemi-nom" id="ennemi-nom">Charb</span>
+          <span class="mda-ennemi-pv"><span id="stat-pv-ennemi-texte">10</span> / <span id="ennemi-pv-max">10</span> PV</span>
+          <div class="mda-ennemi-barre-fond">
+            <div class="mda-ennemi-barre" id="ennemi-barre" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
 
       <!-- Statuts -->
       <div class="mda-status">
         <div class="mda-status-box">
           <span class="mda-status-label">Vos PV</span>
           <span class="mda-status-val" id="stat-pv-joueur">10</span>
-        </div>
-        <div class="mda-status-box">
-          <span class="mda-status-label">PV ennemi</span>
-          <span class="mda-status-val" id="stat-pv-ennemi">10</span>
         </div>
         <div class="mda-status-box">
           <span class="mda-status-label">Tour</span>
@@ -287,10 +330,10 @@
     // ══════════════════════════════════════════════
 
     const COULEURS = [
-      { id: 'soleil', image: 'heart.png',   label: 'Cœur'   },
-      { id: 'pierre', image: 'spade.png',   label: 'Pique'  },
-      { id: 'lune',   image: 'club.png',    label: 'Trèfle' },
-      { id: 'feu',    image: 'diamond.png', label: 'Carreau'},
+      { id: 'coeur',   image: 'heart.png',   label: 'Cœur'   },
+      { id: 'pique',   image: 'spade.png',   label: 'Pique'  },
+      { id: 'trefle',  image: 'club.png',    label: 'Trèfle' },
+      { id: 'carreau', image: 'diamond.png', label: 'Carreau'},
     ]
 
     // Valeurs numériques des cartes (J/Q/K/A valent 10 chacun)
@@ -301,16 +344,13 @@
       { id: 'J', valeur: 10 }, { id: 'Q', valeur: 10 }, { id: 'K', valeur: 10 }, { id: 'A', valeur: 10 }
     ]
 
-    // Cartes de commandement (pour la Main du Démon)
+    // Cartes de commandement (pour la Main de l'Ange)
     const CARTES_COMMANDEMENT = new Set(['J', 'Q', 'K', 'A', '10'])
 
-    // Dégâts des combinaisons
-    //   formule(cartes) → nombre entier de dégâts
-    // Les cartes passées sont les cartes sélectionnées (1 à 5).
     const COMBOS = [
-      // Ordre décroissant de priorité (on retourne le premier match)
+      // Ordre décroissant de priorité
       {
-        nom: 'Main du Démon',
+        nom: "Main de l'Ange",
         priorite: 10,
         tester: cartes => {
           if (cartes.length !== 5) return false
@@ -489,11 +529,14 @@
 
     function majStatuts() {
       const pvJEl = document.getElementById('stat-pv-joueur')
-      const pvEEl = document.getElementById('stat-pv-ennemi')
       pvJEl.textContent = pvJoueur
       pvJEl.className   = 'mda-status-val ' + (pvJoueur <= 3 ? 'danger' : 'ok')
-      pvEEl.textContent = pvEnnemi
-      pvEEl.className   = 'mda-status-val ' + (pvEnnemi <= 3 ? 'danger' : 'ok')
+
+      // Barre de vie ennemi
+      document.getElementById('stat-pv-ennemi-texte').textContent = pvEnnemi
+      const pct = Math.max(0, (pvEnnemi / CONFIG.pvEnnemi) * 100)
+      document.getElementById('ennemi-barre').style.width = pct + '%'
+
       document.getElementById('stat-tour').textContent       = tour
       document.getElementById('stat-defausses').textContent  = defaussesRestantes
       document.getElementById('stat-cartes').textContent     = main.length
@@ -584,7 +627,7 @@
       log(`✦ Combo : ${combo.nom} → ${combo.degats} dégâts`, 'log-combo')
 
       pvEnnemi = Math.max(0, pvEnnemi - combo.degats)
-      log(`☠ L'ennemi perd ${combo.degats} PV → ${pvEnnemi} PV restants`, 'log-combat')
+      log(`☠ Charb perd ${combo.degats} PV → ${pvEnnemi} PV restants`, 'log-combat')
 
       // Retirer les cartes jouées de la main
       const indicesSel = [...selection].sort((a, b) => b - a)
@@ -594,7 +637,7 @@
       // Attaque de l'ennemi (tous les N tours)
       if (tour % CONFIG.ennemiFréquence === 0) {
         pvJoueur = Math.max(0, pvJoueur - CONFIG.ennemiDegats)
-        log(`🔴 L'ennemi attaque ! Vous perdez ${CONFIG.ennemiDegats} PV → ${pvJoueur} PV restants`, 'log-ennemi')
+        log(`🔴 Charb attaque ! Vous perdez ${CONFIG.ennemiDegats} PV → ${pvJoueur} PV restants`, 'log-ennemi')
       }
 
       tour++
@@ -647,7 +690,7 @@
       // L'ennemi attaque aussi sur les défausses (consomme le tour)
       if (tour % CONFIG.ennemiFréquence === 0) {
         pvJoueur = Math.max(0, pvJoueur - CONFIG.ennemiDegats)
-        log(`🔴 L'ennemi attaque pendant votre défausse ! -${CONFIG.ennemiDegats} PV → ${pvJoueur} PV`, 'log-ennemi')
+        log(`🔴 Charb attaque pendant votre défausse ! -${CONFIG.ennemiDegats} PV → ${pvJoueur} PV`, 'log-ennemi')
       }
 
       tour++
@@ -666,7 +709,7 @@
       return COULEURS.find(c => c.id === couleurId)?.label ?? ''
     }
 
-    const ORDRE_COULEUR = ['soleil', 'pierre', 'lune', 'feu']
+    const ORDRE_COULEUR = ['coeur', 'pique', 'trefle', 'carreau']
     const ORDRE_RANG    = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
 
     window.trierMain = function(mode) {
@@ -703,7 +746,7 @@
       if (victoire) {
         titre.textContent = '🎉 Victoire !'
         titre.className = 'fin-titre fin-victoire'
-        detail.textContent = `Vous avez vaincu l'ennemi en ${tour - 1} tour${tour > 2 ? 's' : ''}.`
+        detail.textContent = `Vous avez vaincu Charb en ${tour - 1} tour${tour > 2 ? 's' : ''}.`
         log('═══ VICTOIRE ═══', 'log-gain')
       } else {
         titre.textContent = '💀 Défaite'
@@ -738,9 +781,10 @@
       ;['tri-couleur','tri-valeur','tri-reset'].forEach(id => document.getElementById(id)?.classList.remove('actif'))
 
       log('═══ Nouvelle partie ═══', 'log-info')
-      log(`✦ Vous affrontez un ennemi avec ${CONFIG.pvEnnemi} PV.`, 'log-info')
+      log(`✦ Vous affrontez Charb (${CONFIG.pvEnnemi} PV).`, 'log-info')
       log(`⚠ Il attaque tous les ${CONFIG.ennemiFréquence} tours pour ${CONFIG.ennemiDegats} dégât.`, 'log-ennemi')
       log(`🃏 ${CONFIG.cartesParManche} cartes piochées. ${CONFIG.defaussesParManche} défausses disponibles.`, 'log-info')
+      document.getElementById('ennemi-pv-max').textContent = CONFIG.pvEnnemi
 
       appliquerTri()
       renderMain()
