@@ -26,7 +26,8 @@
   <style>body { visibility: hidden; }</style>
   <style>
     .shikaku-wrap {
-      max-width: 580px;
+      max-width: 760px;
+      width: 100%;
       margin: 0 auto;
       padding: 2rem 1rem 7rem;
       display: flex;
@@ -124,8 +125,9 @@
         <h1>Shikaku</h1>
         <div class="niveau-btns">
           <button class="niveau-btn" onclick="demarrer(5)">5×5</button>
-          <button class="niveau-btn" onclick="demarrer(20)">20×20</button>
-          <button class="niveau-btn" onclick="demarrer(40)">40×40</button>
+          <button class="niveau-btn" onclick="demarrer(7)">7×7</button>
+          <button class="niveau-btn" onclick="demarrer(9)">9×9</button>
+          <button class="niveau-btn" onclick="demarrer(11)">11×11</button>
         </div>
       </div>
       <p class="shikaku-info">
@@ -168,7 +170,7 @@
       appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
-      demarrer(7)
+      demarrer(20)
     })()
   </script>
 
@@ -200,208 +202,103 @@
   // GÉNÉRATION DU PUZZLE
   // ─────────────────────────────────────────────────────────────
 
-  /** Aire maximale d'un rectangle selon la taille de grille. */
-  function aireMaxPour(n) {
-    if (n <= 5)  return 5
-    if (n <= 8)  return 8
-    if (n <= 12) return 12
-    if (n <= 20) return 16
-    return 22
+  function melanger(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr
   }
 
   /**
-   * Binary Space Partitioning : découpe récursivement la grille en rectangles
-   * par des coupes horizontales ou verticales aléatoires.
-   *
-   * Avantages vs glouton haut-gauche :
-   *   • Distribution spatiale uniforme — grands et petits rectangles répartis
-   *     sur toute la grille, pas concentrés en haut.
-   *   • Couverture totale garantie (chaque coupe produit deux sous-rectangles
-   *     valides, jamais de région en L ou en T impossible à couvrir).
-   *   • Très rapide : profondeur O(log n²) même sur 40×40.
+   * Génère une partition de la grille N×N en rectangles.
+   * Algorithme : on place des rectangles un par un sur les cases libres,
+   * en choisissant aléatoirement la taille parmi les rectangles valides
+   * qui tiennent dans l'espace disponible à partir de la case la plus
+   * haute-gauche non encore affectée.
    */
-  function genererPartitionBSP(n) {
-    const aMax  = aireMaxPour(n)
-    const rects = []
+  function genererSolution(n) {
+    const grille = Array.from({length: n}, () => Array(n).fill(-1))
+    const rects  = []   // [{ r1,c1,r2,c2 }]
 
-    function split(r1, c1, r2, c2) {
-      const h    = r2 - r1 + 1
-      const w    = c2 - c1 + 1
-      const aire = h * w
-      const canH = h >= 2
-      const canV = w >= 2
+    // Aire min et max selon la taille de grille
+    const aireMin = n <= 5 ? 2 : n <= 10 ? 3 : n <= 20 ? 4 : 6
+    const aireMax = n <= 5 ? 8 : n <= 10 ? 15 : n <= 20 ? 25 : 40
 
-      // Feuille obligatoire : cellule unique
-      if (!canH && !canV) { rects.push({r1, c1, r2, c2, aire}); return }
+    let id = 0
+    while (true) {
+      // Trouver la première case libre (haut-gauche)
+      let fr = -1, fc = -1
+      outer: for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (grille[r][c] === -1) { fr = r; fc = c; break outer }
+        }
+      }
+      if (fr === -1) break  // grille complète
 
-      if (aire <= aMax) {
-        // Probabilité d'arrêt décroissante : ~100 % à aire=1, ~15 % à aire=aMax
-        const t     = (aire - 1) / Math.max(1, aMax - 1)
-        const pStop = 1 - 0.85 * t
-        if (Math.random() < pStop) { rects.push({r1, c1, r2, c2, aire}); return }
+      // Lister tous les rectangles valides qui commencent en (fr, fc)
+      const tous = []
+      for (let r2 = fr; r2 < n; r2++) {
+        for (let c2 = fc; c2 < n; c2++) {
+          const aire = (r2 - fr + 1) * (c2 - fc + 1)
+          if (aire > aireMax) break
+          let ok = true
+          for (let r = fr; r <= r2 && ok; r++)
+            for (let c = fc; c <= c2 && ok; c++)
+              if (grille[r][c] !== -1) ok = false
+          if (ok) tous.push({ r1: fr, c1: fc, r2, c2, aire })
+        }
       }
 
-      // Direction de coupe : favorise l'axe le plus long → pièces plus carrées
-      let doH
-      if (!canH)      doH = false
-      else if (!canV) doH = true
-      else            doH = Math.random() < (h >= w ? 0.62 : 0.38)
+      if (tous.length === 0) return null
 
-      if (doH) {
-        const sr = r1 + Math.floor(Math.random() * (h - 1))
-        split(r1, c1, sr, c2)
-        split(sr + 1, c1, r2, c2)
-      } else {
-        const sc = c1 + Math.floor(Math.random() * (w - 1))
-        split(r1, c1, r2, sc)
-        split(r1, sc + 1, r2, c2)
+      // Préférer les candidats d'aire >= aireMin ; ne descendre en dessous
+      // que si aucun choix plus grand n'est disponible (cellule coincée)
+      const candidats = tous.filter(c => c.aire >= aireMin).length > 0
+        ? tous.filter(c => c.aire >= aireMin)
+        : tous
+
+      // Poids proportionnel à l'aire → favorise les grands rectangles
+      const poids = candidats.map(c => c.aire)
+      const total = poids.reduce((s, p) => s + p, 0)
+      let tirage  = Math.random() * total
+      let choisi  = candidats[candidats.length - 1]
+      for (let i = 0; i < candidats.length; i++) {
+        tirage -= poids[i]
+        if (tirage <= 0) { choisi = candidats[i]; break }
       }
+
+      // Affecter les cases
+      for (let r = choisi.r1; r <= choisi.r2; r++)
+        for (let c = choisi.c1; c <= choisi.c2; c++)
+          grille[r][c] = id
+
+      rects.push(choisi)
+      id++
     }
 
-    split(0, 0, n - 1, n - 1)
-
-    const g = Array.from({length: n}, () => Array(n).fill(-1))
-    rects.forEach((rect, id) => {
-      for (let r = rect.r1; r <= rect.r2; r++)
-        for (let c = rect.c1; c <= rect.c2; c++)
-          g[r][c] = id
-    })
-
-    return {g, rects}
+    return { grille, rects }
   }
 
-  /**
-   * Place l'indice de chaque rectangle à une position ALÉATOIRE dans celui-ci.
-   * La variété de position rend le puzzle visuellement moins prévisible et
-   * augmente la difficulté (le joueur ne peut pas deviner la taille juste
-   * en regardant où est le chiffre).
-   */
-  function placerIndicesAleatoires(rects) {
-    return rects.map(rect => {
+  /** Génère la solution, avec retry si la génération échoue (rare). */
+  function generer(n) {
+    let res = null
+    let essais = 0
+    while (!res && essais < 200) { res = genererSolution(n); essais++ }
+    if (!res) { alert('Échec de génération, réessayez.'); return }
+
+    solution = res.grille
+    const rects = res.rects
+
+    // Pour chaque rectangle, choisir aléatoirement UNE case qui affichera l'indice
+    indices = rects.map(rect => {
       const cases = []
       for (let r = rect.r1; r <= rect.r2; r++)
         for (let c = rect.c1; c <= rect.c2; c++)
-          cases.push({r, c})
+          cases.push({ r, c })
       const choix = cases[Math.floor(Math.random() * cases.length)]
-      return {r: choix.r, c: choix.c, valeur: rect.aire}
+      return { r: choix.r, c: choix.c, valeur: rect.aire }
     })
-  }
-
-  /**
-   * Solveur par backtracking : compte le nombre de solutions valides
-   * pour la configuration d'indices donnée (s'arrête à maxSol).
-   *
-   * Optimisations :
-   *   • Pré-calcul des rectangles valides par indice
-   *   • Les indices sont traités du plus contraint au moins contraint
-   *     (moins de candidats → moins de branches → élagage plus rapide)
-   */
-  function compterSolutions(n, idx, maxSol) {
-    const posMap = new Map()
-    idx.forEach((ind, i) => posMap.set(ind.r * n + ind.c, i))
-
-    const candParInd = idx.map(({r, c, valeur: a}) => {
-      const res = []
-      for (let rows = 1; rows <= Math.min(a, n); rows++) {
-        if (a % rows !== 0) continue
-        const cols = a / rows
-        if (cols > n) continue
-        for (let r1 = Math.max(0, r - rows + 1); r1 <= Math.min(n - rows, r); r1++) {
-          const r2 = r1 + rows - 1
-          for (let c1 = Math.max(0, c - cols + 1); c1 <= Math.min(n - cols, c); c1++) {
-            const c2 = c1 + cols - 1
-            let autreClue = false
-            for (let ri = r1; ri <= r2 && !autreClue; ri++)
-              for (let ci = c1; ci <= c2 && !autreClue; ci++)
-                if ((ri !== r || ci !== c) && posMap.has(ri * n + ci)) autreClue = true
-            if (!autreClue) res.push({r1, c1, r2, c2})
-          }
-        }
-      }
-      return res
-    })
-
-    // Trier : les indices les plus contraints en premier (élagage maximal)
-    const ordre   = candParInd.map((_, i) => i).sort((a, b) => candParInd[a].length - candParInd[b].length)
-    const candOrd = ordre.map(i => candParInd[i])
-
-    const grid = Array.from({length: n}, () => Array(n).fill(-1))
-    let sols = 0
-
-    function bt(ki) {
-      if (sols >= maxSol) return
-      if (ki === candOrd.length) {
-        for (let r = 0; r < n; r++)
-          for (let c = 0; c < n; c++)
-            if (grid[r][c] === -1) return
-        sols++
-        return
-      }
-      for (const rect of candOrd[ki]) {
-        let ok = true
-        for (let r = rect.r1; r <= rect.r2 && ok; r++)
-          for (let c = rect.c1; c <= rect.c2 && ok; c++)
-            if (grid[r][c] !== -1) ok = false
-        if (!ok) continue
-        for (let r = rect.r1; r <= rect.r2; r++)
-          for (let c = rect.c1; c <= rect.c2; c++)
-            grid[r][c] = ki
-        bt(ki + 1)
-        for (let r = rect.r1; r <= rect.r2; r++)
-          for (let c = rect.c1; c <= rect.c2; c++)
-            grid[r][c] = -1
-        if (sols >= maxSol) return
-      }
-    }
-
-    bt(0)
-    return sols
-  }
-
-  /**
-   * Point d'entrée de la génération.
-   *
-   * Stratégie :
-   *   • Petites grilles (≤ 7) : BSP + placements aléatoires + vérification
-   *     d'unicité par backtracking. On essaie plusieurs placements sur la même
-   *     partition avant d'en changer (les partitions BSP se prêtent en général
-   *     très bien à l'unicité).
-   *   • Grandes grilles (> 7) : BSP + placement aléatoire sans vérification
-   *     (trop coûteux). La structure BSP garantit une bonne jouabilité.
-   */
-  function generer(n) {
-    const MAX_PARTITIONS = 60
-    const PLACEMENTS_PAR_PARTITION = 8
-
-    for (let ep = 0; ep < MAX_PARTITIONS; ep++) {
-      const {g, rects} = genererPartitionBSP(n)
-
-      if (n <= 7) {
-        // Essayer plusieurs placements d'indices sur cette partition
-        for (let pi = 0; pi < PLACEMENTS_PAR_PARTITION; pi++) {
-          const idx = placerIndicesAleatoires(rects)
-          if (compterSolutions(n, idx, 2) === 1) {
-            solution = g
-            indices  = idx
-            return
-          }
-        }
-        // Aucun placement unique trouvé → nouvelle partition BSP
-      } else {
-        solution = g
-        indices  = placerIndicesAleatoires(rects)
-        return
-      }
-    }
-
-    // Dernier recours (très rare) : centrage, toujours plus contraint
-    const {g, rects} = genererPartitionBSP(n)
-    solution = g
-    indices  = rects.map(rect => ({
-      r:      Math.floor((rect.r1 + rect.r2) / 2),
-      c:      Math.floor((rect.c1 + rect.c2) / 2),
-      valeur: rect.aire
-    }))
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -424,14 +321,23 @@
 
     canvas = document.getElementById('canvas')
     ctx    = canvas.getContext('2d')
-    const maxW = Math.min(window.innerWidth - 40, 720)
-    CELL = Math.max(2, Math.floor(maxW / TAILLE))
-    canvas.width  = TAILLE * CELL
-    canvas.height = TAILLE * CELL
-
+    redimensionnerCanvas()
     dessiner()
     bindEvents()
   }
+
+  function redimensionnerCanvas() {
+    if (!canvas || !TAILLE) return
+    const wrap = document.querySelector('.shikaku-wrap')
+    const wrapW = wrap ? wrap.clientWidth - 24 : window.innerWidth - 40
+    const maxW  = Math.min(wrapW, window.innerHeight - 280, 720)
+    CELL = Math.max(2, Math.floor(maxW / TAILLE))
+    canvas.width  = TAILLE * CELL
+    canvas.height = TAILLE * CELL
+    if (ctx) dessiner()
+  }
+
+  window.addEventListener('resize', () => { if (TAILLE) redimensionnerCanvas() })
 
   // ─────────────────────────────────────────────────────────────
   // DESSIN
