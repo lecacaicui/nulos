@@ -73,7 +73,7 @@
       border: 2px solid rgba(0,0,0,0.2);
       border-radius: 10px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.1s ease;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -81,11 +81,8 @@
       user-select: none;
     }
 
-    /* Effet quand on survole la case avec un élément traîné (dragover) */
-    .case-terre.drag-over {
-      background: #A0522D;
-      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-      transform: scale(1.04);
+    .case-terre:hover {
+      filter: brightness(1.1);
     }
 
     /* Zone inventaire des graines achetées */
@@ -104,17 +101,21 @@
       border: 1px solid var(--couleur-bordure);
       border-radius: 8px;
       padding: 0.75rem;
-      cursor: grab;
+      cursor: pointer;
       user-select: none;
-      transition: background 0.1s;
+      transition: all 0.2s ease;
     }
 
-    .item-graine:active {
-      cursor: grabbing;
+    /* Style quand un sac de graine est sélectionné pour planter */
+    .item-graine.actif {
+      border-color: var(--couleur-bouton);
+      background: rgba(37, 99, 235, 0.15); /* Légère lueur */
+      transform: scale(1.02);
+      box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
     }
 
     .item-graine.epuise {
-      opacity: 0.5;
+      opacity: 0.4;
       cursor: not-allowed;
     }
 
@@ -202,7 +203,7 @@
         <h2>🛒 Achats & Sac</h2>
         <button class="btn btn-primary" id="btn-ouvrir-magasin">🌱 Ouvrir le Magasin</button>
         
-        <h3 style="font-size: 0.9rem; margin-top: 1rem; color: var(--couleur-texte-faible);">🎒 Glisser un paquet sur le champ :</h3>
+        <h3 style="font-size: 0.9rem; margin-top: 1rem; color: var(--couleur-texte-faible);">🎒 Sélectionnez un sac pour semer :</h3>
         <div class="zone-inventaire" id="inventaire-graines">
           </div>
       </section>
@@ -243,7 +244,7 @@
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
-    // Données fictives initiales du jeu
+    // Configuration des données initiales
     let argent = 500
     const catalogueGraines = [
       { id: 'graine1', nom: 'Graine Blé', emoji: '🌾', prix: 10 },
@@ -252,16 +253,19 @@
       { id: 'graine4', nom: 'Graine Tomate', emoji: '🍅', prix: 40 }
     ]
 
-    // État du joueur (Stock de graines possédées)
+    // État de l'inventaire du joueur
     const inventaire = {
-      graine1: 2, // Offertes au début
+      graine1: 5, // Offertes au début pour tester
       graine2: 0,
       graine3: 0,
       graine4: 0
     }
 
-    // Sauvegarde de l'id de la graine qu'on est en train de glisser (drag)
-    let graineSelectionneeId = null
+    // Retient l'ID du sac actuellement sélectionné par le joueur (null si aucun)
+    let graineActiveId = null
+
+    // Tableau pour suivre l'état des 16 cases du champ (false = vide, true = occupé)
+    const casesOccupees = new Array(16).fill(false)
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -288,7 +292,7 @@
       document.getElementById('argent-joueur').textContent = argent
     }
 
-    // 1. Génère le champ 4x4 et y ajoute les écouteurs de Drop
+    // 1. Génère le champ et gère l'action au survol (mouseenter)
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       grille.innerHTML = ''
@@ -297,42 +301,42 @@
         const caseTerre = document.createElement('div')
         caseTerre.classList.add('case-terre')
         caseTerre.dataset.index = i
-        caseTerre.textContent = '🟫' // Terre vide
+        caseTerre.textContent = '🟫' // Aspect initial : Terre vide
         
-        // --- Événements de Drag & Drop sur le champ ---
-        caseTerre.addEventListener('dragover', (e) => {
-          e.preventDefault() // Autorise le drop sur cet élément
-          if (graineSelectionneeId && inventaire[graineSelectionneeId] > 0) {
-            caseTerre.classList.add('drag-over')
+        // Fonction partagée pour tenter de planter
+        const tenterDePlanter = () => {
+          // Condition 1 : Un sac doit être sélectionné
+          // Condition 2 : Il doit rester au moins une graine dans ce sac
+          // Condition 3 : La case doit être totalement vide (pas de doublon !)
+          if (graineActiveId && inventaire[graineActiveId] > 0 && !casesOccupees[i]) {
+            const templateGraine = catalogueGraines.find(g => g.id === graineActiveId)
+            if (templateGraine) {
+              inventaire[graineActiveId]--   // Consomme la graine
+              casesOccupees[i] = true       // Marque la case comme occupée
+              caseTerre.textContent = templateGraine.emoji // Affiche le fruit/légume
+              
+              renderInventaire()            // Met à jour les compteurs à gauche
+              
+              // Si le sac vient de s'épuiser suite à cette action, on désactive la sélection automatique
+              if (inventaire[graineActiveId] === 0) {
+                graineActiveId = null
+                renderInventaire()
+              }
+            }
           }
-        })
+        }
 
-        caseTerre.addEventListener('dragleave', () => {
-          caseTerre.classList.remove('drag-over')
-        })
+        // Déclencheur 1 : Dès que la souris entre/survole la case
+        caseTerre.addEventListener('mouseenter', tenterDePlanter)
 
-        caseTerre.addEventListener('drop', (e) => {
-          e.preventDefault()
-          caseTerre.classList.remove('drag-over')
-
-          if (!graineSelectionneeId || inventaire[graineSelectionneeId] <= 0) return
-
-          // Planter la graine !
-          const templateGraine = catalogueGraines.find(g => g.id === graineSelectionneeId)
-          if (templateGraine) {
-            inventaire[graineSelectionneeId]-- // Réduit le stock
-            caseTerre.textContent = templateGraine.emoji // Change l'aspect visuel de la case
-            
-            renderInventaire() // Rafraîchit les compteurs du sac
-            console.log(`Planté ${templateGraine.nom} sur la case ${i}`)
-          }
-        })
+        // Déclencheur 2 : Permet aussi de cliquer directement si la souris était déjà posée dessus
+        caseTerre.addEventListener('click', tenterDePlanter)
 
         grille.appendChild(caseTerre)
       }
     }
 
-    // 2. Affiche le sac de graines (inventaire à gauche)
+    // 2. Génère et rafraîchit le sac d'inventaire à gauche
     function renderInventaire() {
       const conteneur = document.getElementById('inventaire-graines')
       conteneur.innerHTML = ''
@@ -341,33 +345,37 @@
         const qte = inventaire[graine.id] || 0
         const div = document.createElement('div')
         div.classList.add('item-graine')
-        if (qte === 0) div.classList.add('epuise')
+        
+        if (qte === 0) {
+          div.classList.add('epuise')
+        }
+        // Si ce sac est celui sélectionné pour peindre/planter, on lui applique la classe .actif
+        if (graine.id === graineActiveId) {
+          div.classList.add('actif')
+        }
         
         div.innerHTML = `
           <span>${graine.emoji} <b>${graine.nom}</b></span>
           <span>x${qte}</span>
         `
         
-        // Rendre l'élément déplaçable si on en possède
-        if (qte > 0) {
-          div.setAttribute('draggable', 'true')
-          
-          div.addEventListener('dragstart', () => {
-            graineSelectionneeId = graine.id
-            div.style.opacity = '0.4'
-          })
+        // Clic sur le sac pour l'activer / le désactiver
+        div.addEventListener('click', () => {
+          if (qte === 0) return // Impossible de sélectionner un sac vide
 
-          div.addEventListener('dragend', () => {
-            graineSelectionneeId = null
-            div.style.opacity = '1'
-          })
-        }
+          if (graineActiveId === graine.id) {
+            graineActiveId = null // Désélectionne si on re-clique dessus
+          } else {
+            graineActiveId = graine.id // Active ce sac
+          }
+          renderInventaire() // Relance le visuel pour mettre à jour les bordures bleues
+        })
 
         conteneur.appendChild(div)
       })
     }
 
-    // 3. Génère la liste d'achats avec choix de quantité dans le magasin
+    // 3. Génère la boutique de graines
     function genererMagasin() {
       const liste = document.getElementById('liste-magasin')
       liste.innerHTML = ''
@@ -379,7 +387,7 @@
         ligne.innerHTML = `
           <div style="display:flex; flex-direction:column;">
             <span>${graine.emoji} <b>${graine.nom}</b></span>
-            <span style="font-size:0.8rem; color:var(--couleur-texte-faible)">Prix unitaire : ${graine.prix} $</span>
+            <span style="font-size:0.8rem; color:var(--couleur-texte-faible)">Prix : ${graine.prix} $</span>
           </div>
           <div style="display:flex; align-items:center; gap:0.5rem;">
             <input type="number" min="1" max="99" value="1" class="selecteur-quantite" id="qte-${graine.id}">
@@ -388,7 +396,6 @@
         `
         liste.appendChild(ligne)
 
-        // Gestionnaire d'achat quantitatif
         ligne.querySelector(`#btn-acheter-${graine.id}`).addEventListener('click', () => {
           const inputQte = ligne.querySelector(`#qte-${graine.id}`)
           const quantite = parseInt(inputQte.value) || 1
@@ -399,16 +406,15 @@
             inventaire[graine.id] += quantite
             majAffichageArgent()
             renderInventaire()
-            inputQte.value = 1 // Reset l'input
-            alert(`Succès ! Vous avez acheté ${quantite} ${graine.nom}(s).`)
+            inputQte.value = 1
           } else {
-            alert("Pas assez d'argent pour cette quantité !")
+            alert("Fonds insuffisants pour cette quantité !")
           }
         })
       })
     }
 
-    // 4. Modale ouverture / fermeture
+    // 4. Gestion d'ouverture/fermeture de la modale magasin
     function initEvenements() {
       const modale = document.getElementById('modale-graines')
       const btnOuvrir = document.getElementById('btn-ouvrir-magasin')
