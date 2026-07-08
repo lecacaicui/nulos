@@ -6,7 +6,6 @@
   <title>Champ de bataille</title>
   <link rel="stylesheet" href="../style/style.css">
   
-  <!-- Script d'initialisation du thème pour éviter le flash blanc -->
   <script>
   (function(){
     var t = localStorage.getItem('theme_couleurs');
@@ -28,50 +27,132 @@
 
   <style>body { visibility: hidden; }</style>
   
-  <!-- Styles spécifiques à la page "Champ" -->
   <style>
-    .champ-wrap { 
-      width: 100%; 
-      padding: 2rem 2.5rem 6rem; 
-    }
-    .champ-layout {
+    .jeu-champ-container {
       display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 2rem;
-      align-items: start;
-    }
-    .zone-principale {
-      background: var(--couleur-conteneur);
-      border: 1px solid var(--var-couleur-bordure, var(--couleur-bordure));
-      border-radius: 12px;
-      padding: 2rem;
-    }
-    .zone-statut {
-      display: flex;
-      flex-direction: column;
+      grid-template-columns: 250px 1fr 250px;
       gap: 1.5rem;
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem 1rem 6rem;
     }
-    .panneau-info {
+
+    /* Panneaux latéraux et centraux */
+    .panneau-jeu {
       background: var(--couleur-conteneur);
       border: 1px solid var(--couleur-bordure);
       border-radius: 12px;
-      padding: 1.2rem;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
-    .champ-titre {
-      font-size: 1.4rem;
+
+    .panneau-jeu h2 {
+      font-size: 1.1rem;
       font-weight: 700;
-      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--couleur-bordure);
+      padding-bottom: 0.5rem;
+      margin-bottom: 0.5rem;
       color: var(--couleur-texte);
     }
-    .champ-description {
-      font-size: 0.9rem;
-      color: var(--couleur-texte-faible);
-      line-height: 1.5;
-      margin-bottom: 1.5rem;
+
+    /* Grille du champ au centre (4x4) */
+    .grille-champ {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      max-width: 400px;
+      width: 100%;
+      margin: 1.5rem auto;
+      aspect-ratio: 1 / 1;
     }
+
+    .case-terre {
+      background: #8B5A2B; /* Couleur terre par défaut */
+      border: 2px solid rgba(0,0,0,0.15);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.1s, filter 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .case-terre:hover {
+      filter: brightness(1.1);
+      transform: scale(1.02);
+    }
+
+    /* Fenêtre modale pour le magasin de graines */
+    .modale-graines {
+      display: none; /* Cachée par défaut */
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modale-graines.active {
+      display: flex;
+    }
+
+    .modale-graines-contenu {
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      position: relative;
+    }
+
+    .grille-graines {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .carte-graine {
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .carte-graine:hover {
+      border-color: var(--couleur-bouton);
+    }
+
+    .btn-fermer {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+    }
+
+    /* Responsive */
     @media (max-width: 900px) {
-      .champ-layout { grid-template-columns: 1fr; }
-      .champ-wrap { padding: 1rem 1rem 6rem; }
+      .jeu-champ-container {
+        grid-template-columns: 1fr;
+      }
+      #score {
+        grid-row: 1; /* Met le score en haut sur mobile */
+      }
     }
   </style>
 </head>
@@ -79,38 +160,47 @@
   <div id="header-placeholder"></div>
 
   <main>
-    <div class="champ-wrap">
-      <div class="champ-layout">
-        
-        <!-- Zone principale de contenu -->
-        <div class="zone-principale">
-          <h1 class="champ-titre">⚔️ Le Champ</h1>
-          <p class="champ-description">
-            Bienvenue sur le champ. Cette zone dynamique est prête à accueillir les fonctionnalités spécifiques de votre nouveau module ou mini-jeu.
-          </p>
-          
-          <!-- Contenu à personnaliser ou à dynamiser -->
-          <div class="btn-group" style="max-width: 200px;">
-            <button class="btn btn-primary" id="btn-action">Action Principale</button>
-          </div>
-        </div>
+    <div class="jeu-champ-container">
+      
+      <section class="panneau-jeu" id="achat">
+        <h2>🛒 Achats</h2>
+        <p style="font-size: 0.85rem; color: var(--couleur-texte-faible);">Choisissez vos outils ou graines :</p>
+        <button class="btn btn-primary" id="btn-ouvrir-graines">🌱 Graines</button>
+      </section>
 
-        <!-- Colonne latérale / Panneau d'informations -->
-        <div class="zone-statut">
-          <div class="panneau-info">
-            <h2 style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: .05em; color: var(--couleur-texte-faible); margin-bottom: 0.75rem;">
-              ℹ️ Informations de session
-            </h2>
-            <div style="font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
-              <div>Joueur : <span id="joueur-nom" style="font-weight: 600;">...</span></div>
-              <div style="font-size: 0.8rem; color: var(--couleur-texte-faible);">Statut : En ligne</div>
-            </div>
-          </div>
-        </div>
+      <section class="panneau-jeu" id="champ" style="text-align: center;">
+        <h2>🌾 Mon Champ</h2>
+        <div class="grille-champ" id="grille-terre"></div>
+      </section>
 
-      </div>
+      <section class="panneau-jeu" id="score">
+        <h2>💰 Économie</h2>
+        <div style="font-size: 1.1rem; font-weight: 600;">
+          Argent : <span id="argent-joueur" style="color: var(--couleur-bouton);">0</span> $
+        </div>
+        <div style="font-size: 0.85rem; color: var(--couleur-texte-faible); margin-top: 0.5rem;">
+          Joueur : <span id="nom-joueur">...</span>
+        </div>
+      </section>
+
     </div>
   </main>
+
+  <div class="modale-graines" id="modale-graines">
+    <div class="modale-graines-contenu">
+      <button class="btn-fermer" id="btn-fermer-graines">✕</button>
+      <h3>Sélectionner une Graine</h3>
+      
+      <div class="grille-graines">
+        <div class="carte-graine">🌱 Graine 1</div>
+        <div class="carte-graine">🌿 Graine 2</div>
+        <div class="carte-graine">🥕 Graine 3</div>
+        <div class="carte-graine">🌽 Graine 4</div>
+        <div class="carte-graine">🌻 Graine 5</div>
+        <div class="carte-graine">🍅 Graine 6</div>
+      </div>
+    </div>
+  </div>
 
   <div id="footer-placeholder"></div>
 
@@ -121,32 +211,68 @@
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
     ;(async () => {
-      // Redirection si le visiteur n'est pas authentifié
+      // Sécurité : Redirection si non connecté
       if (!localStorage.getItem('username')) {
         window.location.href = 'connexion.html'
         return
       }
 
-      // Rendre le body visible une fois le thème initialisé
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       
-      // Chargement dynamique des layouts globaux (avec le chemin relatif parent '../')
       await chargerHeader('../')
       await chargerFooter('../')
 
-      // Récupération et affichage du pseudonyme local
+      // Remplissage infos de base
       const username = localStorage.getItem('username')
-      document.getElementById('joueur-nom').textContent = username
+      document.getElementById('nom-joueur').textContent = username
+      
+      // Exemple : Initialise l'argent à 150 pour l'instant (à lier à ta BDD plus tard)
+      document.getElementById('argent-joueur').textContent = '150'
 
-      // Logique initiale de votre page
-      initChamp()
+      // Initialisation des éléments de jeu
+      genererGrille()
+      initEvenements()
     })()
 
-    function initChamp() {
-      const btn = document.getElementById('btn-action')
-      btn.addEventListener('click', () => {
-        alert('Action enregistrée sur le Champ !')
+    // Génère dynamiquement les 16 cases (4x4) de terre
+    function genererGrille() {
+      const grille = document.getElementById('grille-terre')
+      grille.innerHTML = '' // On vide d'abord
+      
+      for (let i = 0; i < 16; i++) {
+        const caseTerre = document.createElement('div')
+        caseTerre.classList.add('case-terre')
+        caseTerre.dataset.index = i
+        // Petit effet visuel par défaut (optionnel)
+        caseTerre.textContent = '🟫' 
+        
+        caseTerre.addEventListener('click', () => {
+          console.log(`Case cliquée : ${i}`)
+        })
+        grille.appendChild(caseTerre)
+      }
+    }
+
+    // Gère l'ouverture/fermeture de la fenêtre de graines
+    function initEvenements() {
+      const modale = document.getElementById('modale-graines')
+      const btnOuvrir = document.getElementById('btn-ouvrir-graines')
+      const btnFermer = document.getElementById('btn-fermer-graines')
+
+      btnOuvrir.addEventListener('click', () => {
+        modale.classList.add('active')
+      })
+
+      btnFermer.addEventListener('click', () => {
+        modale.classList.remove('active')
+      })
+
+      // Ferme la fenêtre si on clique en dehors du carré blanc
+      modale.addEventListener('click', (e) => {
+        if (e.target === modale) {
+          modale.classList.remove('active')
+        }
       })
     }
   </script>
