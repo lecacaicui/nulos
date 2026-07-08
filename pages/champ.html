@@ -6,6 +6,7 @@
   <title>Champ de bataille</title>
   <link rel="stylesheet" href="../style/style.css">
   
+  <!-- Script d'initialisation du thème pour éviter le flash blanc -->
   <script>
   (function(){
     var t = localStorage.getItem('theme_couleurs');
@@ -28,6 +29,54 @@
   <style>body { visibility: hidden; }</style>
   
   <style>
+    /* Zone globale du jeu : on désactive le curseur par défaut quand un outil est actif */
+    .jeu-champ-container.outil-actif {
+      cursor: none;
+    }
+    .jeu-champ-container.outil-actif .case-terre,
+    .jeu-champ-container.outil-actif .item-graine,
+    .jeu-champ-container.outil-actif .item-outil,
+    .jeu-champ-container.outil-actif .btn {
+      cursor: none !important;
+    }
+
+    /* Le curseur personnalisé dynamique */
+    #custom-cursor {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      border: 2px solid #fff;
+      pointer-events: none; /* Ne doit pas bloquer les clics en dessous */
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      display: none; /* Masqué par défaut */
+      transition: width 0.15s ease, height 0.15s ease, background 0.15s ease;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+
+    /* Tailles du curseur selon les états */
+    #custom-cursor.mode-planter {
+      display: block;
+      background: rgba(37, 99, 235, 0.3);
+      border-color: #2563eb;
+    }
+
+    #custom-cursor.mode-recolter {
+      display: block;
+      background: rgba(239, 68, 68, 0.3);
+      border-color: #ef4444;
+    }
+
+    /* Quand le curseur survole le champ (on l'agrandit / zone plus grosse) */
+    #custom-cursor.zone-zoom {
+      width: 45px;
+      height: 45px;
+    }
+
     .jeu-champ-container {
       display: grid;
       grid-template-columns: 280px 1fr 250px;
@@ -93,7 +142,6 @@
       line-height: 1;
     }
 
-    /* Libellé de la mutation sous l'émoji */
     .case-mutation-label {
       font-size: 0.65rem;
       font-weight: 800;
@@ -106,14 +154,13 @@
       filter: brightness(1.1);
     }
 
-    /* Styles d'arrière-plan selon les mutations */
     .case-terre.mutation-dore {
-      background: #D4AF37 !important; /* Jaune Or */
+      background: #D4AF37 !important;
       color: #000 !important;
       border-color: #AA7C11;
     }
     .case-terre.mutation-diamant {
-      background: #4A90E2 !important; /* Bleu Diamant */
+      background: #4A90E2 !important;
       color: #fff !important;
       border-color: #21508A;
     }
@@ -123,7 +170,6 @@
       border-color: #fff;
     }
 
-    /* Badge du Timer en haut à droite */
     .case-timer {
       position: absolute;
       top: 4px;
@@ -138,7 +184,6 @@
       font-family: monospace;
     }
 
-    /* Zone inventaire */
     .zone-inventaire {
       display: flex;
       flex-direction: column;
@@ -168,7 +213,6 @@
 
     .item-graine.epuise { opacity: 0.4; cursor: not-allowed; }
 
-    /* Modale magasin */
     .modale-graines {
       display: none;
       position: fixed;
@@ -241,11 +285,16 @@
   </style>
 </head>
 <body>
+  <!-- Élément HTML de notre curseur sur-mesure -->
+  <div id="custom-cursor"></div>
+
   <div id="header-placeholder"></div>
 
   <main>
-    <div class="jeu-champ-container">
+    <!-- Conteneur global du jeu -->
+    <div class="jeu-champ-container" id="zone-jeu">
       
+      <!-- À GAUCHE : Zone d'Achat & Sac -->
       <section class="panneau-jeu" id="achat">
         <h2>🛒 Achats & Sac</h2>
         <button class="btn btn-primary" id="btn-ouvrir-magasin">🌱 Ouvrir le Magasin</button>
@@ -257,15 +306,16 @@
         </div>
 
         <h3 style="font-size: 0.9rem; margin-top: 0.5rem; color: var(--couleur-texte-faible);">🎒 Graines à semer :</h3>
-        <div class="zone-inventaire" id="inventaire-graines">
-          </div>
+        <div class="zone-inventaire" id="inventaire-graines"></div>
       </section>
 
+      <!-- AU CENTRE : Le Champ -->
       <section class="panneau-jeu" id="champ" style="text-align: center;">
         <h2>🌾 Mon Champ (4x4)</h2>
         <div class="grille-champ" id="grille-terre"></div>
       </section>
 
+      <!-- À DROITE : Le Score & Économie -->
       <section class="panneau-jeu" id="score">
         <h2>💰 Économie</h2>
         <div style="font-size: 1.1rem; font-weight: 600;">
@@ -279,6 +329,7 @@
     </div>
   </main>
 
+  <!-- Magasin -->
   <div class="modale-graines" id="modale-graines">
     <div class="modale-graines-contenu">
       <button class="btn-fermer" id="btn-fermer-graines">✕</button>
@@ -309,9 +360,6 @@
     let graineActiveId = null
     let serpeActive = false
 
-    // Modificateurs de mutations
-    // statut: 'vide', 'pousse', 'pret'
-    // mutation: 'normal', 'dore', 'diamant', 'arcenciel'
     const etatChamp = Array.from({ length: 16 }, () => ({
       statut: 'vide',
       graineId: null,
@@ -336,25 +384,55 @@
       renderInventaire()
       genererMagasin()
       initEvenements()
+      initCurseurDynamique()
     })()
 
     function majAffichageArgent() {
       document.getElementById('argent-joueur').textContent = argent
     }
 
-    // Fonction pour calculer la mutation d'une plante arrivant à maturité
     function determinerMutation() {
-      const tirage = Math.random() // Renvoie un float entre 0 et 1
-
-      if (tirage <= 1 / 100) return 'arcenciel' // 1%
-      if (tirage <= 1 / 25)  return 'diamant'   // 4%
-      if (tirage <= 1 / 5)   return 'dore'      // 20%
+      const tirage = Math.random()
+      if (tirage <= 1 / 100) return 'arcenciel'
+      if (tirage <= 1 / 25)  return 'diamant'
+      if (tirage <= 1 / 5)   return 'dore'
       return 'normal'
+    }
+
+    // --- LOGIQUE DU CURSEUR PERSONNALISÉ ---
+    function initCurseurDynamique() {
+      const cursor = document.getElementById('custom-cursor')
+      const zoneJeu = document.getElementById('zone-jeu')
+
+      // Suit les mouvements de la souris
+      window.addEventListener('mousemove', (e) => {
+        cursor.style.left = e.clientX + 'px'
+        cursor.style.top = e.clientY + 'px'
+      })
+    }
+
+    // Met à jour l'apparence générale du curseur
+    function majEtatCurseur() {
+      const cursor = document.getElementById('custom-cursor')
+      const zoneJeu = document.getElementById('zone-jeu')
+
+      // Reset des classes
+      cursor.className = ''
+      zoneJeu.classList.remove('outil-actif')
+
+      if (serpeActive) {
+        cursor.classList.add('mode-recolter')
+        zoneJeu.classList.add('outil-actif')
+      } else if (graineActiveId) {
+        cursor.classList.add('mode-planter')
+        zoneJeu.classList.add('outil-actif')
+      }
     }
 
     // 1. Génération du champ
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
+      const cursor = document.getElementById('custom-cursor')
       grille.innerHTML = ''
       
       for (let i = 0; i < 16; i++) {
@@ -364,7 +442,6 @@
         const caseTerre = document.createElement('div')
         caseTerre.classList.add('case-terre')
         
-        // Structure interne pour accueillir l'émoji et le texte de mutation
         caseTerre.innerHTML = `
           <span class="case-emoji">🟫</span>
           <span class="case-mutation-label"></span>
@@ -379,6 +456,16 @@
 
         const emojiEl = caseTerre.querySelector('.case-emoji')
         const labelEl = caseTerre.querySelector('.case-mutation-label')
+
+        // Gestion de l'agrandissement du curseur (Plus gros dans le champ)
+        caseTerre.addEventListener('mouseenter', () => {
+          if (serpeActive || graineActiveId) {
+            cursor.classList.add('zone-zoom')
+          }
+        })
+        caseTerre.addEventListener('mouseleave', () => {
+          cursor.classList.remove('zone-zoom')
+        })
 
         const interagirCase = () => {
           const info = etatChamp[i]
@@ -410,7 +497,6 @@
                 info.statut = 'pret'
                 timerBadge.style.display = 'none'
 
-                // --- TIRAGE AU SORT DE LA MUTATION ---
                 info.mutation = determinerMutation()
                 emojiEl.textContent = template.emoji
 
@@ -446,27 +532,29 @@
               argent += gainFinal
               majAffichageArgent()
               
-              // Nettoyage complet et reset CSS de la case
               info.statut = 'vide'
               info.graineId = null
               info.mutation = 'normal'
               
               emojiEl.textContent = '🟫'
               labelEl.textContent = ''
-              caseTerre.className = 'case-terre' // Retire les classes de rareté (.mutation-xxx)
+              caseTerre.className = 'case-terre'
               timerBadge.style.display = 'none'
             }
           }
         }
 
-        caseTerre.addEventListener('mouseenter', interagirCase)
-        caseTerre.addEventListener('click', interagirCase)
+        caseTerre.addEventListener('mouseenter', (e) => {
+          // On ne plante/récolte au survol que si le bouton de la souris est enfoncé (optionnel mais plus fluide)
+          if (e.buttons === 1) interagirCase()
+        })
+        caseTerre.addEventListener('mousedown', interagirCase)
 
         grille.appendChild(container)
       }
     }
 
-    // 2. Rendu graphique du sac à dos
+    // 2. Inventaire
     function renderInventaire() {
       const conteneur = document.getElementById('inventaire-graines')
       conteneur.innerHTML = ''
@@ -474,6 +562,8 @@
       const outilSerpe = document.getElementById('outil-serpe')
       if (serpeActive) outilSerpe.classList.add('actif')
       else outilSerpe.classList.remove('actif')
+
+      majEtatCurseur()
 
       catalogueGraines.forEach(graine => {
         const qte = inventaire[graine.id] || 0
