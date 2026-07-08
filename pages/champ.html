@@ -6,7 +6,6 @@
   <title>Champ de bataille</title>
   <link rel="stylesheet" href="../style/style.css">
   
-  <!-- Script d'initialisation du thème pour éviter le flash blanc -->
   <script>
   (function(){
     var t = localStorage.getItem('theme_couleurs');
@@ -83,17 +82,48 @@
       cursor: pointer;
       transition: all 0.1s ease;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 1.8rem;
       user-select: none;
+    }
+
+    .case-emoji {
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+
+    /* Libellé de la mutation sous l'émoji */
+    .case-mutation-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      margin-top: 2px;
+      text-transform: uppercase;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
     }
 
     .case-terre:hover {
       filter: brightness(1.1);
     }
 
-    /* Badge du Timer en haut à droite de la plantation */
+    /* Styles d'arrière-plan selon les mutations */
+    .case-terre.mutation-dore {
+      background: #D4AF37 !important; /* Jaune Or */
+      color: #000 !important;
+      border-color: #AA7C11;
+    }
+    .case-terre.mutation-diamant {
+      background: #4A90E2 !important; /* Bleu Diamant */
+      color: #fff !important;
+      border-color: #21508A;
+    }
+    .case-terre.mutation-arcenciel {
+      background: linear-gradient(45deg, #ff2a2a, #ff7a2a, #ffa22a, #2aff2a, #2a2aff, #a22aff, #ff2aff) !important;
+      color: #fff !important;
+      border-color: #fff;
+    }
+
+    /* Badge du Timer en haut à droite */
     .case-timer {
       position: absolute;
       top: 4px;
@@ -104,7 +134,7 @@
       font-weight: 700;
       padding: 2px 5px;
       border-radius: 4px;
-      pointer-events: none; /* Ne bloque pas le clic sur la case */
+      pointer-events: none;
       font-family: monospace;
     }
 
@@ -136,10 +166,7 @@
       box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
     }
 
-    .item-graine.epuise {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
+    .item-graine.epuise { opacity: 0.4; cursor: not-allowed; }
 
     /* Modale magasin */
     .modale-graines {
@@ -219,7 +246,6 @@
   <main>
     <div class="jeu-champ-container">
       
-      <!-- À GAUCHE : Zone d'Achat & Sac -->
       <section class="panneau-jeu" id="achat">
         <h2>🛒 Achats & Sac</h2>
         <button class="btn btn-primary" id="btn-ouvrir-magasin">🌱 Ouvrir le Magasin</button>
@@ -232,17 +258,14 @@
 
         <h3 style="font-size: 0.9rem; margin-top: 0.5rem; color: var(--couleur-texte-faible);">🎒 Graines à semer :</h3>
         <div class="zone-inventaire" id="inventaire-graines">
-          <!-- Injecté par JS -->
-        </div>
+          </div>
       </section>
 
-      <!-- AU CENTRE : Le Champ -->
       <section class="panneau-jeu" id="champ" style="text-align: center;">
         <h2>🌾 Mon Champ (4x4)</h2>
         <div class="grille-champ" id="grille-terre"></div>
       </section>
 
-      <!-- À DROITE : Le Score & Économie -->
       <section class="panneau-jeu" id="score">
         <h2>💰 Économie</h2>
         <div style="font-size: 1.1rem; font-weight: 600;">
@@ -256,7 +279,6 @@
     </div>
   </main>
 
-  <!-- Magasin -->
   <div class="modale-graines" id="modale-graines">
     <div class="modale-graines-contenu">
       <button class="btn-fermer" id="btn-fermer-graines">✕</button>
@@ -275,7 +297,6 @@
 
     let argent = 500
     
-    // Ajout d'un paramètre 'tempsPousse' (en secondes) et 'gain' à la récolte
     const catalogueGraines = [
       { id: 'graine1', nom: 'Blé', emoji: '🌾', prix: 10, tempsPousse: 5, gain: 20 },
       { id: 'graine2', nom: 'Carotte', emoji: '🥕', prix: 15, tempsPousse: 10, gain: 30 },
@@ -285,15 +306,16 @@
 
     const inventaire = { graine1: 5, graine2: 2, graine3: 0, graine4: 0 }
 
-    // Modes de sélection ("graine" ou "serpe")
     let graineActiveId = null
     let serpeActive = false
 
-    // Suivi complet de l'état des 16 cases
-    // Statuts possibles : 'vide', 'pousse', 'pret'
+    // Modificateurs de mutations
+    // statut: 'vide', 'pousse', 'pret'
+    // mutation: 'normal', 'dore', 'diamant', 'arcenciel'
     const etatChamp = Array.from({ length: 16 }, () => ({
       statut: 'vide',
       graineId: null,
+      mutation: 'normal',
       tempsRestant: 0,
       intervalId: null
     }))
@@ -320,7 +342,17 @@
       document.getElementById('argent-joueur').textContent = argent
     }
 
-    // 1. Génération de la grille avec gestion de la pousse et de la serpe
+    // Fonction pour calculer la mutation d'une plante arrivant à maturité
+    function determinerMutation() {
+      const tirage = Math.random() // Renvoie un float entre 0 et 1
+
+      if (tirage <= 1 / 100) return 'arcenciel' // 1%
+      if (tirage <= 1 / 25)  return 'diamant'   // 4%
+      if (tirage <= 1 / 5)   return 'dore'      // 20%
+      return 'normal'
+    }
+
+    // 1. Génération du champ
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       grille.innerHTML = ''
@@ -331,7 +363,12 @@
 
         const caseTerre = document.createElement('div')
         caseTerre.classList.add('case-terre')
-        caseTerre.textContent = '🟫'
+        
+        // Structure interne pour accueillir l'émoji et le texte de mutation
+        caseTerre.innerHTML = `
+          <span class="case-emoji">🟫</span>
+          <span class="case-mutation-label"></span>
+        `
         
         const timerBadge = document.createElement('div')
         timerBadge.classList.add('case-timer')
@@ -340,11 +377,13 @@
         container.appendChild(caseTerre)
         container.appendChild(timerBadge)
 
-        // Logique d'interaction unifiée (au survol ou au clic)
+        const emojiEl = caseTerre.querySelector('.case-emoji')
+        const labelEl = caseTerre.querySelector('.case-mutation-label')
+
         const interagirCase = () => {
           const info = etatChamp[i]
 
-          // MODE PLANTER (Graine sélectionnée)
+          // ACTION : PLANTER
           if (graineActiveId && !serpeActive && info.statut === 'vide' && inventaire[graineActiveId] > 0) {
             const template = catalogueGraines.find(g => g.id === graineActiveId)
             if (!template) return
@@ -352,24 +391,39 @@
             inventaire[graineActiveId]--
             info.statut = 'pousse'
             info.graineId = graineActiveId
+            info.mutation = 'normal'
             info.tempsRestant = template.tempsPousse
 
-            caseTerre.textContent = '🌱' // Visuel de pousse
+            emojiEl.textContent = '🌱'
+            labelEl.textContent = ''
             timerBadge.textContent = `${info.tempsRestant}s`
             timerBadge.style.display = 'block'
             
             renderInventaire()
 
-            // Lancement du compte à rebours
             info.intervalId = setInterval(() => {
               info.tempsRestant--
               timerBadge.textContent = `${info.tempsRestant}s`
 
               if (info.tempsRestant <= 0) {
                 clearInterval(info.intervalId)
-                info.statut = 'pret' // La plante est mûre !
-                caseTerre.textContent = template.emoji
+                info.statut = 'pret'
                 timerBadge.style.display = 'none'
+
+                // --- TIRAGE AU SORT DE LA MUTATION ---
+                info.mutation = determinerMutation()
+                emojiEl.textContent = template.emoji
+
+                if (info.mutation === 'dore') {
+                  caseTerre.classList.add('mutation-dore')
+                  labelEl.textContent = '✨ Doré'
+                } else if (info.mutation === 'diamant') {
+                  caseTerre.classList.add('mutation-diamant')
+                  labelEl.textContent = '💎 Diamant'
+                } else if (info.mutation === 'arcenciel') {
+                  caseTerre.classList.add('mutation-arcenciel')
+                  labelEl.textContent = '🌈 Prismatique'
+                }
               }
             }, 1000)
 
@@ -379,17 +433,27 @@
             }
           }
 
-          // MODE RÉCOLTE (Serpe active)
+          // ACTION : RÉCOLTER
           else if (serpeActive && info.statut === 'pret') {
             const template = catalogueGraines.find(g => g.id === info.graineId)
             if (template) {
-              argent += template.gain
+              let multiplicateur = 1
+              if (info.mutation === 'dore') multiplicateur = 3
+              if (info.mutation === 'diamant') multiplicateur = 10
+              if (info.mutation === 'arcenciel') multiplicateur = 50
+
+              const gainFinal = template.gain * multiplicateur
+              argent += gainFinal
               majAffichageArgent()
               
-              // Reset de la case
+              // Nettoyage complet et reset CSS de la case
               info.statut = 'vide'
               info.graineId = null
-              caseTerre.textContent = '🟫'
+              info.mutation = 'normal'
+              
+              emojiEl.textContent = '🟫'
+              labelEl.textContent = ''
+              caseTerre.className = 'case-terre' // Retire les classes de rareté (.mutation-xxx)
               timerBadge.style.display = 'none'
             }
           }
@@ -402,17 +466,14 @@
       }
     }
 
-    // 2. Rendu graphique du sac à dos (Graines + désactivation si serpe active)
+    // 2. Rendu graphique du sac à dos
     function renderInventaire() {
       const conteneur = document.getElementById('inventaire-graines')
       conteneur.innerHTML = ''
 
       const outilSerpe = document.getElementById('outil-serpe')
-      if (serpeActive) {
-        outilSerpe.classList.add('actif')
-      } else {
-        outilSerpe.classList.remove('actif')
-      }
+      if (serpeActive) outilSerpe.classList.add('actif')
+      else outilSerpe.classList.remove('actif')
 
       catalogueGraines.forEach(graine => {
         const qte = inventaire[graine.id] || 0
@@ -429,7 +490,7 @@
         
         div.addEventListener('click', () => {
           if (qte === 0) return
-          serpeActive = false // Coupe la serpe si on prend des graines
+          serpeActive = false
           graineActiveId = (graineActiveId === graine.id) ? null : graine.id
           renderInventaire()
         })
@@ -438,7 +499,7 @@
       })
     }
 
-    // 3. Gestionnaire de la boutique d'achat
+    // 3. Boutique
     function genererMagasin() {
       const liste = document.getElementById('liste-magasin')
       liste.innerHTML = ''
@@ -450,7 +511,7 @@
         ligne.innerHTML = `
           <div style="display:flex; flex-direction:column;">
             <span>${graine.emoji} <b>Graine de ${graine.nom}</b></span>
-            <span style="font-size:0.8rem; color:var(--couleur-texte-faible)">Prix : ${graine.prix} $ (Temps : ${graine.tempsPousse}s)</span>
+            <span style="font-size:0.8rem; color:var(--couleur-texte-faible)">Prix : ${graine.prix} $ | Base : ${graine.gain} $</span>
           </div>
           <div style="display:flex; align-items:center; gap:0.5rem;">
             <input type="number" min="1" max="99" value="1" class="selecteur-quantite" id="qte-${graine.id}">
@@ -483,10 +544,9 @@
       const btnFermer = document.getElementById('btn-fermer-graines')
       const outilSerpe = document.getElementById('outil-serpe')
 
-      // Clic sur l'outil Serpe
       outilSerpe.addEventListener('click', () => {
         serpeActive = !serpeActive
-        graineActiveId = null // Désactive la graine si on prend la serpe
+        graineActiveId = null
         renderInventaire()
       })
 
