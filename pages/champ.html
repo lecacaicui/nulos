@@ -30,7 +30,7 @@
   <style>
     .jeu-champ-container {
       display: grid;
-      grid-template-columns: 250px 1fr 250px;
+      grid-template-columns: 280px 1fr 250px;
       gap: 1.5rem;
       width: 100%;
       max-width: 1400px;
@@ -38,7 +38,6 @@
       padding: 2rem 1rem 6rem;
     }
 
-    /* Panneaux latéraux et centraux */
     .panneau-jeu {
       background: var(--couleur-conteneur);
       border: 1px solid var(--couleur-bordure);
@@ -58,37 +57,70 @@
       color: var(--couleur-texte);
     }
 
-    /* Grille du champ au centre (4x4) */
+    /* Grille du champ */
     .grille-champ {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 0.5rem;
-      max-width: 400px;
+      gap: 0.6rem;
+      max-width: 440px;
       width: 100%;
       margin: 1.5rem auto;
       aspect-ratio: 1 / 1;
     }
 
     .case-terre {
-      background: #8B5A2B; /* Couleur terre par défaut */
-      border: 2px solid rgba(0,0,0,0.15);
-      border-radius: 8px;
+      background: #8B5A2B;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-radius: 10px;
       cursor: pointer;
-      transition: transform 0.1s, filter 0.1s;
+      transition: all 0.15s ease;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
+      font-size: 1.8rem;
+      user-select: none;
     }
 
-    .case-terre:hover {
-      filter: brightness(1.1);
-      transform: scale(1.02);
+    /* Effet quand on survole la case avec un élément traîné (dragover) */
+    .case-terre.drag-over {
+      background: #A0522D;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+      transform: scale(1.04);
     }
 
-    /* Fenêtre modale pour le magasin de graines */
+    /* Zone inventaire des graines achetées */
+    .zone-inventaire {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .item-graine {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 8px;
+      padding: 0.75rem;
+      cursor: grab;
+      user-select: none;
+      transition: background 0.1s;
+    }
+
+    .item-graine:active {
+      cursor: grabbing;
+    }
+
+    .item-graine.epuise {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Modale magasin */
     .modale-graines {
-      display: none; /* Cachée par défaut */
+      display: none;
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.5);
@@ -107,31 +139,40 @@
       border: 1px solid var(--couleur-bordure);
       border-radius: 12px;
       padding: 2rem;
-      max-width: 500px;
+      max-width: 550px;
       width: 90%;
       position: relative;
     }
 
     .grille-graines {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
       margin-top: 1.5rem;
+      max-height: 350px;
+      overflow-y: auto;
     }
 
-    .carte-graine {
+    .ligne-magasin-graine {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       background: var(--couleur-fond);
       border: 1px solid var(--couleur-bordure);
       border-radius: 8px;
-      padding: 1rem;
-      text-align: center;
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
+      padding: 0.75rem 1rem;
+      gap: 1rem;
     }
 
-    .carte-graine:hover {
-      border-color: var(--couleur-bouton);
+    .selecteur-quantite {
+      width: 60px;
+      padding: 0.3rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px;
+      background: var(--couleur-conteneur);
+      color: var(--couleur-texte);
+      font-weight: 600;
+      text-align: center;
     }
 
     .btn-fermer {
@@ -145,14 +186,9 @@
       cursor: pointer;
     }
 
-    /* Responsive */
     @media (max-width: 900px) {
-      .jeu-champ-container {
-        grid-template-columns: 1fr;
-      }
-      #score {
-        grid-row: 1; /* Met le score en haut sur mobile */
-      }
+      .jeu-champ-container { grid-template-columns: 1fr; }
+      #score { grid-row: 1; }
     }
   </style>
 </head>
@@ -163,20 +199,23 @@
     <div class="jeu-champ-container">
       
       <section class="panneau-jeu" id="achat">
-        <h2>🛒 Achats</h2>
-        <p style="font-size: 0.85rem; color: var(--couleur-texte-faible);">Choisissez vos outils ou graines :</p>
-        <button class="btn btn-primary" id="btn-ouvrir-graines">🌱 Graines</button>
+        <h2>🛒 Achats & Sac</h2>
+        <button class="btn btn-primary" id="btn-ouvrir-magasin">🌱 Ouvrir le Magasin</button>
+        
+        <h3 style="font-size: 0.9rem; margin-top: 1rem; color: var(--couleur-texte-faible);">🎒 Glisser un paquet sur le champ :</h3>
+        <div class="zone-inventaire" id="inventaire-graines">
+          </div>
       </section>
 
       <section class="panneau-jeu" id="champ" style="text-align: center;">
-        <h2>🌾 Mon Champ</h2>
+        <h2>🌾 Mon Champ (4x4)</h2>
         <div class="grille-champ" id="grille-terre"></div>
       </section>
 
       <section class="panneau-jeu" id="score">
         <h2>💰 Économie</h2>
         <div style="font-size: 1.1rem; font-weight: 600;">
-          Argent : <span id="argent-joueur" style="color: var(--couleur-bouton);">0</span> $
+          Argent : <span id="argent-joueur" style="color: var(--couleur-bouton);">500</span> $
         </div>
         <div style="font-size: 0.85rem; color: var(--couleur-texte-faible); margin-top: 0.5rem;">
           Joueur : <span id="nom-joueur">...</span>
@@ -189,16 +228,10 @@
   <div class="modale-graines" id="modale-graines">
     <div class="modale-graines-contenu">
       <button class="btn-fermer" id="btn-fermer-graines">✕</button>
-      <h3>Sélectionner une Graine</h3>
+      <h3>🛒 Acheter des graines</h3>
       
-      <div class="grille-graines">
-        <div class="carte-graine">🌱 Graine 1</div>
-        <div class="carte-graine">🌿 Graine 2</div>
-        <div class="carte-graine">🥕 Graine 3</div>
-        <div class="carte-graine">🌽 Graine 4</div>
-        <div class="carte-graine">🌻 Graine 5</div>
-        <div class="carte-graine">🍅 Graine 6</div>
-      </div>
+      <div class="grille-graines" id="liste-magasin">
+        </div>
     </div>
   </div>
 
@@ -210,8 +243,27 @@
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
+    // Données fictives initiales du jeu
+    let argent = 500
+    const catalogueGraines = [
+      { id: 'graine1', nom: 'Graine Blé', emoji: '🌾', prix: 10 },
+      { id: 'graine2', nom: 'Graine Carotte', emoji: '🥕', prix: 15 },
+      { id: 'graine3', nom: 'Graine Maïs', emoji: '🌽', prix: 25 },
+      { id: 'graine4', nom: 'Graine Tomate', emoji: '🍅', prix: 40 }
+    ]
+
+    // État du joueur (Stock de graines possédées)
+    const inventaire = {
+      graine1: 2, // Offertes au début
+      graine2: 0,
+      graine3: 0,
+      graine4: 0
+    }
+
+    // Sauvegarde de l'id de la graine qu'on est en train de glisser (drag)
+    let graineSelectionneeId = null
+
     ;(async () => {
-      // Sécurité : Redirection si non connecté
       if (!localStorage.getItem('username')) {
         window.location.href = 'connexion.html'
         return
@@ -223,57 +275,148 @@
       await chargerHeader('../')
       await chargerFooter('../')
 
-      // Remplissage infos de base
-      const username = localStorage.getItem('username')
-      document.getElementById('nom-joueur').textContent = username
-      
-      // Exemple : Initialise l'argent à 150 pour l'instant (à lier à ta BDD plus tard)
-      document.getElementById('argent-joueur').textContent = '150'
+      document.getElementById('nom-joueur').textContent = localStorage.getItem('username')
+      majAffichageArgent()
 
-      // Initialisation des éléments de jeu
       genererGrille()
+      renderInventaire()
+      genererMagasin()
       initEvenements()
     })()
 
-    // Génère dynamiquement les 16 cases (4x4) de terre
+    function majAffichageArgent() {
+      document.getElementById('argent-joueur').textContent = argent
+    }
+
+    // 1. Génère le champ 4x4 et y ajoute les écouteurs de Drop
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
-      grille.innerHTML = '' // On vide d'abord
+      grille.innerHTML = ''
       
       for (let i = 0; i < 16; i++) {
         const caseTerre = document.createElement('div')
         caseTerre.classList.add('case-terre')
         caseTerre.dataset.index = i
-        // Petit effet visuel par défaut (optionnel)
-        caseTerre.textContent = '🟫' 
+        caseTerre.textContent = '🟫' // Terre vide
         
-        caseTerre.addEventListener('click', () => {
-          console.log(`Case cliquée : ${i}`)
+        // --- Événements de Drag & Drop sur le champ ---
+        caseTerre.addEventListener('dragover', (e) => {
+          e.preventDefault() // Autorise le drop sur cet élément
+          if (graineSelectionneeId && inventaire[graineSelectionneeId] > 0) {
+            caseTerre.classList.add('drag-over')
+          }
         })
+
+        caseTerre.addEventListener('dragleave', () => {
+          caseTerre.classList.remove('drag-over')
+        })
+
+        caseTerre.addEventListener('drop', (e) => {
+          e.preventDefault()
+          caseTerre.classList.remove('drag-over')
+
+          if (!graineSelectionneeId || inventaire[graineSelectionneeId] <= 0) return
+
+          // Planter la graine !
+          const templateGraine = catalogueGraines.find(g => g.id === graineSelectionneeId)
+          if (templateGraine) {
+            inventaire[graineSelectionneeId]-- // Réduit le stock
+            caseTerre.textContent = templateGraine.emoji // Change l'aspect visuel de la case
+            
+            renderInventaire() // Rafraîchit les compteurs du sac
+            console.log(`Planté ${templateGraine.nom} sur la case ${i}`)
+          }
+        })
+
         grille.appendChild(caseTerre)
       }
     }
 
-    // Gère l'ouverture/fermeture de la fenêtre de graines
+    // 2. Affiche le sac de graines (inventaire à gauche)
+    function renderInventaire() {
+      const conteneur = document.getElementById('inventaire-graines')
+      conteneur.innerHTML = ''
+
+      catalogueGraines.forEach(graine => {
+        const qte = inventaire[graine.id] || 0
+        const div = document.createElement('div')
+        div.classList.add('item-graine')
+        if (qte === 0) div.classList.add('epuise')
+        
+        div.innerHTML = `
+          <span>${graine.emoji} <b>${graine.nom}</b></span>
+          <span>x${qte}</span>
+        `
+        
+        // Rendre l'élément déplaçable si on en possède
+        if (qte > 0) {
+          div.setAttribute('draggable', 'true')
+          
+          div.addEventListener('dragstart', () => {
+            graineSelectionneeId = graine.id
+            div.style.opacity = '0.4'
+          })
+
+          div.addEventListener('dragend', () => {
+            graineSelectionneeId = null
+            div.style.opacity = '1'
+          })
+        }
+
+        conteneur.appendChild(div)
+      })
+    }
+
+    // 3. Génère la liste d'achats avec choix de quantité dans le magasin
+    function genererMagasin() {
+      const liste = document.getElementById('liste-magasin')
+      liste.innerHTML = ''
+
+      catalogueGraines.forEach(graine => {
+        const ligne = document.createElement('div')
+        ligne.classList.add('ligne-magasin-graine')
+        
+        ligne.innerHTML = `
+          <div style="display:flex; flex-direction:column;">
+            <span>${graine.emoji} <b>${graine.nom}</b></span>
+            <span style="font-size:0.8rem; color:var(--couleur-texte-faible)">Prix unitaire : ${graine.prix} $</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <input type="number" min="1" max="99" value="1" class="selecteur-quantite" id="qte-${graine.id}">
+            <button class="btn btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.85rem;" id="btn-acheter-${graine.id}">Acheter</button>
+          </div>
+        `
+        liste.appendChild(ligne)
+
+        // Gestionnaire d'achat quantitatif
+        ligne.querySelector(`#btn-acheter-${graine.id}`).addEventListener('click', () => {
+          const inputQte = ligne.querySelector(`#qte-${graine.id}`)
+          const quantite = parseInt(inputQte.value) || 1
+          const coutTotal = graine.prix * quantite
+
+          if (argent >= coutTotal) {
+            argent -= coutTotal
+            inventaire[graine.id] += quantite
+            majAffichageArgent()
+            renderInventaire()
+            inputQte.value = 1 // Reset l'input
+            alert(`Succès ! Vous avez acheté ${quantite} ${graine.nom}(s).`)
+          } else {
+            alert("Pas assez d'argent pour cette quantité !")
+          }
+        })
+      })
+    }
+
+    // 4. Modale ouverture / fermeture
     function initEvenements() {
       const modale = document.getElementById('modale-graines')
-      const btnOuvrir = document.getElementById('btn-ouvrir-graines')
+      const btnOuvrir = document.getElementById('btn-ouvrir-magasin')
       const btnFermer = document.getElementById('btn-fermer-graines')
 
-      btnOuvrir.addEventListener('click', () => {
-        modale.classList.add('active')
-      })
-
-      btnFermer.addEventListener('click', () => {
-        modale.classList.remove('active')
-      })
-
-      // Ferme la fenêtre si on clique en dehors du carré blanc
-      modale.addEventListener('click', (e) => {
-        if (e.target === modale) {
-          modale.classList.remove('active')
-        }
-      })
+      btnOuvrir.addEventListener('click', () => modale.classList.add('active'))
+      btnFermer.addEventListener('click', () => modale.classList.remove('active'))
+      modale.addEventListener('click', (e) => { if (e.target === modale) modale.classList.remove('active') })
     }
   </script>
 </body>
