@@ -29,7 +29,6 @@
   <style>body { visibility: hidden; }</style>
   
   <style>
-    /* Zone globale du jeu : on désactive le curseur par défaut quand un outil est actif */
     .jeu-champ-container.outil-actif {
       cursor: none;
     }
@@ -40,25 +39,21 @@
       cursor: none !important;
     }
 
-    /* Le curseur personnalisé dynamique */
     #custom-cursor {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 20px;
-      height: 20px;
+      top: 0; left: 0;
+      width: 20px; height: 20px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.4);
       border: 2px solid #fff;
-      pointer-events: none; /* Ne doit pas bloquer les clics en dessous */
+      pointer-events: none;
       transform: translate(-50%, -50%);
       z-index: 9999;
-      display: none; /* Masqué par défaut */
+      display: none;
       transition: width 0.15s ease, height 0.15s ease, background 0.15s ease;
       box-shadow: 0 0 10px rgba(0,0,0,0.3);
     }
 
-    /* Tailles du curseur selon les états */
     #custom-cursor.mode-planter {
       display: block;
       background: rgba(37, 99, 235, 0.3);
@@ -71,7 +66,6 @@
       border-color: #ef4444;
     }
 
-    /* Quand le curseur survole le champ (on l'agrandit / zone plus grosse) */
     #custom-cursor.zone-zoom {
       width: 45px;
       height: 45px;
@@ -79,7 +73,7 @@
 
     .jeu-champ-container {
       display: grid;
-      grid-template-columns: 280px 1fr 250px;
+      grid-template-columns: 280px 1fr 280px;
       gap: 1.5rem;
       width: 100%;
       max-width: 1400px;
@@ -106,15 +100,14 @@
       color: var(--couleur-texte);
     }
 
-    /* Grille du champ */
+    /* Grille adaptative pour supporter l'agrandissement */
     .grille-champ {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, 1fr); /* Modifié dynamiquement par JS */
       gap: 0.6rem;
-      max-width: 440px;
+      max-width: 500px;
       width: 100%;
       margin: 1.5rem auto;
-      aspect-ratio: 1 / 1;
     }
 
     .case-container {
@@ -191,7 +184,7 @@
       margin-top: 0.5rem;
     }
 
-    .item-graine, .item-outil {
+    .item-graine, .item-outil, .item-upgrade {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -202,6 +195,13 @@
       cursor: pointer;
       user-select: none;
       transition: all 0.2s ease;
+    }
+
+    .item-upgrade {
+      cursor: default;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
     }
 
     .item-graine.actif, .item-outil.actif {
@@ -285,13 +285,10 @@
   </style>
 </head>
 <body>
-  <!-- Élément HTML de notre curseur sur-mesure -->
   <div id="custom-cursor"></div>
-
   <div id="header-placeholder"></div>
 
   <main>
-    <!-- Conteneur global du jeu -->
     <div class="jeu-champ-container" id="zone-jeu">
       
       <!-- À GAUCHE : Zone d'Achat & Sac -->
@@ -311,19 +308,44 @@
 
       <!-- AU CENTRE : Le Champ -->
       <section class="panneau-jeu" id="champ" style="text-align: center;">
-        <h2>🌾 Mon Champ (4x4)</h2>
+        <h2>🌾 Mon Champ (<span id="txt-taille-grille">4x4</span>)</h2>
         <div class="grille-champ" id="grille-terre"></div>
       </section>
 
-      <!-- À DROITE : Le Score & Économie -->
+      <!-- À DROITE : Le Score & Économie & Améliorations -->
       <section class="panneau-jeu" id="score">
         <h2>💰 Économie</h2>
-        <div style="font-size: 1.1rem; font-weight: 600;">
+        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">
           Argent : <span id="argent-joueur" style="color: var(--couleur-bouton);">500</span> $
         </div>
-        <div style="font-size: 0.85rem; color: var(--couleur-texte-faible); margin-top: 0.5rem;">
+        <div style="font-size: 0.85rem; color: var(--couleur-texte-faible); margin-bottom: 1rem;">
           Joueur : <span id="nom-joueur">...</span>
         </div>
+
+        <h2>📈 Améliorations</h2>
+        
+        <!-- Upgrade 1 : Agrandir le champ -->
+        <div class="item-upgrade">
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.85rem;">
+            <span>🟫 <b>Nouvelle Parcelle</b></span>
+            <span id="txt-cases-actuelles" style="font-weight:700;">16 cases</span>
+          </div>
+          <button class="btn btn-secondary" style="width:100%; padding:0.4rem; font-size:0.8rem;" id="btn-upgrade-taille">
+            Acheter (+1 case) : <span id="prix-upgrade-taille">150</span> $
+          </button>
+        </div>
+
+        <!-- Upgrade 2 : Vitesse de pousse -->
+        <div class="item-upgrade">
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.85rem;">
+            <span>⚡ <b>Serre Technologique</b></span>
+            <span id="txt-vitesse-actuelle" style="font-weight:700;">Vitesse x1.0</span>
+          </div>
+          <button class="btn btn-secondary" style="width:100%; padding:0.4rem; font-size:0.8rem;" id="btn-upgrade-vitesse">
+            Boost Pousse (+15%) : <span id="prix-upgrade-vitesse">200</span> $
+          </button>
+        </div>
+
       </section>
 
     </div>
@@ -360,7 +382,13 @@
     let graineActiveId = null
     let serpeActive = false
 
-    const etatChamp = Array.from({ length: 16 }, () => ({
+    // Variables d'améliorations
+    let nbCasesChamp = 16
+    let reductionTempsPousse = 0.0 // Pourcentage de réduction (0.15 = -15% de temps)
+    let prixUpgradeTaille = 150
+    let prixUpgradeVitesse = 200
+
+    let etatChamp = Array.from({ length: nbCasesChamp }, () => ({
       statut: 'vide',
       graineId: null,
       mutation: 'normal',
@@ -380,6 +408,7 @@
 
       document.getElementById('nom-joueur').textContent = localStorage.getItem('username')
       majAffichageArgent()
+      majTextesUpgrades()
       genererGrille()
       renderInventaire()
       genererMagasin()
@@ -391,6 +420,18 @@
       document.getElementById('argent-joueur').textContent = argent
     }
 
+    function majTextesUpgrades() {
+      // Calcul et affichage de la grille (ex: 4x4, 5x4, etc.)
+      const colonnes = Math.ceil(Math.sqrt(nbCasesChamp))
+      const lignes = Math.ceil(nbCasesChamp / colonnes)
+      document.getElementById('txt-taille-grille').textContent = `${colonnes}x${lignes}`
+      document.getElementById('txt-cases-actuelles').textContent = `${nbCasesChamp} cases`
+      document.getElementById('prix-upgrade-taille').textContent = prixUpgradeTaille
+
+      document.getElementById('txt-vitesse-actuelle').textContent = `Boost: -${Math.round(reductionTempsPousse * 100)}%`
+      document.getElementById('prix-upgrade-vitesse').textContent = prixUpgradeVitesse
+    }
+
     function determinerMutation() {
       const tirage = Math.random()
       if (tirage <= 1 / 100) return 'arcenciel'
@@ -399,24 +440,17 @@
       return 'normal'
     }
 
-    // --- LOGIQUE DU CURSEUR PERSONNALISÉ ---
     function initCurseurDynamique() {
       const cursor = document.getElementById('custom-cursor')
-      const zoneJeu = document.getElementById('zone-jeu')
-
-      // Suit les mouvements de la souris
       window.addEventListener('mousemove', (e) => {
         cursor.style.left = e.clientX + 'px'
         cursor.style.top = e.clientY + 'px'
       })
     }
 
-    // Met à jour l'apparence générale du curseur
     function majEtatCurseur() {
       const cursor = document.getElementById('custom-cursor')
       const zoneJeu = document.getElementById('zone-jeu')
-
-      // Reset des classes
       cursor.className = ''
       zoneJeu.classList.remove('outil-actif')
 
@@ -429,27 +463,49 @@
       }
     }
 
-    // 1. Génération du champ
+    // 1. Génération et rafraîchissement dynamique de la Grille
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       const cursor = document.getElementById('custom-cursor')
       grille.innerHTML = ''
       
-      for (let i = 0; i < 16; i++) {
+      // Ajuste dynamiquement le nombre de colonnes CSS de la grille de manière équilibrée
+      const colonnes = Math.ceil(Math.sqrt(nbCasesChamp))
+      grille.style.gridTemplateColumns = `repeat(${colonnes}, 1fr)`
+
+      for (let i = 0; i < nbCasesChamp; i++) {
+        // Si l'état de la case n'existe pas encore (nouvelle case achetée), on l'initialise
+        if (!etatChamp[i]) {
+          etatChamp[i] = { statut: 'vide', graineId: null, mutation: 'normal', tempsRestant: 0, intervalId: null }
+        }
+
+        const info = etatChamp[i]
         const container = document.createElement('div')
         container.classList.add('case-container')
 
         const caseTerre = document.createElement('div')
         caseTerre.classList.add('case-terre')
         
+        // Conserve l'état visuel en cas de reconstruction de la grille
+        let labelMutation = ''
+        if (info.statut === 'pret') {
+          if (info.mutation === 'dore') { caseTerre.classList.add('mutation-dore'); labelMutation = '✨ Doré'; }
+          if (info.mutation === 'diamant') { caseTerre.classList.add('mutation-diamant'); labelMutation = '💎 Diamant'; }
+          if (info.mutation === 'arcenciel') { caseTerre.classList.add('mutation-arcenciel'); labelMutation = '🌈 Prismatique'; }
+        }
+
+        const templateActuel = info.graineId ? catalogueGraines.find(g => g.id === info.graineId) : null
+        const emojiVisuel = info.statut === 'vide' ? '🟫' : (info.statut === 'pousse' ? '🌱' : templateActuel.emoji)
+
         caseTerre.innerHTML = `
-          <span class="case-emoji">🟫</span>
-          <span class="case-mutation-label"></span>
+          <span class="case-emoji">${emojiVisuel}</span>
+          <span class="case-mutation-label">${labelMutation}</span>
         `
         
         const timerBadge = document.createElement('div')
         timerBadge.classList.add('case-timer')
-        timerBadge.style.display = 'none'
+        timerBadge.style.display = (info.statut === 'pousse') ? 'block' : 'none'
+        timerBadge.textContent = `${info.tempsRestant}s`
 
         container.appendChild(caseTerre)
         container.appendChild(timerBadge)
@@ -457,19 +513,14 @@
         const emojiEl = caseTerre.querySelector('.case-emoji')
         const labelEl = caseTerre.querySelector('.case-mutation-label')
 
-        // Gestion de l'agrandissement du curseur (Plus gros dans le champ)
         caseTerre.addEventListener('mouseenter', () => {
-          if (serpeActive || graineActiveId) {
-            cursor.classList.add('zone-zoom')
-          }
+          if (serpeActive || graineActiveId) cursor.classList.add('zone-zoom')
         })
         caseTerre.addEventListener('mouseleave', () => {
           cursor.classList.remove('zone-zoom')
         })
 
         const interagirCase = () => {
-          const info = etatChamp[i]
-
           // ACTION : PLANTER
           if (graineActiveId && !serpeActive && info.statut === 'vide' && inventaire[graineActiveId] > 0) {
             const template = catalogueGraines.find(g => g.id === graineActiveId)
@@ -479,7 +530,10 @@
             info.statut = 'pousse'
             info.graineId = graineActiveId
             info.mutation = 'normal'
-            info.tempsRestant = template.tempsPousse
+            
+            // CALCUL DU BOOST DE VITESSE : réduction du temps requis
+            let tempsCalcule = Math.ceil(template.tempsPousse * (1 - reductionTempsPousse))
+            info.tempsRestant = Math.max(1, tempsCalcule) // Minimum 1 seconde
 
             emojiEl.textContent = '🌱'
             labelEl.textContent = ''
@@ -544,10 +598,7 @@
           }
         }
 
-        caseTerre.addEventListener('mouseenter', (e) => {
-          // On ne plante/récolte au survol que si le bouton de la souris est enfoncé (optionnel mais plus fluide)
-          if (e.buttons === 1) interagirCase()
-        })
+        caseTerre.addEventListener('mouseenter', (e) => { if (e.buttons === 1) interagirCase() })
         caseTerre.addEventListener('mousedown', interagirCase)
 
         grille.appendChild(container)
@@ -633,6 +684,44 @@
       const btnOuvrir = document.getElementById('btn-ouvrir-magasin')
       const btnFermer = document.getElementById('btn-fermer-graines')
       const outilSerpe = document.getElementById('outil-serpe')
+
+      // Boutons d'Upgrades
+      const btnUpgradeTaille = document.getElementById('btn-upgrade-taille')
+      const btnUpgradeVitesse = document.getElementById('btn-upgrade-vitesse')
+
+      // Événement : Agrandir le champ (+1 case)
+      btnUpgradeTaille.addEventListener('click', () => {
+        if (argent >= prixUpgradeTaille) {
+          argent -= prixUpgradeTaille
+          nbCasesChamp++
+          prixUpgradeTaille = Math.round(prixUpgradeTaille * 1.4) // Le prix augmente
+          
+          majAffichageArgent()
+          majTextesUpgrades()
+          genererGrille() // Recrée la grille avec la case supplémentaire
+        } else {
+          alert("Fonds insuffisants pour agrandir le champ !")
+        }
+      })
+
+      // Événement : Accélérer la vitesse de pousse
+      btnUpgradeVitesse.addEventListener('click', () => {
+        if (reductionTempsPousse >= 0.75) {
+          alert("Vitesse maximale de la serre atteinte ! (75% max)");
+          return
+        }
+        
+        if (argent >= prixUpgradeVitesse) {
+          argent -= prixUpgradeVitesse
+          reductionTempsPousse += 0.15 // Équivaut à -15% de temps de pousse en plus
+          prixUpgradeVitesse = Math.round(prixUpgradeVitesse * 1.6)
+
+          majAffichageArgent()
+          majTextesUpgrades()
+        } else {
+          alert("Fonds insuffisants pour améliorer la serre !");
+        }
+      })
 
       outilSerpe.addEventListener('click', () => {
         serpeActive = !serpeActive
