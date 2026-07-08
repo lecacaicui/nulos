@@ -6,6 +6,7 @@
   <title>Champ de bataille</title>
   <link rel="stylesheet" href="../style/style.css">
   
+  <!-- Script d'initialisation du thème pour éviter le flash blanc -->
   <script>
   (function(){
     var t = localStorage.getItem('theme_couleurs');
@@ -68,7 +69,14 @@
       aspect-ratio: 1 / 1;
     }
 
+    .case-container {
+      position: relative;
+      aspect-ratio: 1 / 1;
+    }
+
     .case-terre {
+      width: 100%;
+      height: 100%;
       background: #8B5A2B;
       border: 2px solid rgba(0,0,0,0.2);
       border-radius: 10px;
@@ -85,7 +93,22 @@
       filter: brightness(1.1);
     }
 
-    /* Zone inventaire des graines achetées */
+    /* Badge du Timer en haut à droite de la plantation */
+    .case-timer {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+      pointer-events: none; /* Ne bloque pas le clic sur la case */
+      font-family: monospace;
+    }
+
+    /* Zone inventaire */
     .zone-inventaire {
       display: flex;
       flex-direction: column;
@@ -93,7 +116,7 @@
       margin-top: 0.5rem;
     }
 
-    .item-graine {
+    .item-graine, .item-outil {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -106,10 +129,9 @@
       transition: all 0.2s ease;
     }
 
-    /* Style quand un sac de graine est sélectionné pour planter */
-    .item-graine.actif {
+    .item-graine.actif, .item-outil.actif {
       border-color: var(--couleur-bouton);
-      background: rgba(37, 99, 235, 0.15); /* Légère lueur */
+      background: rgba(37, 99, 235, 0.15);
       transform: scale(1.02);
       box-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
     }
@@ -131,9 +153,7 @@
       justify-content: center;
     }
 
-    .modale-graines.active {
-      display: flex;
-    }
+    .modale-graines.active { display: flex; }
 
     .modale-graines-contenu {
       background: var(--couleur-conteneur);
@@ -199,20 +219,30 @@
   <main>
     <div class="jeu-champ-container">
       
+      <!-- À GAUCHE : Zone d'Achat & Sac -->
       <section class="panneau-jeu" id="achat">
         <h2>🛒 Achats & Sac</h2>
         <button class="btn btn-primary" id="btn-ouvrir-magasin">🌱 Ouvrir le Magasin</button>
         
-        <h3 style="font-size: 0.9rem; margin-top: 1rem; color: var(--couleur-texte-faible);">🎒 Sélectionnez un sac pour semer :</h3>
+        <h3 style="font-size: 0.9rem; margin-top: 1rem; color: var(--couleur-texte-faible);">🛠️ Outil de récolte :</h3>
+        <div class="item-outil" id="outil-serpe">
+          <span>⚔️ <b>Serpe de récolte</b></span>
+          <span style="font-size: 0.8rem; color: var(--couleur-texte-faible);">Activer</span>
+        </div>
+
+        <h3 style="font-size: 0.9rem; margin-top: 0.5rem; color: var(--couleur-texte-faible);">🎒 Graines à semer :</h3>
         <div class="zone-inventaire" id="inventaire-graines">
-          </div>
+          <!-- Injecté par JS -->
+        </div>
       </section>
 
+      <!-- AU CENTRE : Le Champ -->
       <section class="panneau-jeu" id="champ" style="text-align: center;">
         <h2>🌾 Mon Champ (4x4)</h2>
         <div class="grille-champ" id="grille-terre"></div>
       </section>
 
+      <!-- À DROITE : Le Score & Économie -->
       <section class="panneau-jeu" id="score">
         <h2>💰 Économie</h2>
         <div style="font-size: 1.1rem; font-weight: 600;">
@@ -226,13 +256,12 @@
     </div>
   </main>
 
+  <!-- Magasin -->
   <div class="modale-graines" id="modale-graines">
     <div class="modale-graines-contenu">
       <button class="btn-fermer" id="btn-fermer-graines">✕</button>
       <h3>🛒 Acheter des graines</h3>
-      
-      <div class="grille-graines" id="liste-magasin">
-        </div>
+      <div class="grille-graines" id="liste-magasin"></div>
     </div>
   </div>
 
@@ -244,44 +273,43 @@
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
-    // Configuration des données initiales
     let argent = 500
+    
+    // Ajout d'un paramètre 'tempsPousse' (en secondes) et 'gain' à la récolte
     const catalogueGraines = [
-      { id: 'graine1', nom: 'Graine Blé', emoji: '🌾', prix: 10 },
-      { id: 'graine2', nom: 'Graine Carotte', emoji: '🥕', prix: 15 },
-      { id: 'graine3', nom: 'Graine Maïs', emoji: '🌽', prix: 25 },
-      { id: 'graine4', nom: 'Graine Tomate', emoji: '🍅', prix: 40 }
+      { id: 'graine1', nom: 'Blé', emoji: '🌾', prix: 10, tempsPousse: 5, gain: 20 },
+      { id: 'graine2', nom: 'Carotte', emoji: '🥕', prix: 15, tempsPousse: 10, gain: 30 },
+      { id: 'graine3', nom: 'Maïs', emoji: '🌽', prix: 25, tempsPousse: 20, gain: 50 },
+      { id: 'graine4', nom: 'Tomate', emoji: '🍅', prix: 40, tempsPousse: 35, gain: 80 }
     ]
 
-    // État de l'inventaire du joueur
-    const inventaire = {
-      graine1: 5, // Offertes au début pour tester
-      graine2: 0,
-      graine3: 0,
-      graine4: 0
-    }
+    const inventaire = { graine1: 5, graine2: 2, graine3: 0, graine4: 0 }
 
-    // Retient l'ID du sac actuellement sélectionné par le joueur (null si aucun)
+    // Modes de sélection ("graine" ou "serpe")
     let graineActiveId = null
+    let serpeActive = false
 
-    // Tableau pour suivre l'état des 16 cases du champ (false = vide, true = occupé)
-    const casesOccupees = new Array(16).fill(false)
+    // Suivi complet de l'état des 16 cases
+    // Statuts possibles : 'vide', 'pousse', 'pret'
+    const etatChamp = Array.from({ length: 16 }, () => ({
+      statut: 'vide',
+      graineId: null,
+      tempsRestant: 0,
+      intervalId: null
+    }))
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
         window.location.href = 'connexion.html'
         return
       }
-
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
-      
       await chargerHeader('../')
       await chargerFooter('../')
 
       document.getElementById('nom-joueur').textContent = localStorage.getItem('username')
       majAffichageArgent()
-
       genererGrille()
       renderInventaire()
       genererMagasin()
@@ -292,90 +320,125 @@
       document.getElementById('argent-joueur').textContent = argent
     }
 
-    // 1. Génère le champ et gère l'action au survol (mouseenter)
+    // 1. Génération de la grille avec gestion de la pousse et de la serpe
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       grille.innerHTML = ''
       
       for (let i = 0; i < 16; i++) {
+        const container = document.createElement('div')
+        container.classList.add('case-container')
+
         const caseTerre = document.createElement('div')
         caseTerre.classList.add('case-terre')
-        caseTerre.dataset.index = i
-        caseTerre.textContent = '🟫' // Aspect initial : Terre vide
+        caseTerre.textContent = '🟫'
         
-        // Fonction partagée pour tenter de planter
-        const tenterDePlanter = () => {
-          // Condition 1 : Un sac doit être sélectionné
-          // Condition 2 : Il doit rester au moins une graine dans ce sac
-          // Condition 3 : La case doit être totalement vide (pas de doublon !)
-          if (graineActiveId && inventaire[graineActiveId] > 0 && !casesOccupees[i]) {
-            const templateGraine = catalogueGraines.find(g => g.id === graineActiveId)
-            if (templateGraine) {
-              inventaire[graineActiveId]--   // Consomme la graine
-              casesOccupees[i] = true       // Marque la case comme occupée
-              caseTerre.textContent = templateGraine.emoji // Affiche le fruit/légume
-              
-              renderInventaire()            // Met à jour les compteurs à gauche
-              
-              // Si le sac vient de s'épuiser suite à cette action, on désactive la sélection automatique
-              if (inventaire[graineActiveId] === 0) {
-                graineActiveId = null
-                renderInventaire()
+        const timerBadge = document.createElement('div')
+        timerBadge.classList.add('case-timer')
+        timerBadge.style.display = 'none'
+
+        container.appendChild(caseTerre)
+        container.appendChild(timerBadge)
+
+        // Logique d'interaction unifiée (au survol ou au clic)
+        const interagirCase = () => {
+          const info = etatChamp[i]
+
+          // MODE PLANTER (Graine sélectionnée)
+          if (graineActiveId && !serpeActive && info.statut === 'vide' && inventaire[graineActiveId] > 0) {
+            const template = catalogueGraines.find(g => g.id === graineActiveId)
+            if (!template) return
+
+            inventaire[graineActiveId]--
+            info.statut = 'pousse'
+            info.graineId = graineActiveId
+            info.tempsRestant = template.tempsPousse
+
+            caseTerre.textContent = '🌱' // Visuel de pousse
+            timerBadge.textContent = `${info.tempsRestant}s`
+            timerBadge.style.display = 'block'
+            
+            renderInventaire()
+
+            // Lancement du compte à rebours
+            info.intervalId = setInterval(() => {
+              info.tempsRestant--
+              timerBadge.textContent = `${info.tempsRestant}s`
+
+              if (info.tempsRestant <= 0) {
+                clearInterval(info.intervalId)
+                info.statut = 'pret' // La plante est mûre !
+                caseTerre.textContent = template.emoji
+                timerBadge.style.display = 'none'
               }
+            }, 1000)
+
+            if (inventaire[graineActiveId] === 0) {
+              graineActiveId = null
+              renderInventaire()
+            }
+          }
+
+          // MODE RÉCOLTE (Serpe active)
+          else if (serpeActive && info.statut === 'pret') {
+            const template = catalogueGraines.find(g => g.id === info.graineId)
+            if (template) {
+              argent += template.gain
+              majAffichageArgent()
+              
+              // Reset de la case
+              info.statut = 'vide'
+              info.graineId = null
+              caseTerre.textContent = '🟫'
+              timerBadge.style.display = 'none'
             }
           }
         }
 
-        // Déclencheur 1 : Dès que la souris entre/survole la case
-        caseTerre.addEventListener('mouseenter', tenterDePlanter)
+        caseTerre.addEventListener('mouseenter', interagirCase)
+        caseTerre.addEventListener('click', interagirCase)
 
-        // Déclencheur 2 : Permet aussi de cliquer directement si la souris était déjà posée dessus
-        caseTerre.addEventListener('click', tenterDePlanter)
-
-        grille.appendChild(caseTerre)
+        grille.appendChild(container)
       }
     }
 
-    // 2. Génère et rafraîchit le sac d'inventaire à gauche
+    // 2. Rendu graphique du sac à dos (Graines + désactivation si serpe active)
     function renderInventaire() {
       const conteneur = document.getElementById('inventaire-graines')
       conteneur.innerHTML = ''
+
+      const outilSerpe = document.getElementById('outil-serpe')
+      if (serpeActive) {
+        outilSerpe.classList.add('actif')
+      } else {
+        outilSerpe.classList.remove('actif')
+      }
 
       catalogueGraines.forEach(graine => {
         const qte = inventaire[graine.id] || 0
         const div = document.createElement('div')
         div.classList.add('item-graine')
         
-        if (qte === 0) {
-          div.classList.add('epuise')
-        }
-        // Si ce sac est celui sélectionné pour peindre/planter, on lui applique la classe .actif
-        if (graine.id === graineActiveId) {
-          div.classList.add('actif')
-        }
+        if (qte === 0) div.classList.add('epuise')
+        if (graine.id === graineActiveId && !serpeActive) div.classList.add('actif')
         
         div.innerHTML = `
           <span>${graine.emoji} <b>${graine.nom}</b></span>
           <span>x${qte}</span>
         `
         
-        // Clic sur le sac pour l'activer / le désactiver
         div.addEventListener('click', () => {
-          if (qte === 0) return // Impossible de sélectionner un sac vide
-
-          if (graineActiveId === graine.id) {
-            graineActiveId = null // Désélectionne si on re-clique dessus
-          } else {
-            graineActiveId = graine.id // Active ce sac
-          }
-          renderInventaire() // Relance le visuel pour mettre à jour les bordures bleues
+          if (qte === 0) return
+          serpeActive = false // Coupe la serpe si on prend des graines
+          graineActiveId = (graineActiveId === graine.id) ? null : graine.id
+          renderInventaire()
         })
 
         conteneur.appendChild(div)
       })
     }
 
-    // 3. Génère la boutique de graines
+    // 3. Gestionnaire de la boutique d'achat
     function genererMagasin() {
       const liste = document.getElementById('liste-magasin')
       liste.innerHTML = ''
@@ -386,8 +449,8 @@
         
         ligne.innerHTML = `
           <div style="display:flex; flex-direction:column;">
-            <span>${graine.emoji} <b>${graine.nom}</b></span>
-            <span style="font-size:0.8rem; color:var(--couleur-texte-faible)">Prix : ${graine.prix} $</span>
+            <span>${graine.emoji} <b>Graine de ${graine.nom}</b></span>
+            <span style="font-size:0.8rem; color:var(--couleur-texte-faible)">Prix : ${graine.prix} $ (Temps : ${graine.tempsPousse}s)</span>
           </div>
           <div style="display:flex; align-items:center; gap:0.5rem;">
             <input type="number" min="1" max="99" value="1" class="selecteur-quantite" id="qte-${graine.id}">
@@ -408,17 +471,24 @@
             renderInventaire()
             inputQte.value = 1
           } else {
-            alert("Fonds insuffisants pour cette quantité !")
+            alert("Fonds insuffisants !")
           }
         })
       })
     }
 
-    // 4. Gestion d'ouverture/fermeture de la modale magasin
     function initEvenements() {
       const modale = document.getElementById('modale-graines')
       const btnOuvrir = document.getElementById('btn-ouvrir-magasin')
       const btnFermer = document.getElementById('btn-fermer-graines')
+      const outilSerpe = document.getElementById('outil-serpe')
+
+      // Clic sur l'outil Serpe
+      outilSerpe.addEventListener('click', () => {
+        serpeActive = !serpeActive
+        graineActiveId = null // Désactive la graine si on prend la serpe
+        renderInventaire()
+      })
 
       btnOuvrir.addEventListener('click', () => modale.classList.add('active'))
       btnFermer.addEventListener('click', () => modale.classList.remove('active'))
