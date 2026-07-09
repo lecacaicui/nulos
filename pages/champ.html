@@ -132,7 +132,6 @@
     .case-emoji {
       font-size: 1.8rem;
       line-height: 1;
-      transition: transform 0.1s ease;
     }
 
     .case-mutation-label {
@@ -177,37 +176,22 @@
       font-family: monospace;
     }
 
-    /* --- ANIMATION DE RÉCOLTE (POP ANIMATION) --- */
-    .anim-recolte {
-      position: absolute;
-      font-size: 2rem;
+    /* --- SYSTÈME DE PARTICULES POUR L'EXPLOSION --- */
+    .particule-recolte {
+      position: fixed;
       pointer-events: none;
-      z-index: 10;
-      animation: floatUpAndFade 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      z-index: 10000;
+      font-size: 1.5rem;
+      user-select: none;
+      will-change: transform, opacity;
     }
 
-    @keyframes floatUpAndFade {
-      0% {
-        transform: translate(-50%, -50%) scale(0.5);
-        opacity: 0;
-      }
-      30% {
-        opacity: 1;
-        transform: translate(-50%, -80%) scale(1.2);
-      }
-      100% {
-        transform: translate(-50%, -150%) scale(1);
-        opacity: 0;
-      }
-    }
-
-    /* Effet d'impact rapide sur la case */
     @keyframes flashRecolte {
-      0% { filter: brightness(1.8); transform: scale(0.95); }
+      0% { filter: brightness(2); transform: scale(0.92); }
       100% { filter: brightness(1); transform: scale(1); }
     }
     .case-flash {
-      animation: flashRecolte 0.2s ease-out;
+      animation: flashRecolte 0.25s ease-out;
     }
 
     .zone-inventaire {
@@ -357,7 +341,7 @@
 
         <h2>📈 Améliorations</h2>
         
-        <!-- Upgrade 1 : Agrandir le champ -->
+        <!-- Upgrade 1 -->
         <div class="item-upgrade">
           <div style="display:flex; justify-content:space-between; width:100%; font-size:0.85rem;">
             <span>🟫 <b>Nouvelle Parcelle</b></span>
@@ -368,7 +352,7 @@
           </button>
         </div>
 
-        <!-- Upgrade 2 : Vitesse de pousse -->
+        <!-- Upgrade 2 -->
         <div class="item-upgrade">
           <div style="display:flex; justify-content:space-between; width:100%; font-size:0.85rem;">
             <span>⚡ <b>Serre Technologique</b></span>
@@ -494,29 +478,82 @@
       }
     }
 
-    // Fonction déclenchant l'animation visuelle de récolte
-    function animerRecolte(caseElement, emoji) {
-      // Effet flash sur la terre
+    // --- LOGIQUE ULTRA-DYNAMIQUE D'EXPLOSION DE PARTICULES ---
+    function exploserRecolte(caseElement, emojiLegume, mutation) {
+      // Effet flash sur la case
       caseElement.classList.remove('case-flash')
-      void caseElement.offsetWidth // Force le reflow pour relancer l'animation CSS
+      void caseElement.offsetWidth
       caseElement.classList.add('case-flash')
 
-      // Création du légume volant
       const rect = caseElement.getBoundingClientRect()
-      const pop = document.createElement('div')
-      pop.classList.add('anim-recolte')
-      pop.textContent = emoji
-      
-      // Positionnement centré au milieu de la case survolée
-      pop.style.left = `${rect.left + rect.width / 2}px`
-      pop.style.top = `${rect.top + rect.height / 2}px`
-      
-      document.body.appendChild(pop)
-      
-      // Nettoyage après l'animation
-      setTimeout(() => pop.remove(), 600)
+      const centreX = rect.left + rect.width / 2
+      const centreY = rect.top + rect.height / 2
+
+      // Liste des éléments à faire éclater
+      const poolParticules = []
+
+      // 1. Le Légume principal (Gros projeté vers le haut)
+      poolParticules.push({ emoji: emojiLegume, vx: (Math.random() - 0.5) * 2, vy: -6 - Math.random() * 4, taille: 2.2 })
+
+      // 2. Toujours des pièces d'or !
+      const nbPieces = mutation !== 'normal' ? 12 : 5
+      for (let i = 0; i < nbPieces; i++) {
+        poolParticules.push({
+          emoji: '🪙',
+          vx: (Math.random() - 0.5) * 8,
+          vy: -4 - Math.random() * 6,
+          taille: 1 + Math.random() * 0.5
+        })
+      }
+
+      // 3. Bonus selon la Rareté
+      if (mutation === 'dore') {
+        for (let i = 0; i < 6; i++) poolParticules.push({ emoji: '⭐', vx: (Math.random() - 0.5) * 10, vy: -3 - Math.random() * 7, taille: 1.2 })
+      } else if (mutation === 'diamant') {
+        for (let i = 0; i < 8; i++) poolParticules.push({ emoji: '🔹', vx: (Math.random() - 0.5) * 11, vy: -3 - Math.random() * 8, taille: 1.3 })
+      } else if (mutation === 'arcenciel') {
+        const eclats = ['✨', '🎨', '🏳️‍🌈', '⭐']
+        for (let i = 0; i < 15; i++) {
+          const rdmEmoji = eclats[Math.floor(Math.random() * eclats.length)]
+          poolParticules.push({ emoji: rdmEmoji, vx: (Math.random() - 0.5) * 14, vy: -2 - Math.random() * 10, taille: 1.4 })
+        }
+      }
+
+      // Injection et animation JS fluide (via RequestAnimationFrame)
+      poolParticules.forEach(p => {
+        const el = document.createElement('div')
+        el.classList.add('particule-recolte')
+        el.textContent = p.emoji
+        el.style.fontSize = `${p.taille}rem`
+        document.body.appendChild(el)
+
+        let posX = centreX
+        let posY = centreY
+        let opacite = 1
+        const gravite = 0.4
+
+        function update() {
+          p.vy += gravite // Application de la gravité
+          posX += p.vx
+          posY += p.vy
+          opacite -= 0.025 // Disparition progressive
+
+          el.style.transform = `translate(-50%, -50%) translate(${posX - centreX}px, ${posY - centreY}px)`
+          el.style.opacity = opacite
+          el.style.left = `${centreX}px`
+          el.style.top = `${centreY}px`
+
+          if (opacite > 0) {
+            requestAnimationFrame(update)
+          } else {
+            el.remove()
+          }
+        }
+        requestAnimationFrame(update)
+      })
     }
 
+    // 1. Génération de la Grille
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       const cursor = document.getElementById('custom-cursor')
@@ -634,12 +671,11 @@
               argent += gainFinal
               majAffichageArgent()
               
-              // Lancement de la nouvelle animation visuelle avant d'effacer la case
-              animerRecolte(caseTerre, template.emoji)
+              // Déclenchement du grand feu d'artifice de récolte !
+              exploserRecolte(caseTerre, template.emoji, info.mutation)
 
               info.statut = 'vide'
               info.graineId = null
-              info.mutation = 'normal'
               
               emojiEl.textContent = '🟫'
               labelEl.textContent = ''
