@@ -132,6 +132,7 @@
     .case-emoji {
       font-size: 1.8rem;
       line-height: 1;
+      transition: transform 0.1s ease;
     }
 
     .case-mutation-label {
@@ -174,6 +175,39 @@
       border-radius: 4px;
       pointer-events: none;
       font-family: monospace;
+    }
+
+    /* --- ANIMATION DE RÉCOLTE (POP ANIMATION) --- */
+    .anim-recolte {
+      position: absolute;
+      font-size: 2rem;
+      pointer-events: none;
+      z-index: 10;
+      animation: floatUpAndFade 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes floatUpAndFade {
+      0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+      }
+      30% {
+        opacity: 1;
+        transform: translate(-50%, -80%) scale(1.2);
+      }
+      100% {
+        transform: translate(-50%, -150%) scale(1);
+        opacity: 0;
+      }
+    }
+
+    /* Effet d'impact rapide sur la case */
+    @keyframes flashRecolte {
+      0% { filter: brightness(1.8); transform: scale(0.95); }
+      100% { filter: brightness(1); transform: scale(1); }
+    }
+    .case-flash {
+      animation: flashRecolte 0.2s ease-out;
     }
 
     .zone-inventaire {
@@ -460,7 +494,29 @@
       }
     }
 
-    // 1. Génération et rafraîchissement dynamique de la Grille
+    // Fonction déclenchant l'animation visuelle de récolte
+    function animerRecolte(caseElement, emoji) {
+      // Effet flash sur la terre
+      caseElement.classList.remove('case-flash')
+      void caseElement.offsetWidth // Force le reflow pour relancer l'animation CSS
+      caseElement.classList.add('case-flash')
+
+      // Création du légume volant
+      const rect = caseElement.getBoundingClientRect()
+      const pop = document.createElement('div')
+      pop.classList.add('anim-recolte')
+      pop.textContent = emoji
+      
+      // Positionnement centré au milieu de la case survolée
+      pop.style.left = `${rect.left + rect.width / 2}px`
+      pop.style.top = `${rect.top + rect.height / 2}px`
+      
+      document.body.appendChild(pop)
+      
+      // Nettoyage après l'animation
+      setTimeout(() => pop.remove(), 600)
+    }
+
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       const cursor = document.getElementById('custom-cursor')
@@ -513,7 +569,7 @@
             cursor.classList.add('zone-zoom')
           }
 
-          // ACTION AUTOMATIQUE : PLANTER (Juste au survol)
+          // ACTION AUTOMATIQUE : PLANTER
           if (graineActiveId && !serpeActive && info.statut === 'vide' && inventaire[graineActiveId] > 0) {
             const template = catalogueGraines.find(g => g.id === graineActiveId)
             if (!template) return
@@ -565,7 +621,7 @@
             }
           }
 
-          // ACTION AUTOMATIQUE : RÉCOLTER (Juste au survol)
+          // ACTION AUTOMATIQUE : RÉCOLTER
           else if (serpeActive && info.statut === 'pret') {
             const template = catalogueGraines.find(g => g.id === info.graineId)
             if (template) {
@@ -578,6 +634,9 @@
               argent += gainFinal
               majAffichageArgent()
               
+              // Lancement de la nouvelle animation visuelle avant d'effacer la case
+              animerRecolte(caseTerre, template.emoji)
+
               info.statut = 'vide'
               info.graineId = null
               info.mutation = 'normal'
