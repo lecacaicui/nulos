@@ -6,7 +6,6 @@
   <title>Champ de bataille</title>
   <link rel="stylesheet" href="../style/style.css">
   
-  <!-- Script d'initialisation du thème pour éviter le flash blanc -->
   <script>
   (function(){
     var t = localStorage.getItem('theme_couleurs');
@@ -320,7 +319,6 @@
   <main>
     <div class="jeu-champ-container" id="zone-jeu">
       
-      <!-- À GAUCHE : Zone d'Achat & Sac -->
       <section class="panneau-jeu" id="achat">
         <h2>🛒 Achats & Sac</h2>
         <button class="btn btn-primary" id="btn-ouvrir-magasin">🌱 Ouvrir le Magasin</button>
@@ -335,13 +333,11 @@
         <div class="zone-inventaire" id="inventaire-graines"></div>
       </section>
 
-      <!-- AU CENTRE : Le Champ -->
       <section class="panneau-jeu" id="champ" style="text-align: center;">
         <h2>🌾 Mon Champ (<span id="txt-taille-grille">2x2</span>)</h2>
         <div class="grille-champ" id="grille-terre"></div>
       </section>
 
-      <!-- À DROITE : Le Score & Économie & Améliorations -->
       <section class="panneau-jeu" id="score">
         <h2>💰 Économie</h2>
         <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">
@@ -353,7 +349,6 @@
 
         <h2>📈 Améliorations</h2>
         
-        <!-- Upgrade 1 -->
         <div class="item-upgrade">
           <div style="display:flex; justify-content:space-between; width:100%; font-size:0.85rem;">
             <span>🟫 <b>Nouvelle Parcelle</b></span>
@@ -364,7 +359,6 @@
           </button>
         </div>
 
-        <!-- Upgrade 2 -->
         <div class="item-upgrade">
           <div style="display:flex; justify-content:space-between; width:100%; font-size:0.85rem;">
             <span>⚡ <b>Serre Technologique</b></span>
@@ -380,7 +374,6 @@
     </div>
   </main>
 
-  <!-- Magasin -->
   <div class="modale-graines" id="modale-graines">
     <div class="modale-graines-contenu">
       <button class="btn-fermer" id="btn-fermer-graines">✕</button>
@@ -411,7 +404,6 @@
     let graineActiveId = null
     let serpeActive = false
 
-    // DÉPART INITIAL À 2x2
     let dimensionGrille = 2 
     let nbCasesChamp = dimensionGrille * dimensionGrille
     let reductionTempsPousse = 0.0
@@ -448,6 +440,8 @@
 
     function majAffichageArgent() {
       document.getElementById('argent-joueur').textContent = argent
+      // On rafraîchit le magasin pour griser ou activer les boutons d'achat dynamiquement
+      genererMagasin()
     }
 
     function majTextesUpgrades() {
@@ -491,7 +485,6 @@
       }
     }
 
-    // --- LOGIQUE ULTRA-DYNAMIQUE D'EXPLOSION DE PARTICULES & RAYONS ---
     function exploserRecolte(caseElement, emojiLegume, mutation) {
       caseElement.classList.remove('case-flash')
       void caseElement.offsetWidth
@@ -607,7 +600,6 @@
       })
     }
 
-    // Génération de la Grille dynamique
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       const cursor = document.getElementById('custom-cursor')
@@ -796,8 +788,25 @@
         `
         liste.appendChild(ligne)
 
-        ligne.querySelector(`#btn-acheter-${graine.id}`).addEventListener('click', () => {
-          const inputQte = inline.querySelector(`#qte-${graine.id}`) || ligne.querySelector(`#qte-${graine.id}`)
+        // Ajout d'une gestion dynamique de l'état du bouton d'achat
+        const inputQte = ligne.querySelector(`#qte-${graine.id}`)
+        const btnAcheter = ligne.querySelector(`#btn-acheter-${graine.id}`)
+        
+        const verifierDisponibilite = () => {
+          const qte = parseInt(inputQte.value) || 1
+          if (argent < (graine.prix * qte)) {
+            btnAcheter.style.opacity = "0.5"
+            btnAcheter.style.cursor = "not-allowed"
+          } else {
+            btnAcheter.style.opacity = "1"
+            btnAcheter.style.cursor = "pointer"
+          }
+        }
+
+        inputQte.addEventListener('input', verifierDisponibilite)
+        verifierDisponibilite()
+
+        btnAcheter.addEventListener('click', () => {
           const quantite = parseInt(inputQte.value) || 1
           const coutTotal = graine.prix * quantite
 
@@ -823,15 +832,14 @@
       const btnUpgradeTaille = document.getElementById('btn-upgrade-taille')
       const btnUpgradeVitesse = document.getElementById('btn-upgrade-vitesse')
 
-      // LOGIQUE D'AUGMENTATION PAR PALIERS CARRÉS (2x2 -> 3x3 -> 4x4)
       btnUpgradeTaille.addEventListener('click', () => {
         if (argent >= prixUpgradeTaille) {
           argent -= prixUpgradeTaille
           
-          dimensionGrille++ // Incrémente le niveau du carré (ex: de 2 à 3)
-          nbCasesChamp = dimensionGrille * dimensionGrille // Recalcule le nombre total de cases (ex: 9)
+          dimensionGrille++ 
+          nbCasesChamp = dimensionGrille * dimensionGrille 
           
-          prixUpgradeTaille = Math.round(prixUpgradeTaille * 2.5) // Augmente de manière conséquente le coût de la prochaine taille
+          prixUpgradeTaille = Math.round(prixUpgradeTaille * 2.5) 
           
           majAffichageArgent()
           majTextesUpgrades()
