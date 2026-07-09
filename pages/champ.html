@@ -100,10 +100,9 @@
       color: var(--couleur-texte);
     }
 
-    /* Grille adaptative pour supporter l'agrandissement */
     .grille-champ {
       display: grid;
-      grid-template-columns: repeat(4, 1fr); /* Modifié dynamiquement par JS */
+      grid-template-columns: repeat(4, 1fr);
       gap: 0.6rem;
       max-width: 500px;
       width: 100%;
@@ -382,9 +381,8 @@
     let graineActiveId = null
     let serpeActive = false
 
-    // Variables d'améliorations
     let nbCasesChamp = 16
-    let reductionTempsPousse = 0.0 // Pourcentage de réduction (0.15 = -15% de temps)
+    let reductionTempsPousse = 0.0
     let prixUpgradeTaille = 150
     let prixUpgradeVitesse = 200
 
@@ -421,7 +419,6 @@
     }
 
     function majTextesUpgrades() {
-      // Calcul et affichage de la grille (ex: 4x4, 5x4, etc.)
       const colonnes = Math.ceil(Math.sqrt(nbCasesChamp))
       const lignes = Math.ceil(nbCasesChamp / colonnes)
       document.getElementById('txt-taille-grille').textContent = `${colonnes}x${lignes}`
@@ -469,12 +466,10 @@
       const cursor = document.getElementById('custom-cursor')
       grille.innerHTML = ''
       
-      // Ajuste dynamiquement le nombre de colonnes CSS de la grille de manière équilibrée
       const colonnes = Math.ceil(Math.sqrt(nbCasesChamp))
       grille.style.gridTemplateColumns = `repeat(${colonnes}, 1fr)`
 
       for (let i = 0; i < nbCasesChamp; i++) {
-        // Si l'état de la case n'existe pas encore (nouvelle case achetée), on l'initialise
         if (!etatChamp[i]) {
           etatChamp[i] = { statut: 'vide', graineId: null, mutation: 'normal', tempsRestant: 0, intervalId: null }
         }
@@ -486,7 +481,6 @@
         const caseTerre = document.createElement('div')
         caseTerre.classList.add('case-terre')
         
-        // Conserve l'état visuel en cas de reconstruction de la grille
         let labelMutation = ''
         if (info.statut === 'pret') {
           if (info.mutation === 'dore') { caseTerre.classList.add('mutation-dore'); labelMutation = '✨ Doré'; }
@@ -513,15 +507,13 @@
         const emojiEl = caseTerre.querySelector('.case-emoji')
         const labelEl = caseTerre.querySelector('.case-mutation-label')
 
+        // --- INTERACTION AUTOMATIQUE AU SURVOL ---
         caseTerre.addEventListener('mouseenter', () => {
-          if (serpeActive || graineActiveId) cursor.classList.add('zone-zoom')
-        })
-        caseTerre.addEventListener('mouseleave', () => {
-          cursor.classList.remove('zone-zoom')
-        })
+          if (serpeActive || graineActiveId) {
+            cursor.classList.add('zone-zoom')
+          }
 
-        const interagirCase = () => {
-          // ACTION : PLANTER
+          // ACTION AUTOMATIQUE : PLANTER (Juste au survol)
           if (graineActiveId && !serpeActive && info.statut === 'vide' && inventaire[graineActiveId] > 0) {
             const template = catalogueGraines.find(g => g.id === graineActiveId)
             if (!template) return
@@ -531,9 +523,8 @@
             info.graineId = graineActiveId
             info.mutation = 'normal'
             
-            // CALCUL DU BOOST DE VITESSE : réduction du temps requis
             let tempsCalcule = Math.ceil(template.tempsPousse * (1 - reductionTempsPousse))
-            info.tempsRestant = Math.max(1, tempsCalcule) // Minimum 1 seconde
+            info.tempsRestant = Math.max(1, tempsCalcule)
 
             emojiEl.textContent = '🌱'
             labelEl.textContent = ''
@@ -569,11 +560,12 @@
 
             if (inventaire[graineActiveId] === 0) {
               graineActiveId = null
+              cursor.classList.remove('zone-zoom')
               renderInventaire()
             }
           }
 
-          // ACTION : RÉCOLTER
+          // ACTION AUTOMATIQUE : RÉCOLTER (Juste au survol)
           else if (serpeActive && info.statut === 'pret') {
             const template = catalogueGraines.find(g => g.id === info.graineId)
             if (template) {
@@ -596,10 +588,11 @@
               timerBadge.style.display = 'none'
             }
           }
-        }
+        })
 
-        caseTerre.addEventListener('mouseenter', (e) => { if (e.buttons === 1) interagirCase() })
-        caseTerre.addEventListener('mousedown', interagirCase)
+        caseTerre.addEventListener('mouseleave', () => {
+          cursor.classList.remove('zone-zoom')
+        })
 
         grille.appendChild(container)
       }
@@ -685,35 +678,31 @@
       const btnFermer = document.getElementById('btn-fermer-graines')
       const outilSerpe = document.getElementById('outil-serpe')
 
-      // Boutons d'Upgrades
       const btnUpgradeTaille = document.getElementById('btn-upgrade-taille')
       const btnUpgradeVitesse = document.getElementById('btn-upgrade-vitesse')
 
-      // Événement : Agrandir le champ (+1 case)
       btnUpgradeTaille.addEventListener('click', () => {
         if (argent >= prixUpgradeTaille) {
           argent -= prixUpgradeTaille
           nbCasesChamp++
-          prixUpgradeTaille = Math.round(prixUpgradeTaille * 1.4) // Le prix augmente
+          prixUpgradeTaille = Math.round(prixUpgradeTaille * 1.4)
           
           majAffichageArgent()
           majTextesUpgrades()
-          genererGrille() // Recrée la grille avec la case supplémentaire
+          genererGrille()
         } else {
           alert("Fonds insuffisants pour agrandir le champ !")
         }
       })
 
-      // Événement : Accélérer la vitesse de pousse
       btnUpgradeVitesse.addEventListener('click', () => {
         if (reductionTempsPousse >= 0.75) {
           alert("Vitesse maximale de la serre atteinte ! (75% max)");
           return
         }
-        
         if (argent >= prixUpgradeVitesse) {
           argent -= prixUpgradeVitesse
-          reductionTempsPousse += 0.15 // Équivaut à -15% de temps de pousse en plus
+          reductionTempsPousse += 0.15
           prixUpgradeVitesse = Math.round(prixUpgradeVitesse * 1.6)
 
           majAffichageArgent()
