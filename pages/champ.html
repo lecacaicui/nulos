@@ -186,6 +186,19 @@
       will-change: transform, opacity;
     }
 
+    /* --- RAYONS DE LUMIÈRE (GOD RAYS) --- */
+    .rayon-lumiere {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9998;
+      width: 2px;
+      height: 120px;
+      transform-origin: bottom center;
+      background: linear-gradient(to top, rgba(255,255,255,0.8), transparent);
+      opacity: 1;
+      will-change: transform, opacity;
+    }
+
     @keyframes flashRecolte {
       0% { filter: brightness(2); transform: scale(0.92); }
       100% { filter: brightness(1); transform: scale(1); }
@@ -478,7 +491,7 @@
       }
     }
 
-    // --- LOGIQUE ULTRA-DYNAMIQUE D'EXPLOSION DE PARTICULES ---
+    // --- LOGIQUE ULTRA-DYNAMIQUE D'EXPLOSION DE PARTICULES & RAYONS ---
     function exploserRecolte(caseElement, emojiLegume, mutation) {
       // Effet flash sur la case
       caseElement.classList.remove('case-flash')
@@ -489,13 +502,62 @@
       const centreX = rect.left + rect.width / 2
       const centreY = rect.top + rect.height / 2
 
-      // Liste des éléments à faire éclater
+      // 1. AJOUT DES RAYONS DE LUMIÈRE DIVINS (GOD RAYS) SI RARE
+      if (mutation !== 'normal') {
+        const nbRayons = mutation === 'arcenciel' ? 24 : 16
+        let degradreCouleur = 'linear-gradient(to top, rgba(255, 223, 0, 0.9), transparent)' // Doré par défaut
+
+        if (mutation === 'diamant') {
+          degradreCouleur = 'linear-gradient(to top, rgba(0, 191, 255, 0.9), transparent)'
+        } else if (mutation === 'arcenciel') {
+          degradreCouleur = 'linear-gradient(to top, rgba(255, 105, 180, 0.9), rgba(0, 255, 127, 0.5), transparent)'
+        }
+
+        const angleDepart = Math.random() * 360
+
+        for (let i = 0; i < nbRayons; i++) {
+          const ray = document.createElement('div')
+          ray.classList.add('rayon-lumiere')
+          ray.style.background = degradreCouleur
+          ray.style.left = `${centreX}px`
+          ray.style.top = `${centreY - 120}px` // Pivot centré sur le bas du rayon
+
+          const angle = angleDepart + (i * (360 / nbRayons))
+          ray.style.transform = `rotate(${angle}deg)`
+          document.body.appendChild(ray)
+
+          let opaciteRayon = 1.0
+          let longueurRayon = 120
+          const vitesseRotation = (Math.random() > 0.5 ? 0.4 : -0.4)
+
+          function animerRayon() {
+            opaciteRayon -= 0.02
+            longueurRayon += 2
+            const angleActuel = parseFloat(ray.style.transform.replace('rotate(', '').replace('deg)', '')) || 0
+            
+            ray.style.transform = `rotate(${angleActuel + vitesseRotation}deg)`
+            ray.style.height = `${longueurRayon}px`
+            ray.style.top = `${centreY - longueurRayon}px`
+            ray.style.opacity = opaciteRayon
+            ray.style.width = `${Math.max(1, 4 * opaciteRayon)}px`
+
+            if (opaciteRayon > 0) {
+              requestAnimationFrame(animerRayon)
+            } else {
+              ray.remove()
+            }
+          }
+          requestAnimationFrame(animerRayon)
+        }
+      }
+
+      // 2. Éléments physiques de l'explosion
       const poolParticules = []
 
-      // 1. Le Légume principal (Gros projeté vers le haut)
+      // Le Légume principal (Gros projeté vers le haut)
       poolParticules.push({ emoji: emojiLegume, vx: (Math.random() - 0.5) * 2, vy: -6 - Math.random() * 4, taille: 2.2 })
 
-      // 2. Toujours des pièces d'or !
+      // Pièces d'or
       const nbPieces = mutation !== 'normal' ? 12 : 5
       for (let i = 0; i < nbPieces; i++) {
         poolParticules.push({
@@ -506,7 +568,7 @@
         })
       }
 
-      // 3. Bonus selon la Rareté
+      // Bonus selon la Rareté
       if (mutation === 'dore') {
         for (let i = 0; i < 6; i++) poolParticules.push({ emoji: '⭐', vx: (Math.random() - 0.5) * 10, vy: -3 - Math.random() * 7, taille: 1.2 })
       } else if (mutation === 'diamant') {
@@ -519,7 +581,7 @@
         }
       }
 
-      // Injection et animation JS fluide (via RequestAnimationFrame)
+      // Injection et animation JS des émojis
       poolParticules.forEach(p => {
         const el = document.createElement('div')
         el.classList.add('particule-recolte')
@@ -533,10 +595,10 @@
         const gravite = 0.4
 
         function update() {
-          p.vy += gravite // Application de la gravité
+          p.vy += gravite
           posX += p.vx
           posY += p.vy
-          opacite -= 0.025 // Disparition progressive
+          opacite -= 0.025
 
           el.style.transform = `translate(-50%, -50%) translate(${posX - centreX}px, ${posY - centreY}px)`
           el.style.opacity = opacite
@@ -553,7 +615,7 @@
       })
     }
 
-    // 1. Génération de la Grille
+    // Génération de la Grille
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       const cursor = document.getElementById('custom-cursor')
@@ -600,13 +662,13 @@
         const emojiEl = caseTerre.querySelector('.case-emoji')
         const labelEl = caseTerre.querySelector('.case-mutation-label')
 
-        // --- INTERACTION AUTOMATIQUE AU SURVOL ---
+        // INTERACTION AUTOMATIQUE AU SURVOL
         caseTerre.addEventListener('mouseenter', () => {
           if (serpeActive || graineActiveId) {
             cursor.classList.add('zone-zoom')
           }
 
-          // ACTION AUTOMATIQUE : PLANTER
+          // PLANTER
           if (graineActiveId && !serpeActive && info.statut === 'vide' && inventaire[graineActiveId] > 0) {
             const template = catalogueGraines.find(g => g.id === graineActiveId)
             if (!template) return
@@ -658,7 +720,7 @@
             }
           }
 
-          // ACTION AUTOMATIQUE : RÉCOLTER
+          // RÉCOLTER
           else if (serpeActive && info.statut === 'pret') {
             const template = catalogueGraines.find(g => g.id === info.graineId)
             if (template) {
@@ -671,7 +733,6 @@
               argent += gainFinal
               majAffichageArgent()
               
-              // Déclenchement du grand feu d'artifice de récolte !
               exploserRecolte(caseTerre, template.emoji, info.mutation)
 
               info.statut = 'vide'
@@ -693,7 +754,7 @@
       }
     }
 
-    // 2. Inventaire
+    // Inventaire
     function renderInventaire() {
       const conteneur = document.getElementById('inventaire-graines')
       conteneur.innerHTML = ''
@@ -728,7 +789,7 @@
       })
     }
 
-    // 3. Boutique
+    // Boutique
     function genererMagasin() {
       const liste = document.getElementById('liste-magasin')
       liste.innerHTML = ''
