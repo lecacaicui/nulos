@@ -102,7 +102,6 @@
 
     .grille-champ {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
       gap: 0.6rem;
       max-width: 500px;
       width: 100%;
@@ -338,7 +337,7 @@
 
       <!-- AU CENTRE : Le Champ -->
       <section class="panneau-jeu" id="champ" style="text-align: center;">
-        <h2>🌾 Mon Champ (<span id="txt-taille-grille">4x4</span>)</h2>
+        <h2>🌾 Mon Champ (<span id="txt-taille-grille">2x2</span>)</h2>
         <div class="grille-champ" id="grille-terre"></div>
       </section>
 
@@ -358,10 +357,10 @@
         <div class="item-upgrade">
           <div style="display:flex; justify-content:space-between; width:100%; font-size:0.85rem;">
             <span>🟫 <b>Nouvelle Parcelle</b></span>
-            <span id="txt-cases-actuelles" style="font-weight:700;">16 cases</span>
+            <span id="txt-cases-actuelles" style="font-weight:700;">2x2</span>
           </div>
           <button class="btn btn-secondary" style="width:100%; padding:0.4rem; font-size:0.8rem;" id="btn-upgrade-taille">
-            Acheter (+1 case) : <span id="prix-upgrade-taille">150</span> $
+            Passer à la taille <span id="txt-prochaine-taille">3x3</span> : <span id="prix-upgrade-taille">300</span> $
           </button>
         </div>
 
@@ -412,9 +411,11 @@
     let graineActiveId = null
     let serpeActive = false
 
-    let nbCasesChamp = 16
+    // DÉPART INITIAL À 2x2
+    let dimensionGrille = 2 
+    let nbCasesChamp = dimensionGrille * dimensionGrille
     let reductionTempsPousse = 0.0
-    let prixUpgradeTaille = 150
+    let prixUpgradeTaille = 300
     let prixUpgradeVitesse = 200
 
     let etatChamp = Array.from({ length: nbCasesChamp }, () => ({
@@ -450,10 +451,9 @@
     }
 
     function majTextesUpgrades() {
-      const colonnes = Math.ceil(Math.sqrt(nbCasesChamp))
-      const lignes = Math.ceil(nbCasesChamp / colonnes)
-      document.getElementById('txt-taille-grille').textContent = `${colonnes}x${lignes}`
-      document.getElementById('txt-cases-actuelles').textContent = `${nbCasesChamp} cases`
+      document.getElementById('txt-taille-grille').textContent = `${dimensionGrille}x${dimensionGrille}`
+      document.getElementById('txt-cases-actuelles').textContent = `${dimensionGrille}x${dimensionGrille}`
+      document.getElementById('txt-prochaine-taille').textContent = `${dimensionGrille + 1}x${dimensionGrille + 1}`
       document.getElementById('prix-upgrade-taille').textContent = prixUpgradeTaille
 
       document.getElementById('txt-vitesse-actuelle').textContent = `Boost: -${Math.round(reductionTempsPousse * 100)}%`
@@ -493,7 +493,6 @@
 
     // --- LOGIQUE ULTRA-DYNAMIQUE D'EXPLOSION DE PARTICULES & RAYONS ---
     function exploserRecolte(caseElement, emojiLegume, mutation) {
-      // Effet flash sur la case
       caseElement.classList.remove('case-flash')
       void caseElement.offsetWidth
       caseElement.classList.add('case-flash')
@@ -502,10 +501,9 @@
       const centreX = rect.left + rect.width / 2
       const centreY = rect.top + rect.height / 2
 
-      // 1. AJOUT DES RAYONS DE LUMIÈRE DIVINS (GOD RAYS) SI RARE
       if (mutation !== 'normal') {
         const nbRayons = mutation === 'arcenciel' ? 24 : 16
-        let degradreCouleur = 'linear-gradient(to top, rgba(255, 223, 0, 0.9), transparent)' // Doré par défaut
+        let degradreCouleur = 'linear-gradient(to top, rgba(255, 223, 0, 0.9), transparent)'
 
         if (mutation === 'diamant') {
           degradreCouleur = 'linear-gradient(to top, rgba(0, 191, 255, 0.9), transparent)'
@@ -520,7 +518,7 @@
           ray.classList.add('rayon-lumiere')
           ray.style.background = degradreCouleur
           ray.style.left = `${centreX}px`
-          ray.style.top = `${centreY - 120}px` // Pivot centré sur le bas du rayon
+          ray.style.top = `${centreY - 120}px`
 
           const angle = angleDepart + (i * (360 / nbRayons))
           ray.style.transform = `rotate(${angle}deg)`
@@ -551,13 +549,9 @@
         }
       }
 
-      // 2. Éléments physiques de l'explosion
       const poolParticules = []
-
-      // Le Légume principal (Gros projeté vers le haut)
       poolParticules.push({ emoji: emojiLegume, vx: (Math.random() - 0.5) * 2, vy: -6 - Math.random() * 4, taille: 2.2 })
 
-      // Pièces d'or
       const nbPieces = mutation !== 'normal' ? 12 : 5
       for (let i = 0; i < nbPieces; i++) {
         poolParticules.push({
@@ -568,7 +562,6 @@
         })
       }
 
-      // Bonus selon la Rareté
       if (mutation === 'dore') {
         for (let i = 0; i < 6; i++) poolParticules.push({ emoji: '⭐', vx: (Math.random() - 0.5) * 10, vy: -3 - Math.random() * 7, taille: 1.2 })
       } else if (mutation === 'diamant') {
@@ -581,7 +574,6 @@
         }
       }
 
-      // Injection et animation JS des émojis
       poolParticules.forEach(p => {
         const el = document.createElement('div')
         el.classList.add('particule-recolte')
@@ -615,14 +607,13 @@
       })
     }
 
-    // Génération de la Grille
+    // Génération de la Grille dynamique
     function genererGrille() {
       const grille = document.getElementById('grille-terre')
       const cursor = document.getElementById('custom-cursor')
       grille.innerHTML = ''
       
-      const colonnes = Math.ceil(Math.sqrt(nbCasesChamp))
-      grille.style.gridTemplateColumns = `repeat(${colonnes}, 1fr)`
+      grille.style.gridTemplateColumns = `repeat(${dimensionGrille}, 1fr)`
 
       for (let i = 0; i < nbCasesChamp; i++) {
         if (!etatChamp[i]) {
@@ -662,13 +653,11 @@
         const emojiEl = caseTerre.querySelector('.case-emoji')
         const labelEl = caseTerre.querySelector('.case-mutation-label')
 
-        // INTERACTION AUTOMATIQUE AU SURVOL
         caseTerre.addEventListener('mouseenter', () => {
           if (serpeActive || graineActiveId) {
             cursor.classList.add('zone-zoom')
           }
 
-          // PLANTER
           if (graineActiveId && !serpeActive && info.statut === 'vide' && inventaire[graineActiveId] > 0) {
             const template = catalogueGraines.find(g => g.id === graineActiveId)
             if (!template) return
@@ -720,7 +709,6 @@
             }
           }
 
-          // RÉCOLTER
           else if (serpeActive && info.statut === 'pret') {
             const template = catalogueGraines.find(g => g.id === info.graineId)
             if (template) {
@@ -754,7 +742,6 @@
       }
     }
 
-    // Inventaire
     function renderInventaire() {
       const conteneur = document.getElementById('inventaire-graines')
       conteneur.innerHTML = ''
@@ -789,7 +776,6 @@
       })
     }
 
-    // Boutique
     function genererMagasin() {
       const liste = document.getElementById('liste-magasin')
       liste.innerHTML = ''
@@ -811,7 +797,7 @@
         liste.appendChild(ligne)
 
         ligne.querySelector(`#btn-acheter-${graine.id}`).addEventListener('click', () => {
-          const inputQte = ligne.querySelector(`#qte-${graine.id}`)
+          const inputQte = inline.querySelector(`#qte-${graine.id}`) || ligne.querySelector(`#qte-${graine.id}`)
           const quantite = parseInt(inputQte.value) || 1
           const coutTotal = graine.prix * quantite
 
@@ -822,7 +808,7 @@
             renderInventaire()
             inputQte.value = 1
           } else {
-            alert("Fonds insuffisants !")
+            alert("Fonds insuffisants !");
           }
         })
       })
@@ -837,17 +823,21 @@
       const btnUpgradeTaille = document.getElementById('btn-upgrade-taille')
       const btnUpgradeVitesse = document.getElementById('btn-upgrade-vitesse')
 
+      // LOGIQUE D'AUGMENTATION PAR PALIERS CARRÉS (2x2 -> 3x3 -> 4x4)
       btnUpgradeTaille.addEventListener('click', () => {
         if (argent >= prixUpgradeTaille) {
           argent -= prixUpgradeTaille
-          nbCasesChamp++
-          prixUpgradeTaille = Math.round(prixUpgradeTaille * 1.4)
+          
+          dimensionGrille++ // Incrémente le niveau du carré (ex: de 2 à 3)
+          nbCasesChamp = dimensionGrille * dimensionGrille // Recalcule le nombre total de cases (ex: 9)
+          
+          prixUpgradeTaille = Math.round(prixUpgradeTaille * 2.5) // Augmente de manière conséquente le coût de la prochaine taille
           
           majAffichageArgent()
           majTextesUpgrades()
           genererGrille()
         } else {
-          alert("Fonds insuffisants pour agrandir le champ !")
+          alert("Fonds insuffisants pour agrandir le champ !");
         }
       })
 
