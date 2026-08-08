@@ -662,7 +662,6 @@
   <div id="footer-placeholder"></div>
 
   <script type="module">
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs, invaliderCacheTheme } from '../script/header.js'
 
     // Protège contre les injections XSS
@@ -676,6 +675,7 @@
     }
     import {
       RARETES,
+      db,
       urlImage, uploadImageStorage,
       adminListerCreatures, adminSauvegarderCreature, adminToggleActifCreature, adminSupprimerCreature,
       adminListerLootBoxes, adminSauvegarderLootBox, adminToggleActifLootBox, adminSupprimerLootBox,
@@ -687,8 +687,6 @@
     import {
       adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
     } from '../script/mda.js'
-
-    const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
     // Prévisualisation des images avant upload
     function lierPreview(inputId, previewId) {
