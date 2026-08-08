@@ -4,6 +4,34 @@ const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
+// ===== Storage : images des créatures et loot box =====
+// Les images sont stockées dans le bucket public "pictures" de Supabase Storage.
+// La colonne `image` des tables `creatures` et `loot_boxes` contient uniquement
+// le nom du fichier (ex: "flamby.png") ; urlImage() construit l'URL complète.
+const STORAGE_BUCKET_URL = SUPABASE_URL + '/storage/v1/object/public/pictures/'
+
+/** Construit l'URL publique d'une image stockée dans Supabase Storage. */
+export function urlImage(nom) {
+  if (!nom) return ''
+  if (nom.startsWith('http')) return nom  // déjà une URL complète
+  return STORAGE_BUCKET_URL + nom
+}
+
+/**
+ * Upload un fichier image dans le bucket "pictures" de Supabase Storage.
+ * Retourne { ok, chemin } — `chemin` est le nom du fichier tel qu'il doit
+ * être stocké dans la colonne `image` de la BDD (ex: "1704067200000_flamby.png").
+ * Nécessite que l'utilisateur soit authentifié avec les droits d'upload.
+ */
+export async function uploadImageStorage(fichier) {
+  const chemin = Date.now() + '_' + fichier.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const { data, error } = await db.storage
+    .from('pictures')
+    .upload(chemin, fichier, { upsert: true, cacheControl: '3600' })
+  if (error) { console.error('uploadImageStorage :', error); return { ok: false, chemin: null } }
+  return { ok: true, chemin: data.path }
+}
+
 // ===== Configuration des raretés =====
 // 'secret' existe dans le schéma mais reste volontairement absente de cet
 // objet d'affichage tant qu'elle n'est pas utilisée : voir RARETES_VISIBLES.
