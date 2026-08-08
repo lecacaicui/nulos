@@ -917,7 +917,7 @@
         return `
         <div class="box-carte">
           <button class="box-info-btn" onclick="ouvrirModalePool('${b.id}', '${b.nom.replace(/'/g,"\\'")}')">?</button>
-          <img class="box-img" src="../pictures/${b.image}" alt="${b.nom}">
+          <img class="box-img" src="${urlImage(b.image)}" alt="${b.nom}">
           <div class="box-nom">${b.nom}</div>
           <div class="box-prix ${abordable ? '' : 'insuffisant'}">${Number(b.prix).toLocaleString('fr')} pièces</div>
           <button class="btn btn-primary" onclick="acheterBox('${b.id}')" ${abordable ? '' : 'disabled title="Pas assez de pièces"'}>Ouvrir</button>
@@ -953,7 +953,7 @@
         const pctAff = pct >= 0.1 ? pct.toFixed(1) : '<0.1'
         return `
           <div class="pool-ligne">
-            <img class="pool-img" src="../pictures/${c.image}" alt="${c.nom}" onerror="this.style.opacity=.3">
+            <img class="pool-img" src="${urlImage(c.image)}" alt="${c.nom}" onerror="this.style.opacity=.3">
             <div class="pool-infos">
               <div class="pool-nom">${c.nom}</div>
               <div class="pool-rarete-multi">
@@ -1020,7 +1020,7 @@
     function lancerAnimation(box, resultat) {
       const infosRarete = RARETES[resultat.creature.rarete] ?? { label: resultat.creature.rarete, couleur: '#9ca3af' }
       _animResultat  = resultat
-      _animBoiteImg  = '../pictures/' + box.image
+      _animBoiteImg  = urlImage(box.image)
       _animCouleur   = infosRarete.couleur
 
       const overlay = document.getElementById('anim-overlay')
@@ -1212,7 +1212,7 @@
       document.getElementById('anim-fond-couleur').style.background = infosRarete.couleur
 
       document.getElementById('anim-creature-lueur').style.background      = infosRarete.couleur
-      document.getElementById('anim-creature-img').src                      = '../pictures/' + creature.image
+      document.getElementById('anim-creature-img').src                      = urlImage(creature.image)
       document.getElementById('anim-creature-img').alt                      = creature.nom
       document.getElementById('anim-creature-img').style.color              = infosRarete.couleur
       document.getElementById('anim-creature-rarete').textContent           = infosRarete.label
@@ -1432,7 +1432,7 @@
         return `
           <div class="creature-carte ${ligne.equipee ? 'equipee' : ''}" onclick="toggleEquipement('${creature.id}', ${ligne.equipee})">
             <span class="creature-carte-tag" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
-            <img class="creature-carte-img" src="../pictures/${creature.image}" alt="${creature.nom}">
+            <img class="creature-carte-img" src="${urlImage(creature.image)}" alt="${creature.nom}">
             <span class="creature-carte-nom">${creature.nom}</span>
             <span class="creature-carte-multi">x${Number(creature.multiplicateur).toFixed(2)}</span>
             ${ligne.equipee ? '<span class="creature-carte-equipee-label">✓ Équipée</span>' : ''}
@@ -1525,7 +1525,7 @@
         return `
           <div class="${classes}" ${onclick}>
             <span class="index-carte-tag" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
-            <img class="index-carte-img" src="../pictures/${creature.image}" alt="${creature.nom}">
+            <img class="index-carte-img" src="${urlImage(creature.image)}" alt="${creature.nom}">
             <span class="index-carte-nom">${creature.nom}</span>
             <span class="index-carte-multi">x${Number(creature.multiplicateur).toFixed(2)}</span>
             ${equipee ? '<span class="index-carte-equipee-label">✓ Équipée</span>' : ''}
