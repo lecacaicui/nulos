@@ -563,8 +563,13 @@
       </select>
       <label for="c-multiplicateur">Multiplicateur de production (ex: 1.15)</label>
       <input type="number" id="c-multiplicateur" step="0.01" min="1" placeholder="1.10">
-      <label for="c-image">Nom du fichier image (dans /pictures/)</label>
-      <input type="text" id="c-image" placeholder="ex: flamby.png">
+      <label for="c-image-fichier">Image</label>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <input type="file" id="c-image-fichier" accept="image/*" style="flex:1;min-width:0;font-size:.85rem">
+        <img id="c-image-preview" src="" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--couleur-bordure);border-radius:6px;display:none">
+      </div>
+      <input type="hidden" id="c-image">
+      <div class="msg-inline" id="c-image-msg" style="margin-left:0"></div>
       <label for="c-prix-vente">Prix de revente si doublon (pièces)</label>
       <input type="number" id="c-prix-vente" min="0" step="1" placeholder="100">
       <button class="btn btn-primary btn-full" onclick="sauvegarderCreature()">Enregistrer</button>
@@ -583,8 +588,13 @@
       <input type="text" id="lb-nom" placeholder="ex: Loot Box Premium">
       <label for="lb-prix">Prix (pièces)</label>
       <input type="number" id="lb-prix" min="0" step="1" placeholder="400000">
-      <label for="lb-image">Nom du fichier image (dans /pictures/)</label>
-      <input type="text" id="lb-image" placeholder="ex: lootbox_premium.png">
+      <label for="lb-image-fichier">Image</label>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <input type="file" id="lb-image-fichier" accept="image/*" style="flex:1;min-width:0;font-size:.85rem">
+        <img id="lb-image-preview" src="" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--couleur-bordure);border-radius:6px;display:none">
+      </div>
+      <input type="hidden" id="lb-image">
+      <div class="msg-inline" id="lb-image-msg" style="margin-left:0"></div>
       <label for="lb-ordre">Ordre d'affichage</label>
       <input type="number" id="lb-ordre" step="1" placeholder="1">
       <button class="btn btn-primary btn-full" onclick="sauvegarderLootBox()">Enregistrer</button>
@@ -610,8 +620,13 @@
       <input type="text" id="m-id" placeholder="ex: charb">
       <label for="m-nom">Nom affiché</label>
       <input type="text" id="m-nom" placeholder="ex: Charb">
-      <label for="m-image">Nom du fichier image (dans /pictures/)</label>
-      <input type="text" id="m-image" placeholder="ex: charb.png">
+      <label for="m-image-fichier">Image</label>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <input type="file" id="m-image-fichier" accept="image/*" style="flex:1;min-width:0;font-size:.85rem">
+        <img id="m-image-preview" src="" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--couleur-bordure);border-radius:6px;display:none">
+      </div>
+      <input type="hidden" id="m-image">
+      <div class="msg-inline" id="m-image-msg" style="margin-left:0"></div>
       <label for="m-pv">Points de vie (PV)</label>
       <input type="number" id="m-pv" min="1" step="1" placeholder="10">
       <label for="m-degats">Dégâts d'attaque</label>
@@ -661,6 +676,7 @@
     }
     import {
       RARETES,
+      urlImage, uploadImageStorage,
       adminListerCreatures, adminSauvegarderCreature, adminToggleActifCreature, adminSupprimerCreature,
       adminListerLootBoxes, adminSauvegarderLootBox, adminToggleActifLootBox, adminSupprimerLootBox,
       adminListerLiaisons, adminAjouterCreatureBox, adminRetirerCreatureBox
@@ -673,6 +689,18 @@
     } from '../script/mda.js'
 
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
+
+    // Prévisualisation des images avant upload
+    function lierPreview(inputId, previewId) {
+      const input = document.getElementById(inputId)
+      if (!input) return
+      input.addEventListener('change', () => {
+        const f = input.files[0]
+        const prev = document.getElementById(previewId)
+        if (f) { prev.src = URL.createObjectURL(f); prev.style.display = 'block' }
+        else      prev.style.display = 'none'
+      })
+    }
 
     const NIVEAUX_ORDRE = { commun: 0, plus: 1, admin: 2, super_admin: 3 }
     const RARETES_ORDRE = { commun: 0, rare: 1, epique: 2, legendaire: 3, cosmique: 4, secret: 5 }
@@ -928,7 +956,7 @@
       tbody.innerHTML = data.map(c => {
         const infosRarete = RARETES[c.rarete] ?? { label: c.rarete, couleur: '#9ca3af' }
         return `<tr>
-          <td><img class="img-mini" src="../pictures/${esc(c.image)}" alt="${esc(c.nom)}" onerror="this.style.opacity=0.2"></td>
+          <td><img class="img-mini" src="${urlImage(esc(c.image))}" alt="${esc(c.nom)}" onerror="this.style.opacity=0.2"></td>
           <td>${esc(c.nom)}</td>
           <td><span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span></td>
           <td>x${Number(c.multiplicateur).toFixed(2)}</td>
@@ -963,6 +991,10 @@
       document.getElementById('c-rarete').value = c?.rarete ?? 'commun'
       document.getElementById('c-multiplicateur').value = c?.multiplicateur ?? '1.10'
       document.getElementById('c-image').value = c?.image ?? ''
+      document.getElementById('c-image-fichier').value = ''
+      const cprev = document.getElementById('c-image-preview')
+      if (c?.image) { cprev.src = urlImage(c.image); cprev.style.display = 'block' }
+      else cprev.style.display = 'none'
       document.getElementById('c-prix-vente').value = c?.prix_vente ?? '0'
       document.getElementById('msg-modale-creature').textContent = ''
       document.getElementById('modale-creature-fond').classList.add('ouverte')
@@ -977,7 +1009,15 @@
       const nom = document.getElementById('c-nom').value.trim()
       const rarete = document.getElementById('c-rarete').value
       const multiplicateur = parseFloat(document.getElementById('c-multiplicateur').value)
-      const image = document.getElementById('c-image').value.trim()
+      const fichierC = document.getElementById('c-image-fichier').files[0]
+      let image = document.getElementById('c-image').value.trim()
+      if (fichierC) {
+        document.getElementById('c-image-msg').textContent = 'Upload en cours…'
+        const { ok, chemin } = await uploadImageStorage(fichierC)
+        if (!ok) { document.getElementById('c-image-msg').textContent = '✗ Erreur upload'; return }
+        image = chemin
+        document.getElementById('c-image-msg').textContent = ''
+      }
       const prix_vente = parseInt(document.getElementById('c-prix-vente').value) || 0
       const msgEl = document.getElementById('msg-modale-creature')
       if (!id || !nom || !image || isNaN(multiplicateur)) {
@@ -1036,7 +1076,7 @@
       document.getElementById('lb-compteur').textContent = data.length + ' / ' + lootBoxesCache.length + ' loot box'
       const tbody = document.getElementById('tbody-lootboxes')
       tbody.innerHTML = data.map(b => `<tr>
-        <td><img class="img-mini" src="../pictures/${esc(b.image)}" alt="${esc(b.nom)}" onerror="this.style.opacity=0.2"></td>
+        <td><img class="img-mini" src="${urlImage(esc(b.image))}" alt="${esc(b.nom)}" onerror="this.style.opacity=0.2"></td>
         <td>${esc(b.nom)}</td>
         <td>${Number(b.prix).toLocaleString('fr')}</td>
         <td>${b.ordre}</td>
@@ -1067,6 +1107,10 @@
       document.getElementById('lb-nom').value = b?.nom ?? ''
       document.getElementById('lb-prix').value = b?.prix ?? '400000'
       document.getElementById('lb-image').value = b?.image ?? ''
+      document.getElementById('lb-image-fichier').value = ''
+      const lbprev = document.getElementById('lb-image-preview')
+      if (b?.image) { lbprev.src = urlImage(b.image); lbprev.style.display = 'block' }
+      else lbprev.style.display = 'none'
       document.getElementById('lb-ordre').value = b?.ordre ?? (lootBoxesCache.length + 1)
       document.getElementById('msg-modale-lootbox').textContent = ''
       const compoEl = document.getElementById('composition-lootbox')
@@ -1088,7 +1132,15 @@
       const id = document.getElementById('lb-id').value.trim()
       const nom = document.getElementById('lb-nom').value.trim()
       const prix = parseInt(document.getElementById('lb-prix').value)
-      const image = document.getElementById('lb-image').value.trim()
+      const fichierLB = document.getElementById('lb-image-fichier').files[0]
+      let image = document.getElementById('lb-image').value.trim()
+      if (fichierLB) {
+        document.getElementById('lb-image-msg').textContent = 'Upload en cours…'
+        const { ok, chemin } = await uploadImageStorage(fichierLB)
+        if (!ok) { document.getElementById('lb-image-msg').textContent = '✗ Erreur upload'; return }
+        image = chemin
+        document.getElementById('lb-image-msg').textContent = ''
+      }
       const ordre = parseInt(document.getElementById('lb-ordre').value) || 0
       const msgEl = document.getElementById('msg-modale-lootbox')
       if (!id || !nom || !image || isNaN(prix)) {
@@ -1122,7 +1174,7 @@
         const infosRarete = RARETES[l.creatures?.rarete] ?? { label: l.creatures?.rarete, couleur: '#9ca3af' }
         return `<div class="ligne-composition">
           <div class="infos">
-            <img class="img-mini" src="../pictures/${esc(l.creatures?.image ?? '')}" alt="" onerror="this.style.opacity=0.2">
+            <img class="img-mini" src="${urlImage(esc(l.creatures?.image ?? ''))}" alt="" onerror="this.style.opacity=0.2">
             <span>${esc(l.creatures?.nom ?? l.creature_id)}</span>
             <span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
             <span class="note-verrouille">poids ${l.poids}</span>
@@ -1187,7 +1239,7 @@
       document.getElementById('m-compteur').textContent = data.length + ' / ' + ennemisMDACache.length + ' ennemi(s)'
       const tbody = document.getElementById('tbody-mda')
       tbody.innerHTML = data.map(m => `<tr>
-        <td><img class="img-mini" src="../pictures/${esc(m.image)}" alt="${esc(m.nom)}" onerror="this.style.opacity=0.2"></td>
+        <td><img class="img-mini" src="${urlImage(esc(m.image))}" alt="${esc(m.nom)}" onerror="this.style.opacity=0.2"></td>
         <td>${esc(m.nom)}</td>
         <td>${Number(m.pv).toLocaleString('fr')}</td>
         <td>${Number(m.degats_attaque).toLocaleString('fr')}</td>
@@ -1219,6 +1271,10 @@
       document.getElementById('m-id').disabled = !!id
       document.getElementById('m-nom').value = m?.nom ?? ''
       document.getElementById('m-image').value = m?.image ?? ''
+      document.getElementById('m-image-fichier').value = ''
+      const mprev = document.getElementById('m-image-preview')
+      if (m?.image) { mprev.src = urlImage(m.image); mprev.style.display = 'block' }
+      else mprev.style.display = 'none'
       document.getElementById('m-pv').value = m?.pv ?? '10'
       document.getElementById('m-degats').value = m?.degats_attaque ?? '1'
       document.getElementById('m-delai').value = m?.delai_attaque ?? '4'
@@ -1235,7 +1291,15 @@
     window.sauvegarderEnnemiMDA = async function() {
       const id = document.getElementById('m-id').value.trim()
       const nom = document.getElementById('m-nom').value.trim()
-      const image = document.getElementById('m-image').value.trim()
+      const fichierM = document.getElementById('m-image-fichier').files[0]
+      let image = document.getElementById('m-image').value.trim()
+      if (fichierM) {
+        document.getElementById('m-image-msg').textContent = 'Upload en cours…'
+        const { ok, chemin } = await uploadImageStorage(fichierM)
+        if (!ok) { document.getElementById('m-image-msg').textContent = '✗ Erreur upload'; return }
+        image = chemin
+        document.getElementById('m-image-msg').textContent = ''
+      }
       const pv = parseInt(document.getElementById('m-pv').value)
       const degats_attaque = parseInt(document.getElementById('m-degats').value)
       const delai_attaque = parseInt(document.getElementById('m-delai').value)
