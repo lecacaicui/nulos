@@ -844,10 +844,11 @@
 
   <script type="module">
     import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import {
       RARETES,
       RARETES_VISIBLES,
+      urlImage,
+      db,
       chargerLootBoxes,
       chargerPoolLootBox,
       ouvrirLootBox,
@@ -855,8 +856,6 @@
       equiperCreature,
       deseqiperCreature
     } from '../script/lootbox.js'
-
-    const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
     let userId = null
     let pieces = 0
