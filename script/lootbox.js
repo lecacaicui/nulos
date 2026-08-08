@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
-const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+export const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
 // ===== Storage : images des créatures et loot box =====
 // Les images sont stockées dans le bucket public "pictures" de Supabase Storage.
