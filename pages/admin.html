@@ -824,8 +824,6 @@
     }
     import {
       RARETES,
-      db,
-      urlImage, uploadImageStorage,
       adminListerCreatures, adminSauvegarderCreature, adminToggleActifCreature, adminSupprimerCreature,
       adminListerLootBoxes, adminSauvegarderLootBox, adminToggleActifLootBox, adminSupprimerLootBox,
       adminListerLiaisons, adminAjouterCreatureBox, adminRetirerCreatureBox
@@ -836,6 +834,31 @@
     import {
       adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
     } from '../script/mda.js'
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+    // Client Supabase local à admin (évite les exports manquants de lootbox.js)
+    const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
+    const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    const STORAGE_BUCKET = 'images'
+
+    /** Construit l'URL publique d'une image stockée dans le bucket. */
+    function urlImage(chemin) {
+      if (!chemin) return ''
+      if (chemin.startsWith('http')) return chemin
+      const { data } = db.storage.from(STORAGE_BUCKET).getPublicUrl(chemin)
+      return data?.publicUrl ?? ''
+    }
+
+    /** Upload un fichier dans le bucket et retourne { ok, chemin }. */
+    async function uploadImageStorage(file) {
+      const ext    = file.name.split('.').pop()
+      const chemin = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await db.storage.from(STORAGE_BUCKET).upload(chemin, file, { upsert: false })
+      if (error) { console.error('uploadImageStorage :', error); return { ok: false, chemin: null } }
+      return { ok: true, chemin }
+    }
 
     // ===== Picker image =====
     // prefixe en cours ('c', 'lb', 'm') — détermine quel hidden input on cible
@@ -934,11 +957,26 @@
       const grille = document.getElementById('picker-bib-grille')
       grille.innerHTML = '<div class="img-bib-vide">Chargement…</div>'
       try {
-        const { data, error } = await db.storage.from('images').list('', { limit: 400, sortBy: { column: 'name', order: 'asc' } })
-        if (error || !data) { grille.innerHTML = '<div class="img-bib-vide">Impossible de charger la bibliothèque.</div>'; return }
-        _biblioCache = data.filter(f => f.name && !f.name.endsWith('/')).map(f => f.name)
+        const { data, error } = await db.storage
+          .from(STORAGE_BUCKET)
+          .list('', { limit: 500, offset: 0, sortBy: { column: 'name', order: 'asc' } })
+        if (error) {
+          console.error('chargerBibliotheque error:', error)
+          grille.innerHTML = `<div class="img-bib-vide">Erreur bucket : ${error.message}</div>`
+          return
+        }
+        if (!data || data.length === 0) {
+          grille.innerHTML = '<div class="img-bib-vide">Aucune image dans la bibliothèque.</div>'
+          _biblioCache = []
+          return
+        }
+        // Filtrer les dossiers (.placeholder, etc.) — garder seulement les vrais fichiers
+        _biblioCache = data
+          .filter(f => f.id && !f.name.startsWith('.'))
+          .map(f => f.name)
         _renderBiblio(_biblioCache)
       } catch(e) {
+        console.error('chargerBibliotheque exception:', e)
         grille.innerHTML = '<div class="img-bib-vide">Erreur : ' + e.message + '</div>'
       }
     }
