@@ -824,6 +824,7 @@
     }
     import {
       RARETES,
+      db, urlImage, uploadImageStorage,
       adminListerCreatures, adminSauvegarderCreature, adminToggleActifCreature, adminSupprimerCreature,
       adminListerLootBoxes, adminSauvegarderLootBox, adminToggleActifLootBox, adminSupprimerLootBox,
       adminListerLiaisons, adminAjouterCreatureBox, adminRetirerCreatureBox
@@ -834,31 +835,8 @@
     import {
       adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
     } from '../script/mda.js'
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-    // Client Supabase local à admin (évite les exports manquants de lootbox.js)
-    const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
-    const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
-    const db = createClient(SUPABASE_URL, SUPABASE_KEY)
-
-    const STORAGE_BUCKET = 'images'
-
-    /** Construit l'URL publique d'une image stockée dans le bucket. */
-    function urlImage(chemin) {
-      if (!chemin) return ''
-      if (chemin.startsWith('http')) return chemin
-      const { data } = db.storage.from(STORAGE_BUCKET).getPublicUrl(chemin)
-      return data?.publicUrl ?? ''
-    }
-
-    /** Upload un fichier dans le bucket et retourne { ok, chemin }. */
-    async function uploadImageStorage(file) {
-      const ext    = file.name.split('.').pop()
-      const chemin = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { error } = await db.storage.from(STORAGE_BUCKET).upload(chemin, file, { upsert: false })
-      if (error) { console.error('uploadImageStorage :', error); return { ok: false, chemin: null } }
-      return { ok: true, chemin }
-    }
+    const STORAGE_BUCKET = 'pictures'
 
     // ===== Picker image =====
     // prefixe en cours ('c', 'lb', 'm') — détermine quel hidden input on cible
