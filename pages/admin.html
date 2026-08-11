@@ -216,6 +216,99 @@
       table { min-width: 400px; }
       td, th { padding: .5rem .5rem; font-size: .82rem; }
     }
+    /* ===== Picker image (upload + bibliothèque BDD) ===== */
+    .img-picker-wrap { display: flex; flex-direction: column; gap: .5rem; margin-top: .25rem; }
+    .img-picker-tabs { display: flex; gap: .4rem; }
+    .img-picker-tab {
+      padding: .3rem .8rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px 6px 0 0;
+      background: var(--couleur-fond);
+      color: var(--couleur-texte-faible);
+      font-size: .8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: none;
+      transition: background .12s, color .12s;
+    }
+    .img-picker-tab.actif { background: var(--couleur-conteneur); color: var(--couleur-texte); }
+    .img-picker-body {
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 0 6px 6px 6px;
+      background: var(--couleur-conteneur);
+      padding: .75rem;
+    }
+    .img-picker-panneau { display: none; }
+    .img-picker-panneau.actif { display: block; }
+    .img-picker-preview-wrap {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: .6rem;
+    }
+    .img-picker-preview {
+      width: 56px; height: 56px;
+      object-fit: contain;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px;
+      display: none;
+      flex-shrink: 0;
+    }
+    .img-picker-nom-actuel {
+      font-size: .78rem;
+      color: var(--couleur-texte-faible);
+      font-style: italic;
+      word-break: break-all;
+    }
+    /* Bibliothèque */
+    .img-bib-search {
+      width: 100%;
+      padding: .4rem .6rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px;
+      font-size: .82rem;
+      background: var(--couleur-fond);
+      color: var(--couleur-texte);
+      margin-bottom: .6rem;
+    }
+    .img-bib-grille {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+      gap: .4rem;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .img-bib-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .2rem;
+      padding: .35rem;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      background: var(--couleur-fond);
+      transition: border-color .12s, background .12s;
+    }
+    .img-bib-item:hover { border-color: var(--couleur-bouton); background: var(--couleur-conteneur); }
+    .img-bib-item.selectionne { border-color: var(--couleur-bouton); background: color-mix(in srgb, var(--couleur-bouton) 12%, var(--couleur-conteneur)); }
+    .img-bib-item img { width: 48px; height: 48px; object-fit: contain; }
+    .img-bib-item span { font-size: .6rem; color: var(--couleur-texte-faible); text-align: center; word-break: break-all; line-height: 1.2; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .img-bib-vide { font-size: .82rem; color: var(--couleur-texte-faible); text-align: center; padding: 1rem 0; }
+    /* Upload */
+    .img-upload-zone {
+      border: 2px dashed var(--couleur-bordure);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      font-size: .82rem;
+      color: var(--couleur-texte-faible);
+    }
+    .img-upload-zone:hover, .img-upload-zone.drag { border-color: var(--couleur-bouton); background: color-mix(in srgb, var(--couleur-bouton) 8%, var(--couleur-conteneur)); }
+    .img-upload-zone input[type="file"] { display: none; }
+    .img-upload-msg { font-size: .78rem; margin-top: .4rem; }
   </style>
 </head>
 <body>
@@ -563,10 +656,13 @@
       </select>
       <label for="c-multiplicateur">Multiplicateur de production (ex: 1.15)</label>
       <input type="number" id="c-multiplicateur" step="0.01" min="1" placeholder="1.10">
-      <label for="c-image-fichier">Image</label>
-      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <input type="file" id="c-image-fichier" accept="image/*" style="flex:1;min-width:0;font-size:.85rem">
-        <img id="c-image-preview" src="" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--couleur-bordure);border-radius:6px;display:none">
+      <label>Image</label>
+      <div class="img-picker-wrap" id="c-picker-wrap">
+        <div class="img-picker-preview-wrap">
+          <img class="img-picker-preview" id="c-image-preview" src="" alt="">
+          <span class="img-picker-nom-actuel" id="c-image-nom">Aucune image</span>
+        </div>
+        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('c')">🖼 Choisir / importer une image</button>
       </div>
       <input type="hidden" id="c-image">
       <div class="msg-inline" id="c-image-msg" style="margin-left:0"></div>
@@ -588,10 +684,13 @@
       <input type="text" id="lb-nom" placeholder="ex: Loot Box Premium">
       <label for="lb-prix">Prix (pièces)</label>
       <input type="number" id="lb-prix" min="0" step="1" placeholder="400000">
-      <label for="lb-image-fichier">Image</label>
-      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <input type="file" id="lb-image-fichier" accept="image/*" style="flex:1;min-width:0;font-size:.85rem">
-        <img id="lb-image-preview" src="" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--couleur-bordure);border-radius:6px;display:none">
+      <label>Image</label>
+      <div class="img-picker-wrap" id="lb-picker-wrap">
+        <div class="img-picker-preview-wrap">
+          <img class="img-picker-preview" id="lb-image-preview" src="" alt="">
+          <span class="img-picker-nom-actuel" id="lb-image-nom">Aucune image</span>
+        </div>
+        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('lb')">🖼 Choisir / importer une image</button>
       </div>
       <input type="hidden" id="lb-image">
       <div class="msg-inline" id="lb-image-msg" style="margin-left:0"></div>
@@ -620,10 +719,13 @@
       <input type="text" id="m-id" placeholder="ex: charb">
       <label for="m-nom">Nom affiché</label>
       <input type="text" id="m-nom" placeholder="ex: Charb">
-      <label for="m-image-fichier">Image</label>
-      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <input type="file" id="m-image-fichier" accept="image/*" style="flex:1;min-width:0;font-size:.85rem">
-        <img id="m-image-preview" src="" alt="" style="width:48px;height:48px;object-fit:contain;border:1px solid var(--couleur-bordure);border-radius:6px;display:none">
+      <label>Image</label>
+      <div class="img-picker-wrap" id="m-picker-wrap">
+        <div class="img-picker-preview-wrap">
+          <img class="img-picker-preview" id="m-image-preview" src="" alt="">
+          <span class="img-picker-nom-actuel" id="m-image-nom">Aucune image</span>
+        </div>
+        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('m')">🖼 Choisir / importer une image</button>
       </div>
       <input type="hidden" id="m-image">
       <div class="msg-inline" id="m-image-msg" style="margin-left:0"></div>
@@ -659,6 +761,53 @@
     </div>
   </div>
 
+  <!-- ===== Modale picker image (partagée) ===== -->
+  <div class="modale-fond" id="modale-picker-fond" onclick="if(event.target===this) fermerPickerImage()">
+    <div class="modale-admin" style="max-width:520px">
+      <button class="modale-fermer" onclick="fermerPickerImage()">✕</button>
+      <h2>Choisir une image</h2>
+
+      <div class="img-picker-tabs">
+        <button class="img-picker-tab actif" id="picker-tab-upload" onclick="switchPickerTab('upload')">📤 Importer</button>
+        <button class="img-picker-tab" id="picker-tab-bib"    onclick="switchPickerTab('bib')">🗂 Bibliothèque</button>
+      </div>
+      <div class="img-picker-body">
+
+        <!-- Onglet upload -->
+        <div class="img-picker-panneau actif" id="picker-panneau-upload">
+          <div class="img-upload-zone" id="picker-upload-zone" onclick="document.getElementById('picker-file-input').click()"
+               ondragover="event.preventDefault();this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')"
+               ondrop="pickerHandleDrop(event)">
+            <input type="file" id="picker-file-input" accept="image/*" onchange="pickerHandleFile(this.files[0])">
+            <div>Cliquez ou glissez-déposez une image ici</div>
+            <div style="font-size:.72rem;margin-top:.25rem">PNG, JPG, GIF, WEBP…</div>
+          </div>
+          <div class="img-upload-msg msg-inline" id="picker-upload-msg"></div>
+        </div>
+
+        <!-- Onglet bibliothèque -->
+        <div class="img-picker-panneau" id="picker-panneau-bib">
+          <input class="img-bib-search" type="text" id="picker-bib-search" placeholder="Rechercher…" oninput="filtrerBiblio()">
+          <div class="img-bib-grille" id="picker-bib-grille">
+            <div class="img-bib-vide">Chargement…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prévisualisation de la sélection en cours -->
+      <div class="img-picker-preview-wrap" style="margin-top:.75rem">
+        <img class="img-picker-preview" id="picker-preview" src="" alt="">
+        <span class="img-picker-nom-actuel" id="picker-nom-actuel">Aucune image sélectionnée</span>
+      </div>
+
+      <div style="display:flex;gap:.5rem;margin-top:.75rem">
+        <button class="btn btn-primary" style="flex:1" onclick="validerPickerImage()" id="picker-btn-valider" disabled>Utiliser cette image</button>
+        <button class="btn btn-secondary" onclick="fermerPickerImage()">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <div id="footer-placeholder"></div>
 
   <script type="module">
@@ -688,16 +837,130 @@
       adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
     } from '../script/mda.js'
 
-    // Prévisualisation des images avant upload
-    function lierPreview(inputId, previewId) {
-      const input = document.getElementById(inputId)
-      if (!input) return
-      input.addEventListener('change', () => {
-        const f = input.files[0]
-        const prev = document.getElementById(previewId)
-        if (f) { prev.src = URL.createObjectURL(f); prev.style.display = 'block' }
-        else      prev.style.display = 'none'
+    // ===== Picker image =====
+    // prefixe en cours ('c', 'lb', 'm') — détermine quel hidden input on cible
+    let _pickerPrefixe = null
+    let _pickerCheminSelectionne = null
+    let _biblioCache = []   // liste de tous les chemins BDD connus
+
+    window.ouvrirPickerImage = function(prefixe) {
+      _pickerPrefixe = prefixe
+      _pickerCheminSelectionne = document.getElementById(prefixe + '-image').value || null
+
+      // Reset UI
+      document.getElementById('picker-upload-msg').textContent = ''
+      document.getElementById('picker-file-input').value = ''
+      switchPickerTab('upload')
+
+      // Pré-sélection preview si déjà une image
+      _refreshPickerPreview(_pickerCheminSelectionne)
+
+      // Charger la bibliothèque en arrière-plan
+      chargerBibliotheque()
+
+      document.getElementById('modale-picker-fond').classList.add('ouverte')
+    }
+
+    window.fermerPickerImage = function() {
+      document.getElementById('modale-picker-fond').classList.remove('ouverte')
+      _pickerPrefixe = null
+      _pickerCheminSelectionne = null
+    }
+
+    window.switchPickerTab = function(tab) {
+      ;['upload','bib'].forEach(t => {
+        document.getElementById('picker-tab-' + t).classList.toggle('actif', t === tab)
+        document.getElementById('picker-panneau-' + t).classList.toggle('actif', t === tab)
       })
+    }
+
+    function _refreshPickerPreview(chemin) {
+      const prev = document.getElementById('picker-preview')
+      const nom  = document.getElementById('picker-nom-actuel')
+      const btn  = document.getElementById('picker-btn-valider')
+      if (chemin) {
+        prev.src = urlImage(chemin)
+        prev.style.display = 'block'
+        // Extrait juste le nom de fichier pour l'affichage
+        nom.textContent = chemin.split('/').pop()
+        btn.disabled = false
+      } else {
+        prev.style.display = 'none'
+        nom.textContent = 'Aucune image sélectionnée'
+        btn.disabled = true
+      }
+      // Mettre à jour la sélection dans la grille
+      document.querySelectorAll('.img-bib-item').forEach(el => {
+        el.classList.toggle('selectionne', el.dataset.chemin === chemin)
+      })
+    }
+
+    window.validerPickerImage = function() {
+      if (!_pickerPrefixe || !_pickerCheminSelectionne) return
+      const p = _pickerPrefixe
+      document.getElementById(p + '-image').value = _pickerCheminSelectionne
+      const prev = document.getElementById(p + '-image-preview')
+      prev.src = urlImage(_pickerCheminSelectionne)
+      prev.style.display = 'block'
+      document.getElementById(p + '-image-nom').textContent = _pickerCheminSelectionne.split('/').pop()
+      fermerPickerImage()
+    }
+
+    // Upload depuis le picker
+    window.pickerHandleFile = async function(file) {
+      if (!file) return
+      const msgEl = document.getElementById('picker-upload-msg')
+      msgEl.textContent = 'Upload en cours…'
+      msgEl.className = 'img-upload-msg msg-inline'
+      const { ok, chemin } = await uploadImageStorage(file)
+      if (!ok) { msgEl.textContent = '✗ Erreur upload'; msgEl.className = 'img-upload-msg msg-inline err'; return }
+      msgEl.textContent = '✓ Image importée !'
+      msgEl.className = 'img-upload-msg msg-inline ok'
+      _pickerCheminSelectionne = chemin
+      _refreshPickerPreview(chemin)
+      // Ajouter à la bibliothèque locale et rafraîchir
+      if (!_biblioCache.includes(chemin)) { _biblioCache.push(chemin); _renderBiblio(_biblioCache) }
+    }
+
+    window.pickerHandleDrop = function(e) {
+      e.preventDefault()
+      document.getElementById('picker-upload-zone').classList.remove('drag')
+      const file = e.dataTransfer.files[0]
+      if (file) pickerHandleFile(file)
+    }
+
+    // Bibliothèque : liste tous les fichiers du bucket Supabase Storage
+    async function chargerBibliotheque() {
+      const grille = document.getElementById('picker-bib-grille')
+      grille.innerHTML = '<div class="img-bib-vide">Chargement…</div>'
+      try {
+        const { data, error } = await db.storage.from('images').list('', { limit: 400, sortBy: { column: 'name', order: 'asc' } })
+        if (error || !data) { grille.innerHTML = '<div class="img-bib-vide">Impossible de charger la bibliothèque.</div>'; return }
+        _biblioCache = data.filter(f => f.name && !f.name.endsWith('/')).map(f => f.name)
+        _renderBiblio(_biblioCache)
+      } catch(e) {
+        grille.innerHTML = '<div class="img-bib-vide">Erreur : ' + e.message + '</div>'
+      }
+    }
+
+    function _renderBiblio(liste) {
+      const recherche = (document.getElementById('picker-bib-search')?.value ?? '').toLowerCase()
+      const filtree = recherche ? liste.filter(n => n.toLowerCase().includes(recherche)) : liste
+      const grille = document.getElementById('picker-bib-grille')
+      if (!filtree.length) { grille.innerHTML = '<div class="img-bib-vide">Aucune image trouvée.</div>'; return }
+      grille.innerHTML = filtree.map(chemin => `
+        <div class="img-bib-item ${chemin === _pickerCheminSelectionne ? 'selectionne' : ''}" data-chemin="${chemin}" onclick="selectionnerImageBib('${chemin}')">
+          <img src="${urlImage(chemin)}" alt="${chemin}" onerror="this.style.opacity=.2">
+          <span>${chemin.split('/').pop()}</span>
+        </div>`).join('')
+    }
+
+    window.filtrerBiblio = function() { _renderBiblio(_biblioCache) }
+
+    window.selectionnerImageBib = function(chemin) {
+      _pickerCheminSelectionne = chemin
+      _refreshPickerPreview(chemin)
+      _renderBiblio(_biblioCache)
     }
 
     const NIVEAUX_ORDRE = { commun: 0, plus: 1, admin: 2, super_admin: 3 }
@@ -989,10 +1252,11 @@
       document.getElementById('c-rarete').value = c?.rarete ?? 'commun'
       document.getElementById('c-multiplicateur').value = c?.multiplicateur ?? '1.10'
       document.getElementById('c-image').value = c?.image ?? ''
-      document.getElementById('c-image-fichier').value = ''
+      document.getElementById('c-image-msg').textContent = ''
       const cprev = document.getElementById('c-image-preview')
-      if (c?.image) { cprev.src = urlImage(c.image); cprev.style.display = 'block' }
-      else cprev.style.display = 'none'
+      const cnom  = document.getElementById('c-image-nom')
+      if (c?.image) { cprev.src = urlImage(c.image); cprev.style.display = 'block'; cnom.textContent = c.image.split('/').pop() }
+      else { cprev.style.display = 'none'; cnom.textContent = 'Aucune image' }
       document.getElementById('c-prix-vente').value = c?.prix_vente ?? '0'
       document.getElementById('msg-modale-creature').textContent = ''
       document.getElementById('modale-creature-fond').classList.add('ouverte')
@@ -1007,19 +1271,11 @@
       const nom = document.getElementById('c-nom').value.trim()
       const rarete = document.getElementById('c-rarete').value
       const multiplicateur = parseFloat(document.getElementById('c-multiplicateur').value)
-      const fichierC = document.getElementById('c-image-fichier').files[0]
-      let image = document.getElementById('c-image').value.trim()
-      if (fichierC) {
-        document.getElementById('c-image-msg').textContent = 'Upload en cours…'
-        const { ok, chemin } = await uploadImageStorage(fichierC)
-        if (!ok) { document.getElementById('c-image-msg').textContent = '✗ Erreur upload'; return }
-        image = chemin
-        document.getElementById('c-image-msg').textContent = ''
-      }
+      const image = document.getElementById('c-image').value.trim()
       const prix_vente = parseInt(document.getElementById('c-prix-vente').value) || 0
       const msgEl = document.getElementById('msg-modale-creature')
       if (!id || !nom || !image || isNaN(multiplicateur)) {
-        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (y compris l\'image).'
         msgEl.className = 'msg-inline err'
         return
       }
@@ -1105,10 +1361,11 @@
       document.getElementById('lb-nom').value = b?.nom ?? ''
       document.getElementById('lb-prix').value = b?.prix ?? '400000'
       document.getElementById('lb-image').value = b?.image ?? ''
-      document.getElementById('lb-image-fichier').value = ''
+      document.getElementById('lb-image-msg').textContent = ''
       const lbprev = document.getElementById('lb-image-preview')
-      if (b?.image) { lbprev.src = urlImage(b.image); lbprev.style.display = 'block' }
-      else lbprev.style.display = 'none'
+      const lbnom  = document.getElementById('lb-image-nom')
+      if (b?.image) { lbprev.src = urlImage(b.image); lbprev.style.display = 'block'; lbnom.textContent = b.image.split('/').pop() }
+      else { lbprev.style.display = 'none'; lbnom.textContent = 'Aucune image' }
       document.getElementById('lb-ordre').value = b?.ordre ?? (lootBoxesCache.length + 1)
       document.getElementById('msg-modale-lootbox').textContent = ''
       const compoEl = document.getElementById('composition-lootbox')
@@ -1130,19 +1387,11 @@
       const id = document.getElementById('lb-id').value.trim()
       const nom = document.getElementById('lb-nom').value.trim()
       const prix = parseInt(document.getElementById('lb-prix').value)
-      const fichierLB = document.getElementById('lb-image-fichier').files[0]
-      let image = document.getElementById('lb-image').value.trim()
-      if (fichierLB) {
-        document.getElementById('lb-image-msg').textContent = 'Upload en cours…'
-        const { ok, chemin } = await uploadImageStorage(fichierLB)
-        if (!ok) { document.getElementById('lb-image-msg').textContent = '✗ Erreur upload'; return }
-        image = chemin
-        document.getElementById('lb-image-msg').textContent = ''
-      }
+      const image = document.getElementById('lb-image').value.trim()
       const ordre = parseInt(document.getElementById('lb-ordre').value) || 0
       const msgEl = document.getElementById('msg-modale-lootbox')
       if (!id || !nom || !image || isNaN(prix)) {
-        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (y compris l\'image).'
         msgEl.className = 'msg-inline err'
         return
       }
@@ -1269,10 +1518,11 @@
       document.getElementById('m-id').disabled = !!id
       document.getElementById('m-nom').value = m?.nom ?? ''
       document.getElementById('m-image').value = m?.image ?? ''
-      document.getElementById('m-image-fichier').value = ''
+      document.getElementById('m-image-msg').textContent = ''
       const mprev = document.getElementById('m-image-preview')
-      if (m?.image) { mprev.src = urlImage(m.image); mprev.style.display = 'block' }
-      else mprev.style.display = 'none'
+      const mnom  = document.getElementById('m-image-nom')
+      if (m?.image) { mprev.src = urlImage(m.image); mprev.style.display = 'block'; mnom.textContent = m.image.split('/').pop() }
+      else { mprev.style.display = 'none'; mnom.textContent = 'Aucune image' }
       document.getElementById('m-pv').value = m?.pv ?? '10'
       document.getElementById('m-degats').value = m?.degats_attaque ?? '1'
       document.getElementById('m-delai').value = m?.delai_attaque ?? '4'
@@ -1289,15 +1539,7 @@
     window.sauvegarderEnnemiMDA = async function() {
       const id = document.getElementById('m-id').value.trim()
       const nom = document.getElementById('m-nom').value.trim()
-      const fichierM = document.getElementById('m-image-fichier').files[0]
-      let image = document.getElementById('m-image').value.trim()
-      if (fichierM) {
-        document.getElementById('m-image-msg').textContent = 'Upload en cours…'
-        const { ok, chemin } = await uploadImageStorage(fichierM)
-        if (!ok) { document.getElementById('m-image-msg').textContent = '✗ Erreur upload'; return }
-        image = chemin
-        document.getElementById('m-image-msg').textContent = ''
-      }
+      const image = document.getElementById('m-image').value.trim()
       const pv = parseInt(document.getElementById('m-pv').value)
       const degats_attaque = parseInt(document.getElementById('m-degats').value)
       const delai_attaque = parseInt(document.getElementById('m-delai').value)
@@ -1305,7 +1547,7 @@
       const ordre = parseInt(document.getElementById('m-ordre').value) || 0
       const msgEl = document.getElementById('msg-modale-mda')
       if (!id || !nom || !image || isNaN(pv) || isNaN(degats_attaque) || isNaN(delai_attaque) || pv < 1 || delai_attaque < 1) {
-        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (PV ≥ 1, délai ≥ 1).'
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (PV ≥ 1, délai ≥ 1, image requise).'
         msgEl.className = 'msg-inline err'
         return
       }
