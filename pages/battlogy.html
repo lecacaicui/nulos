@@ -277,16 +277,17 @@
     const img = isPlayer ? imgCastleJoueur : imgCastleEnemi
 
     // ── Image du château, hauteur réduite au tiers ──
-    // Ancrée en haut pour l'ennemi (porte côté grille en bas de l'image),
-    // ancrée en bas pour le joueur (porte côté bord d'écran).
+    // Collée à la grille : le château joueur touche le haut de sa zone
+    // (juste sous la grille), le château ennemi touche le bas de sa zone
+    // (juste au-dessus de la grille).
     const imgH = h / 3
-    const imgY = isPlayer ? y + h - imgH : y
+    const imgY = isPlayer ? y : y + h - imgH
     if (img.complete && img.naturalWidth > 0) {
       ctx.drawImage(img, x, imgY, W, imgH)
     }
 
-    // ── Barre de PV ──
-    const hpBarY  = y + h - 10
+    // ── Barre de PV : au-dessus du château ennemi, en-dessous du château joueur ──
+    const hpBarY  = isPlayer ? y + h - 10 : y + 4
     const hpBarX  = x + 6
     const hpBarW  = W - 12
     ctx.fillStyle = C.hp_bg
