@@ -1556,13 +1556,19 @@
     if (!enTrainDeGlisser) return
     const carte = CARTES[carteEnCours]
 
+    // Taille de la case en surbrillance : volontairement plus grande que la
+    // case réelle (qui fait R - 1.2) pour que l'aide au placement reste
+    // bien visible, avec un contour plus épais.
+    const RAYON_AIDE_PLACEMENT = R * 1.3
+    const EPAISSEUR_AIDE_PLACEMENT = 4
+
     // Carte à placement libre (sort, ex: statue) : toute la grille est
     // utilisable, on se contente de surligner la case survolée.
     if (carte && carte.placementLibre) {
       ctx.fillStyle = '#a855f715'
       ctx.fillRect(MARGE, gridOffsetY, canvas.width - 2 * MARGE, gridH)
       if (hexSurvole) {
-        drawHex(hexSurvole.cx, hexSurvole.cy, R - 1.2, '#a855f788', '#d8b4fe', 2.5)
+        drawHex(hexSurvole.cx, hexSurvole.cy, RAYON_AIDE_PLACEMENT, '#a855f788', '#d8b4fe', EPAISSEUR_AIDE_PLACEMENT)
       }
       return
     }
@@ -1580,10 +1586,10 @@
     if (hexSurvole) {
       const valide = hexSurvole.cy >= yMin - 1 && hexSurvole.cy <= yMax + 1
       drawHex(
-        hexSurvole.cx, hexSurvole.cy, R - 1.2,
+        hexSurvole.cx, hexSurvole.cy, RAYON_AIDE_PLACEMENT,
         valide ? '#3b82f688' : '#ef444466',
         valide ? '#93c5fd' : '#fca5a5',
-        2.5
+        EPAISSEUR_AIDE_PLACEMENT
       )
     }
   }
@@ -1713,8 +1719,20 @@
     requestAnimationFrame(boucleDeJeu)
   }
 
+  // La taille CSS affichée du canvas s'adapte déjà toute seule (voir
+  // max-width/max-height:100% sur #game-canvas) : zoomer ou redimensionner
+  // la fenêtre ne fait qu'étirer/rétrécir visuellement le même contenu,
+  // sans qu'on ait besoin de toucher à sa résolution interne (R, HS, VS,
+  // canvas.width/height). Recalculer cette résolution EN PLEIN COMBAT est
+  // justement ce qui causait des unités "téléportées" ou redimensionnées de
+  // façon incohérente au zoom : on ne le fait donc plus que hors combat
+  // (avant de lancer la partie, ou une fois celle-ci terminée), moments où
+  // le terrain ne contient aucune unité à perturber — ça reste utile pour
+  // bien s'adapter à une vraie rotation d'écran avant de jouer. Pendant la
+  // partie, la résolution interne reste fixe du début à la fin : le jeu
+  // n'est alors plus du tout dépendant de l'état (zoom, taille) de la page.
   window.addEventListener('resize', () => {
-    if (canvas) initArena()
+    if (canvas && (!partieCommencee || partieTerminee)) initArena()
   })
 
   // ─── Glisser-déposer des cartes (souris + tactile via pointer events) ──
@@ -1865,18 +1883,18 @@
     carteEnCours = null
   }
 
-  // ─── Raccourcis clavier : touches du rang des chiffres ────────────────
-  // Sur un clavier AZERTY ce rang affiche &, é, ", ', ( — on se base donc
-  // sur `event.code` (Digit1, Digit2…), qui correspond à l'emplacement
-  // physique de la touche et pas au caractère affiché, pour que « la
-  // touche au-dessus de la lettre A » fonctionne quel que soit le clavier
-  // (AZERTY, QWERTY…). Digit1 prend la 1ère carte de la main, Digit2 la
+  // ─── Raccourcis clavier : rangée A-Z-E-R-T ─────────────────────────────
+  // On se base sur `event.code` (KeyQ, KeyW, KeyE, KeyR, KeyT…), qui
+  // correspond à l'emplacement PHYSIQUE de la touche et pas au caractère
+  // affiché — ces mêmes emplacements affichent A, Z, E, R, T sur un clavier
+  // AZERTY (les 3 dernières touches, E/R/T, sont d'ailleurs déjà identiques
+  // entre AZERTY et QWERTY). KeyQ prend la 1ère carte de la main, KeyW la
   // 2ème, etc. (main limitée à 5 cartes désormais). La carte se retrouve
   // directement « en main » (comme si on avait commencé à la glisser) tant
   // que la touche reste enfoncée ; la relâcher la pose, exactement comme un
   // glisser-déposer classique.
-  const TOUCHES_CARTES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']
-  const TOUCHES_CARTES_LABEL = ['1', '2', '3', '4', '5']
+  const TOUCHES_CARTES = ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT']
+  const TOUCHES_CARTES_LABEL = ['A', 'Z', 'E', 'R', 'T']
   let toucheCarteEnCours = null
   const dernierPointeur = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
 
@@ -2109,14 +2127,15 @@
    *
    *  RACCOURCIS CLAVIER
    *  -------------------
-   *  Les touches du rang des chiffres (au-dessus des lettres — &, é, ", '
-   *  en AZERTY) prennent la carte à la position correspondante dans la MAIN
+   *  Les touches A, Z, E, R, T (rangée juste sous les chiffres, en AZERTY)
+   *  prennent la carte à la position correspondante dans la MAIN
    *  (5 emplacements max désormais) directement "en main", comme si on
    *  avait commencé à la glisser à la souris. Tant que la touche est
    *  maintenue, la carte suit le curseur ; la relâcher la pose à l'endroit
    *  visé (ou annule si l'endroit n'est pas valide, ou la détruit si la
-   *  zone de destruction est survolée). Basé sur `event.code` (Digit1,
-   *  Digit2…), donc indépendant de la disposition du clavier.
+   *  zone de destruction est survolée). Basé sur `event.code` (KeyQ,
+   *  KeyW…, l'emplacement physique de la touche), donc le raccourci reste
+   *  sur A/Z/E/R/T quelle que soit la disposition du clavier.
    *
    *  DECK (choisi par le joueur, jusqu'à 10 emplacements, doublons
    *  autorisés pour l'instant — limite finale visée : 2 exemplaires par
