@@ -145,6 +145,7 @@
       pointer-events: none;
       transform: translate(-50%, -50%);
       font-size: 1.8rem;
+      opacity: .45;
       filter: drop-shadow(0 2px 6px rgba(0,0,0,.4));
     }
     .battlogy-message {
@@ -263,6 +264,13 @@
   let uniteIdCompteur = 0
   let dernierTimestamp = null
 
+  // Apparition automatique d'un guerrier ennemi, pour les tests.
+  const INTERVALLE_SPAWN_ENNEMI = 10000 // ms
+  let tempsDepuisSpawnEnnemi = 0
+
+  // Case survolée pendant le glisser d'une carte (mise en surbrillance).
+  let hexSurvole = null
+
   // ─── Images des châteaux ───────────────────────────────────────
   const imgCastleEnemi  = new Image()
   const imgCastleJoueur = new Image()
@@ -319,8 +327,36 @@
     return { x, y }
   }
 
+  // ─── Trouve l'hexagone le plus proche d'un point (x,y) en pixels ──
+  // Cherche dans une petite fenêtre de colonnes/rangées autour d'une
+  // estimation, puis garde le centre d'hexagone le plus proche. Retourne
+  // null si aucun hexagone n'est assez proche (curseur hors grille).
+  function trouverHexProche(x, y) {
+    const colEstime = Math.round((x - MARGE - R) / HS)
+    let meilleur = null, meilleureDist = Infinity
+    for (let c = Math.max(0, colEstime - 1); c <= Math.min(COLS - 1, colEstime + 1); c++) {
+      const maxRow = (c % 2 === 0) ? ROWS : ROWS - 1
+      const decalage = (c % 2 === 1) ? VS / 2 : 0
+      const rowEstime = Math.round((y - gridOffsetY - VS / 2 - decalage) / VS)
+      for (let r = Math.max(0, rowEstime - 1); r <= Math.min(maxRow, rowEstime + 1); r++) {
+        const { x: cx, y: cy } = hexCenter(r, c)
+        const d = Math.hypot(cx - x, cy - y)
+        if (d < meilleureDist) { meilleureDist = d; meilleur = { row: r, col: c, cx, cy } }
+      }
+    }
+    if (!meilleur || meilleureDist > R * 1.15) return null
+    return meilleur
+  }
+
+  // ─── Une case fait-elle partie de la zone du joueur ? ─────────
+  // (mêmes 8 dernières rangées que celles coloriées en bleu par couleurHex)
+  function estHexJoueur(row, col) {
+    const maxRow = (col % 2 === 0) ? ROWS : ROWS - 1
+    return row >= maxRow - 7
+  }
+
   // ─── Dessin d'un hexagone (flat-top, càd pointy-top tourné de 90°) ──
-  function drawHex(cx, cy, r, fill, stroke) {
+  function drawHex(cx, cy, r, fill, stroke, largeurTrait) {
     ctx.beginPath()
     for (let i = 0; i < 6; i++) {
       const a = Math.PI / 180 * (60 * i)
@@ -333,7 +369,7 @@
     ctx.fill()
     if (stroke) {
       ctx.strokeStyle = stroke
-      ctx.lineWidth = 1
+      ctx.lineWidth = largeurTrait || 1
       ctx.stroke()
     }
   }
@@ -422,6 +458,16 @@
       const decalage = (i - (n - 1) / 2) * 20
       creerUnite(carte, x + decalage, y, team)
     }
+  }
+
+  // Fait apparaître un guerrier ennemi sur une case aléatoire de la zone
+  // ennemie (les 8 premières rangées), pour tester le système de combat.
+  function spawnEnnemiAleatoire() {
+    const col = Math.floor(Math.random() * COLS)
+    const maxRow = (col % 2 === 0) ? ROWS : ROWS - 1
+    const row = Math.floor(Math.random() * Math.min(8, maxRow + 1))
+    const { x, y } = hexCenter(row, col)
+    poserCarte(CARTES.guerrier, x, y, 'ennemi')
   }
 
   function creerUnite(carte, x, y, team) {
@@ -551,12 +597,24 @@
   let enTrainDeGlisser = false
   function dessinerZoneDepot() {
     if (!enTrainDeGlisser) return
-    ctx.fillStyle = '#2563eb22'
+    ctx.fillStyle = '#2563eb18'
     ctx.fillRect(MARGE, zoneJoueurYMin, canvas.width - 2 * MARGE, zoneJoueurYMax - zoneJoueurYMin)
-    ctx.strokeStyle = '#2563eb88'
+    ctx.strokeStyle = '#2563eb55'
     ctx.setLineDash([5, 4])
     ctx.strokeRect(MARGE, zoneJoueurYMin, canvas.width - 2 * MARGE, zoneJoueurYMax - zoneJoueurYMin)
     ctx.setLineDash([])
+
+    // Hexagone précisément survolé par le curseur/doigt : s'illumine en
+    // bleu s'il est posable (notre zone), en rouge sinon.
+    if (hexSurvole) {
+      const valide = estHexJoueur(hexSurvole.row, hexSurvole.col)
+      drawHex(
+        hexSurvole.cx, hexSurvole.cy, R - 1.2,
+        valide ? '#3b82f688' : '#ef444466',
+        valide ? '#93c5fd' : '#fca5a5',
+        2.5
+      )
+    }
   }
 
   // ─── Fond de l'arène ─────────────────────────────────────────
@@ -592,6 +650,13 @@
     dernierTimestamp = timestamp
 
     mettreAJourUnites(dt)
+
+    tempsDepuisSpawnEnnemi += dt
+    if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
+      tempsDepuisSpawnEnnemi -= INTERVALLE_SPAWN_ENNEMI
+      spawnEnnemiAleatoire()
+    }
+
     render()
 
     requestAnimationFrame(boucleDeJeu)
@@ -614,18 +679,28 @@
     messageTimeout = setTimeout(() => el.classList.remove('visible'), 1600)
   }
 
-  function dansZoneJoueur(x, y) {
-    return x >= MARGE && x <= canvas.width - MARGE && y >= zoneJoueurYMin && y <= zoneJoueurYMax
+  // Convertit des coordonnées écran (clientX/Y) en coordonnées du canvas,
+  // ou null si le point est en dehors du canvas.
+  function clientVersCanvas(clientX, clientY) {
+    if (!canvas) return null
+    const r = canvas.getBoundingClientRect()
+    if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) return null
+    return {
+      x: (clientX - r.left) * (canvas.width / r.width),
+      y: (clientY - r.top) * (canvas.height / r.height)
+    }
   }
 
-  function tenterPoserCarte(carteId, x, y) {
+  function tenterPoserCarte(carteId, hex) {
     const carte = CARTES[carteId]
     if (!carte) return
-    if (!dansZoneJoueur(x, y)) { afficherMessage('Pose ta carte dans ta zone (bas du terrain).'); return }
+    if (!hex || !estHexJoueur(hex.row, hex.col)) { afficherMessage('Pose ta carte sur une case de ta zone (bas du terrain).'); return }
     if (or < carte.cout) { afficherMessage("Pas assez d'or."); return }
     if (or !== Infinity) or -= carte.cout
     document.getElementById('or-affiche').textContent = or === Infinity ? '∞' : or
-    poserCarte(carte, x, y, 'joueur')
+    // La carte est posée exactement au centre de la case (pas à l'endroit
+    // précis du curseur/doigt).
+    poserCarte(carte, hex.cx, hex.cy, 'joueur')
   }
 
   function initGlisserDeposer() {
@@ -654,6 +729,9 @@
   function pendantGlisser(e) {
     enTrainDeGlisser = true
     deplacerGhost(e.clientX, e.clientY)
+
+    const pt = clientVersCanvas(e.clientX, e.clientY)
+    hexSurvole = pt ? trouverHexProche(pt.x, pt.y) : null
   }
 
   function finGlisser(e) {
@@ -662,17 +740,12 @@
     enTrainDeGlisser = false
     if (ghostEl) { ghostEl.remove(); ghostEl = null }
 
-    if (carteEnCours && canvas) {
-      const rectCanvas = canvas.getBoundingClientRect()
-      if (e.clientX >= rectCanvas.left && e.clientX <= rectCanvas.right &&
-          e.clientY >= rectCanvas.top && e.clientY <= rectCanvas.bottom) {
-        const scaleX = canvas.width / rectCanvas.width
-        const scaleY = canvas.height / rectCanvas.height
-        const x = (e.clientX - rectCanvas.left) * scaleX
-        const y = (e.clientY - rectCanvas.top) * scaleY
-        tenterPoserCarte(carteEnCours, x, y)
-      }
+    if (carteEnCours) {
+      const pt = clientVersCanvas(e.clientX, e.clientY)
+      const hex = pt ? trouverHexProche(pt.x, pt.y) : null
+      tenterPoserCarte(carteEnCours, hex)
     }
+    hexSurvole = null
     carteEnCours = null
   }
 
