@@ -1293,16 +1293,27 @@
   // cette limite.
   const CHEVAUCHEMENT_MAX = 0.10
 
-  // "Masse" d'une unité pour le partage d'une poussée : une unité qui est
-  // en plein combat (état 'attaque') résiste bien plus qu'une unité qui
-  // marche simplement — elle cède peu de terrain à un allié qui la
-  // bousculerait par derrière, sans pour autant devenir totalement
-  // immobile (voir le partage dans separerPaire ci-dessous). C'est ce qui
-  // empêche une unité de pousser un allié engagé au corps-à-corps jusque
-  // dans le château adverse.
-  const MASSE_COMBAT = 5
-  function masseUnite(u) {
-    return u.etat === 'attaque' ? MASSE_COMBAT : 1
+  // Résistance (avant/arrière uniquement) d'une unité en plein combat : une
+  // unité qui combat (état 'attaque') résiste fortement à être poussée
+  // dans son propre axe de marche (ce qui l'empêcherait d'être avancée de
+  // force dans le château, ou reculée hors de son combat) — mais PAS à
+  // être poussée sur le côté. Le déplacement latéral, lui, passe à pleine
+  // puissance, quel que soit l'état : c'est ce qui permet à d'autres
+  // unités de facilement écarter une unité engagée (ex: deux archers côte
+  // à côte) pour se faufiler entre elles, au lieu de rester bloquées.
+  const RESISTANCE_AVANCEE_COMBAT = 5
+
+  // Atténue uniquement la composante d'un déplacement (dx,dy) qui va dans
+  // l'axe de marche de l'unité (unite.dirX/dirY) — la composante latérale
+  // (perpendiculaire à cet axe) est renvoyée intacte.
+  function attenuerAxeMarche(unite, dx, dy, resistance) {
+    const long = dx * unite.dirX + dy * unite.dirY
+    const latX = dx - long * unite.dirX
+    const latY = dy - long * unite.dirY
+    return {
+      x: latX + (long * unite.dirX) / resistance,
+      y: latY + (long * unite.dirY) / resistance
+    }
   }
 
   // Écarte deux unités qui se chevauchent trop, le long de la droite qui
@@ -1331,20 +1342,21 @@
       a.x -= ux * chevauchement
       a.y -= uy * chevauchement
     } else {
-      // Partage proportionnel à la masse adverse : une unité "lourde"
-      // (en train de combattre) se déplace peu, l'autre absorbe le reste
-      // du chevauchement. Deux unités de masse égale (cas normal, aucune
-      // des deux en combat) retombent sur le partage 50/50 d'origine.
-      const ma = masseUnite(a), mb = masseUnite(b)
-      const total = ma + mb
-      const partA = mb / total
-      const partB = ma / total
-      a.x -= ux * chevauchement * partA
-      a.y -= uy * chevauchement * partA
-      b.x += ux * chevauchement * partB
-      b.y += uy * chevauchement * partB
+      // Partage 50/50 de base, comme avant — mais si l'une des deux
+      // unités combat, sa part de déplacement est filtrée : seule sa
+      // composante avant/arrière est freinée, la composante latérale
+      // reste pleine (voir attenuerAxeMarche).
+      let dA = { x: -ux * chevauchement / 2, y: -uy * chevauchement / 2 }
+      let dB = { x:  ux * chevauchement / 2, y:  uy * chevauchement / 2 }
+
+      if (a.etat === 'attaque') dA = attenuerAxeMarche(a, dA.x, dA.y, RESISTANCE_AVANCEE_COMBAT)
+      if (b.etat === 'attaque') dB = attenuerAxeMarche(b, dB.x, dB.y, RESISTANCE_AVANCEE_COMBAT)
+
+      a.x += dA.x; a.y += dA.y
+      b.x += dB.x; b.y += dB.y
     }
   }
+
 
   // Résout toutes les collisions du terrain (tout camp confondu) pour la
   // frame courante. Les unités immobiles (statue) font obstacle mais ne
