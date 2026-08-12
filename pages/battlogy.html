@@ -305,19 +305,19 @@
       id: 'guerrier', nom: 'Guerrier', emoji: '⚔️', cout: 1,
       pv: 100, degats: 10, porte: 34, vitesseAttaque: 1,
       vitesseMarche: 45, zoneDetection: 90, tempsActivation: 800, nombre: 1,
-      taille: 1
+      taille: 1, typeAttaque: 'melee'
     },
     archer: {
       id: 'archer', nom: 'Archer', emoji: '🏹', cout: 2,
       pv: 55, degats: 12, porte: 120, vitesseAttaque: 0.9,
       vitesseMarche: 40, zoneDetection: 140, tempsActivation: 900, nombre: 1,
-      taille: 1
+      taille: 1, typeAttaque: 'distance'
     },
     squelette: {
       id: 'squelette', nom: 'Squelettes', emoji: '💀', cout: 2,
       pv: 30, degats: 5, porte: 26, vitesseAttaque: 1.3,
       vitesseMarche: 55, zoneDetection: 80, tempsActivation: 500, nombre: 3,
-      taille: 0.5
+      taille: 0.5, typeAttaque: 'melee'
     },
     // Carte spéciale, catégorisée comme un "sort" (fait apparaître une
     // statue plutôt que de recruter une troupe classique). Contourne les
@@ -348,6 +348,13 @@
   let unitesEnnemi = []
   let uniteIdCompteur = 0
   let dernierTimestamp = null
+
+  // Projectiles des attaquants à distance (flèches) : les dégâts ne sont
+  // appliqués qu'à l'impact, pas au moment du tir. Effets de mêlée : simple
+  // éclat visuel affiché brièvement au contact, sans délai (dégâts immédiats).
+  let projectiles = []
+  let effetsMelee = []
+  const VITESSE_PROJECTILE = 340 // px/s
 
   // Apparition automatique d'un guerrier ennemi, pour les tests.
   const INTERVALLE_SPAWN_ENNEMI = 10000 // ms
@@ -438,9 +445,9 @@
     return meilleur
   }
 
-  // ─── Règles de placement dynamiques ────────────────────────────
+  // ─── Règles de placement dynamiques (les deux camps y sont soumis) ────
   // 1. Aucune unité alliée sur le terrain → on ne peut poser que sur les
-  //    cases qui collent notre château (une seule rangée de profondeur).
+  //    cases qui collent notre château (deux rangées de profondeur).
   // 2. Une unité alliée est présente → on peut poser sur toute case entre
   //    notre château et cette unité (la plus avancée, si plusieurs).
   // 3. Un ennemi s'est infiltré entre notre château et notre unité la plus
@@ -451,42 +458,88 @@
   //    statue, qui contourne toutes ces règles).
   //
   // Tout est exprimé en coordonnées y (pixels) : y petit = proche du
-  // château ennemi (haut), y grand = proche de notre château (bas).
-  function calculerZonePose() {
-    const limiteMoitieEnnemie = gridOffsetY + 8 * VS   // jamais au-delà (règle 4)
-    const profondeurColleChateau = VS                   // largeur d'une rangée
+  // château ennemi (haut), y grand = proche du château joueur (bas).
+  // `team` = camp pour lequel on calcule la zone ('joueur' ou 'ennemi') :
+  // le bot ennemi est soumis exactement aux mêmes règles, en miroir.
+  function calculerZonePose(team = 'joueur') {
+    const profondeurZoneDepart = 2 * VS   // zone de départ : 2 rangées (allongée d'une ligne)
 
-    // Par défaut (aucun allié) : uniquement la rangée qui colle le château.
-    let yMin = zoneJoueurYMax - profondeurColleChateau
+    if (team === 'joueur') {
+      const limiteMoitieEnnemie = gridOffsetY + 8 * VS   // jamais au-delà (règle 4)
 
-    const alliesVivants = unitesJoueur.filter(u => u.pv > 0)
+      // Par défaut (aucun allié) : les 2 rangées qui collent le château.
+      let yMin = zoneJoueurYMax - profondeurZoneDepart
+
+      const alliesVivants = unitesJoueur.filter(u => u.pv > 0)
+      if (alliesVivants.length > 0) {
+        // L'allié le plus avancé (le plus petit y) repousse la limite.
+        yMin = Math.min(...alliesVivants.map(u => u.y))
+      }
+
+      // Un ennemi ayant percé entre notre château et notre allié le plus
+      // avancé referme la zone jusqu'à lui.
+      const ennemisEnPercee = unitesEnnemi.filter(u => u.pv > 0 && u.y > yMin && u.y < zoneJoueurYMax)
+      if (ennemisEnPercee.length > 0) {
+        yMin = Math.max(yMin, Math.max(...ennemisEnPercee.map(u => u.y)))
+      }
+
+      // Règle générale : jamais dans la moitié ennemie.
+      yMin = Math.max(yMin, limiteMoitieEnnemie)
+
+      return { yMin, yMax: zoneJoueurYMax }
+    }
+
+    // team === 'ennemi' : symétrique, le château ennemi est en haut (y petit).
+    const limiteMoitieJoueur = zoneJoueurYMax - 8 * VS   // jamais au-delà (règle 4)
+    const yContreChateauEnnemi = gridOffsetY
+
+    // Par défaut (aucun allié) : les 2 rangées qui collent le château.
+    let yMax = yContreChateauEnnemi + profondeurZoneDepart
+
+    const alliesVivants = unitesEnnemi.filter(u => u.pv > 0)
     if (alliesVivants.length > 0) {
-      // L'allié le plus avancé (le plus petit y) repousse la limite.
-      yMin = Math.min(...alliesVivants.map(u => u.y))
+      // L'allié le plus avancé (le plus grand y, càd le plus proche de nous) repousse la limite.
+      yMax = Math.max(...alliesVivants.map(u => u.y))
     }
 
-    // Un ennemi ayant percé entre notre château et notre allié le plus
+    // Un joueur ayant percé entre le château ennemi et son allié le plus
     // avancé referme la zone jusqu'à lui.
-    const ennemisEnPercee = unitesEnnemi.filter(u => u.pv > 0 && u.y > yMin && u.y < zoneJoueurYMax)
-    if (ennemisEnPercee.length > 0) {
-      yMin = Math.max(yMin, Math.max(...ennemisEnPercee.map(u => u.y)))
+    const joueursEnPercee = unitesJoueur.filter(u => u.pv > 0 && u.y < yMax && u.y > yContreChateauEnnemi)
+    if (joueursEnPercee.length > 0) {
+      yMax = Math.min(yMax, Math.min(...joueursEnPercee.map(u => u.y)))
     }
 
-    // Règle générale : jamais dans la moitié ennemie.
-    yMin = Math.max(yMin, limiteMoitieEnnemie)
+    // Règle générale : jamais dans la moitié joueur.
+    yMax = Math.min(yMax, limiteMoitieJoueur)
 
-    return { yMin, yMax: zoneJoueurYMax }
+    return { yMin: yContreChateauEnnemi, yMax }
   }
 
-  // Un hexagone est-il posable pour cette carte, compte tenu des règles
-  // ci-dessus (ou de placementLibre pour les cartes qui les contournent) ?
-  function estPositionValidePourPose(carteId, hex) {
+  // Un hexagone est-il posable pour cette carte et ce camp, compte tenu des
+  // règles ci-dessus (ou de placementLibre pour les cartes qui les contournent) ?
+  function estPositionValidePourPose(carteId, hex, team = 'joueur') {
     if (!hex) return false
     const carte = CARTES[carteId]
     if (!carte) return false
     if (carte.placementLibre) return true
-    const { yMin, yMax } = calculerZonePose()
+    const { yMin, yMax } = calculerZonePose(team)
     return hex.cy >= yMin - 1 && hex.cy <= yMax + 1
+  }
+
+  // Toutes les positions (centres d'hexagones) actuellement valides pour la
+  // pose d'une carte "normale" (non placementLibre) du camp donné. Utilisé
+  // par le bot ennemi pour choisir où poser ses troupes.
+  function positionsValidesPourEquipe(team) {
+    const { yMin, yMax } = calculerZonePose(team)
+    const positions = []
+    for (let c = 0; c < COLS; c++) {
+      const rowsCol = (c % 2 === 0) ? ROWS + 1 : ROWS
+      for (let r = 0; r < rowsCol; r++) {
+        const { x, y } = hexCenter(r, c)
+        if (y >= yMin - 1 && y <= yMax + 1) positions.push({ x, y })
+      }
+    }
+    return positions
   }
 
   // ─── Dessin d'un hexagone (flat-top, càd pointy-top tourné de 90°) ──
@@ -594,14 +647,14 @@
     }
   }
 
-  // Fait apparaître un guerrier ennemi sur une case aléatoire de la zone
-  // ennemie (les 8 premières rangées), pour tester le système de combat.
+  // Fait apparaître un guerrier ennemi, en respectant les mêmes règles de
+  // placement que le joueur (voir calculerZonePose) : parmi les cases
+  // actuellement valides pour le camp ennemi, on en choisit une au hasard.
   function spawnEnnemiAleatoire() {
-    const col = Math.floor(Math.random() * COLS)
-    const maxRow = (col % 2 === 0) ? ROWS : ROWS - 1
-    const row = Math.floor(Math.random() * Math.min(8, maxRow + 1))
-    const { x, y } = hexCenter(row, col)
-    poserCarte(CARTES.guerrier, x, y, 'ennemi')
+    const positions = positionsValidesPourEquipe('ennemi')
+    if (positions.length === 0) return
+    const pos = positions[Math.floor(Math.random() * positions.length)]
+    poserCarte(CARTES.guerrier, pos.x, pos.y, 'ennemi')
   }
 
   function creerUnite(carte, x, y, team) {
@@ -618,6 +671,7 @@
       degats: carte.degats,
       porte: carte.porte,
       taille: carte.taille || 1,
+      typeAttaque: carte.typeAttaque || 'melee',
       zoneDetection: carte.zoneDetection,
       vitesseMarche: carte.vitesseMarche,
       cooldownAttaqueBase: 1000 / (carte.vitesseAttaque || 1),
@@ -680,13 +734,7 @@
       unite.cooldownAttaque -= dt
       if (unite.cooldownAttaque <= 0) {
         unite.cooldownAttaque = unite.cooldownAttaqueBase
-        if (ennemiProche) {
-          ennemiProche.pv = Math.max(0, ennemiProche.pv - unite.degats)
-        } else if (unite.team === 'joueur') {
-          ennemiChateauPV = Math.max(0, ennemiChateauPV - unite.degats)
-        } else {
-          joueurChateauPV = Math.max(0, joueurChateauPV - unite.degats)
-        }
+        declencherAttaque(unite, ennemiProche, cibleX, cibleY)
       }
     } else {
       unite.etat = 'marche'
@@ -702,6 +750,132 @@
     for (const u of unitesEnnemi) mettreAJourUnite(u, dt)
     unitesJoueur = unitesJoueur.filter(u => u.pv > 0)
     unitesEnnemi = unitesEnnemi.filter(u => u.pv > 0)
+  }
+
+  // ─── Attaques : effet visuel immédiat en mêlée, projectile en distance ──
+  // En mêlée, les dégâts sont appliqués tout de suite (l'unité est déjà au
+  // contact), on ajoute juste un éclat visuel léger. À distance, on lance
+  // une flèche : les dégâts ne sont infligés qu'à l'impact du projectile,
+  // pas au moment du tir.
+  function declencherAttaque(unite, ennemiProche, cibleX, cibleY) {
+    if (unite.typeAttaque === 'distance') {
+      const dx = cibleX - unite.x, dy = cibleY - unite.y
+      const dist = Math.hypot(dx, dy) || 1
+      projectiles.push({
+        x: unite.x, y: unite.y,
+        angle: Math.atan2(dy, dx),
+        team: unite.team,
+        degats: unite.degats,
+        cibleUnite: ennemiProche || null,
+        // Point visé au moment du tir : sert de repli si la cible (unité)
+        // meurt avant l'impact, et de cible fixe s'il s'agit d'un château.
+        cibleXFixe: cibleX, cibleYFixe: cibleY
+      })
+    } else {
+      appliquerDegatsSurCible(unite, ennemiProche)
+      effetsMelee.push({
+        x: (unite.x + cibleX) / 2, y: (unite.y + cibleY) / 2,
+        angle: Math.atan2(cibleY - unite.y, cibleX - unite.x),
+        team: unite.team,
+        dureeRestante: 160, dureeTotale: 160
+      })
+    }
+  }
+
+  function appliquerDegatsSurCible(unite, ennemiProche) {
+    if (ennemiProche) {
+      ennemiProche.pv = Math.max(0, ennemiProche.pv - unite.degats)
+    } else if (unite.team === 'joueur') {
+      ennemiChateauPV = Math.max(0, ennemiChateauPV - unite.degats)
+    } else {
+      joueurChateauPV = Math.max(0, joueurChateauPV - unite.degats)
+    }
+  }
+
+  function mettreAJourProjectiles(dt) {
+    for (const p of projectiles) {
+      // Cible actuelle : suit l'unité visée tant qu'elle est vivante,
+      // sinon se rabat sur le dernier point connu (château, ou position
+      // de mort de la cible — la flèche finit sa course dans le vide).
+      let tx = p.cibleXFixe, ty = p.cibleYFixe
+      const cibleVivante = p.cibleUnite && p.cibleUnite.pv > 0
+      if (cibleVivante) { tx = p.cibleUnite.x; ty = p.cibleUnite.y }
+
+      const dx = tx - p.x, dy = ty - p.y
+      const dist = Math.hypot(dx, dy)
+      const pas = VITESSE_PROJECTILE * dt / 1000
+
+      if (dist <= Math.max(pas, 5)) {
+        // Impact : les dégâts n'arrivent que maintenant, à l'atteinte de
+        // la cible — jamais au moment du tir.
+        if (p.cibleUnite) {
+          if (cibleVivante) p.cibleUnite.pv = Math.max(0, p.cibleUnite.pv - p.degats)
+        } else if (p.team === 'joueur') {
+          ennemiChateauPV = Math.max(0, ennemiChateauPV - p.degats)
+        } else {
+          joueurChateauPV = Math.max(0, joueurChateauPV - p.degats)
+        }
+        p.termine = true
+      } else {
+        p.x += dx / dist * pas
+        p.y += dy / dist * pas
+        p.angle = Math.atan2(dy, dx)
+      }
+    }
+    projectiles = projectiles.filter(p => !p.termine)
+  }
+
+  function mettreAJourEffetsMelee(dt) {
+    for (const e of effetsMelee) e.dureeRestante -= dt
+    effetsMelee = effetsMelee.filter(e => e.dureeRestante > 0)
+  }
+
+  // Petite flèche orientée vers sa direction de vol.
+  function dessinerProjectile(p) {
+    const couleur = p.team === 'joueur' ? '#93c5fd' : '#fca5a5'
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.rotate(p.angle || 0)
+    ctx.strokeStyle = couleur
+    ctx.fillStyle = couleur
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(-7, 0)
+    ctx.lineTo(5, 0)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(7, 0)
+    ctx.lineTo(2, -3)
+    ctx.lineTo(2, 3)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
+
+  function dessinerProjectiles() {
+    for (const p of projectiles) dessinerProjectile(p)
+  }
+
+  // Petit éclat en arc de cercle, orienté vers la cible, qui s'estompe
+  // rapidement — le "coup" visuel d'une attaque au corps à corps.
+  function dessinerEffetMelee(e) {
+    const frac = Math.max(0, e.dureeRestante / e.dureeTotale)
+    const couleur = e.team === 'joueur' ? '#93c5fd' : '#fca5a5'
+    ctx.save()
+    ctx.globalAlpha = frac
+    ctx.translate(e.x, e.y)
+    ctx.rotate(e.angle || 0)
+    ctx.strokeStyle = couleur
+    ctx.lineWidth = 2
+    const rayon = 8 + (1 - frac) * 6
+    ctx.beginPath()
+    ctx.arc(0, 0, rayon, -0.7, 0.7)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  function dessinerEffetsMelee() {
+    for (const e of effetsMelee) dessinerEffetMelee(e)
   }
 
   function dessinerUnite(u) {
@@ -804,6 +978,8 @@
     drawCastle(false) // ennemi (haut)
     drawCastle(true)  // joueur (bas)
     dessinerUnites()
+    dessinerProjectiles()
+    dessinerEffetsMelee()
   }
 
   // ─── Boucle de jeu ──────────────────────────────────────────
@@ -814,6 +990,8 @@
 
     if (partieCommencee && !partieTerminee) {
       mettreAJourUnites(dt)
+      mettreAJourProjectiles(dt)
+      mettreAJourEffetsMelee(dt)
 
       tempsDepuisSpawnEnnemi += dt
       if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
@@ -954,6 +1132,8 @@
     ennemiChateauPV = ennemiChateauPVMax
     tempsDepuisSpawnEnnemi = 0
     hexSurvole = null
+    projectiles = []
+    effetsMelee = []
     partieTerminee = false
     partieCommencee = true
     masquerEcran()
