@@ -1233,12 +1233,11 @@
 
   // Fait apparaître un guerrier ennemi, en respectant les mêmes règles de
   // placement que le joueur (voir calculerZonePose) : parmi les cases
-  // actuellement valides pour le camp ennemi (et non déjà occupées à plus
-  // de 50% par une autre unité), on en choisit une au hasard.
+  // actuellement valides pour le camp ennemi, on en choisit une au hasard.
+  // Si elle tombe sur une unité déjà présente, la collision physique (voir
+  // resoudreCollisions) les écarte automatiquement l'une de l'autre.
   function spawnEnnemiAleatoire() {
-    const rayon = RAYON_UNITE_BASE * (CARTES.guerrier.taille || 1)
     const positions = positionsValidesPourEquipe('ennemi')
-      .filter(pos => positionLibrePourUnite(pos.x, pos.y, rayon))
     if (positions.length === 0) return
     const pos = positions[Math.floor(Math.random() * positions.length)]
     poserCarte(CARTES.guerrier, pos.x, pos.y, 'ennemi')
@@ -1279,34 +1278,68 @@
     return RAYON_UNITE_BASE * (unite.taille || 1)
   }
 
-  // Aire d'intersection entre deux cercles de rayons r1/r2 dont les centres
-  // sont distants de d (formule standard de l'aire de lentille circulaire).
-  function aireIntersectionCercles(r1, r2, d) {
-    if (d >= r1 + r2) return 0
-    if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2
-    const alpha = 2 * Math.acos((d * d + r1 * r1 - r2 * r2) / (2 * d * r1))
-    const beta  = 2 * Math.acos((d * d + r2 * r2 - r1 * r1) / (2 * d * r2))
-    return 0.5 * r1 * r1 * (alpha - Math.sin(alpha)) + 0.5 * r2 * r2 * (beta - Math.sin(beta))
+  // ─── Collisions entre unités ───────────────────────────────────────
+  // Remplace l'ancien système qui empêchait purement et simplement la POSE
+  // d'une unité trop proche d'une autre : on peut désormais toujours poser
+  // où on veut, y compris pile sur une unité existante (alliée ou
+  // ennemie). Les deux unités se comportent alors comme des cercles
+  // physiques qui ne peuvent pas se chevaucher de plus de
+  // CHEVAUCHEMENT_MAX (10 %) du plus grand des deux diamètres — au-delà,
+  // elles se repoussent l'une l'autre à chaque frame jusqu'à respecter
+  // cette limite.
+  const CHEVAUCHEMENT_MAX = 0.10
+
+  // Écarte deux unités qui se chevauchent trop, le long de la droite qui
+  // relie leurs centres. `bFixe` : b ne bouge jamais (obstacle immobile,
+  // ex: la statue) — seule a est repoussée, de tout le chevauchement.
+  function separerPaire(a, b, bFixe = false) {
+    const ra = rayonUnite(a), rb = rayonUnite(b)
+    const distMin = ra + rb - CHEVAUCHEMENT_MAX * 2 * Math.max(ra, rb)
+
+    let dx = b.x - a.x, dy = b.y - a.y
+    let d = Math.hypot(dx, dy)
+
+    if (d === 0) {
+      // Pile superposées (unité qui vient d'apparaître exactement sur une
+      // autre) : direction arbitraire pour amorcer la séparation.
+      const angle = Math.random() * Math.PI * 2
+      dx = Math.cos(angle); dy = Math.sin(angle); d = 1
+    }
+
+    if (d >= distMin) return
+
+    const chevauchement = distMin - d
+    const ux = dx / d, uy = dy / d
+
+    if (bFixe) {
+      a.x -= ux * chevauchement
+      a.y -= uy * chevauchement
+    } else {
+      a.x -= ux * chevauchement / 2
+      a.y -= uy * chevauchement / 2
+      b.x += ux * chevauchement / 2
+      b.y += uy * chevauchement / 2
+    }
   }
 
-  // Les unités ne peuvent jamais se chevaucher à plus de 50% : il faut
-  // toujours qu'au moins la moitié de la surface de l'unité posée reste
-  // visible (pas de "stack" complet d'unités les unes sur les autres).
-  const VISIBILITE_MIN_UNITE = 0.5
+  // Résout toutes les collisions du terrain (tout camp confondu) pour la
+  // frame courante. Les unités immobiles (statue) font obstacle mais ne
+  // sont jamais elles-mêmes déplacées par une collision.
+  function resoudreCollisions() {
+    const toutesVivantes = unitesJoueur.concat(unitesEnnemi).filter(u => u.pv > 0)
+    const mobiles    = toutesVivantes.filter(u => !u.immobile)
+    const immobiles  = toutesVivantes.filter(u => u.immobile)
 
-  // Vérifie qu'une future unité (centrée en x,y, de rayon r) ne chevauche
-  // aucune unité déjà présente (vivante, tout camp confondu) à plus de
-  // 50% de sa propre surface.
-  function positionLibrePourUnite(x, y, r) {
-    const toutes = unitesJoueur.concat(unitesEnnemi)
-    for (const u of toutes) {
-      if (u.pv <= 0) continue
-      const ru = rayonUnite(u)
-      const d = Math.hypot(u.x - x, u.y - y)
-      const aire = aireIntersectionCercles(r, ru, d)
-      if (aire > VISIBILITE_MIN_UNITE * Math.PI * r * r) return false
+    for (let i = 0; i < mobiles.length; i++) {
+      for (let j = i + 1; j < mobiles.length; j++) {
+        separerPaire(mobiles[i], mobiles[j])
+      }
     }
-    return true
+    for (const m of mobiles) {
+      for (const fixe of immobiles) {
+        separerPaire(m, fixe, true)
+      }
+    }
   }
 
   // Cherche, parmi le camp adverse, l'ennemi vivant le plus proche présent
@@ -1384,6 +1417,7 @@
     for (const u of unitesEnnemi) mettreAJourUnite(u, dt)
     unitesJoueur = unitesJoueur.filter(u => u.pv > 0)
     unitesEnnemi = unitesEnnemi.filter(u => u.pv > 0)
+    resoudreCollisions()
   }
 
   // ─── Attaques : effet visuel immédiat en mêlée, projectile en distance ──
@@ -1778,10 +1812,6 @@
           ? 'Case invalide.'
           : "Tu ne peux pas poser cette unité ici pour l'instant."
       )
-      return
-    }
-    if (!positionLibrePourUnite(hex.cx, hex.cy, RAYON_UNITE_BASE * (carte.taille || 1))) {
-      afficherMessage('Trop proche d\'une autre unité.')
       return
     }
     if (or < carte.cout) { afficherMessage("Pas assez d'or."); return }
