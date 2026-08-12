@@ -290,23 +290,35 @@
   // porte / zoneDetection en px, vitesseMarche en px/s, vitesseAttaque en
   // attaques/seconde, tempsActivation en ms, cout en or, nombre = nombre
   // d'unités invoquées par la carte (ex: 3 squelettes pour une seule carte).
+  // `taille` : multiplicateur appliqué au rayon de base d'une unité
+  // (RAYON_UNITE_BASE, voir plus bas). Affecte à la fois le dessin (cercle,
+  // police, barre de vie) ET la hit box utilisée pour le combat (la
+  // portée d'attaque d'un adversaire est comparée à ce rayon). 1 = taille
+  // normale ; les squelettes sont 2x plus petits (0.5).
   const CARTES = {
     guerrier: {
       id: 'guerrier', nom: 'Guerrier', emoji: '⚔️', cout: 1,
       pv: 100, degats: 10, porte: 34, vitesseAttaque: 1,
-      vitesseMarche: 45, zoneDetection: 90, tempsActivation: 800, nombre: 1
+      vitesseMarche: 45, zoneDetection: 90, tempsActivation: 800, nombre: 1,
+      taille: 1
     },
     archer: {
       id: 'archer', nom: 'Archer', emoji: '🏹', cout: 2,
       pv: 55, degats: 12, porte: 120, vitesseAttaque: 0.9,
-      vitesseMarche: 40, zoneDetection: 140, tempsActivation: 900, nombre: 1
+      vitesseMarche: 40, zoneDetection: 140, tempsActivation: 900, nombre: 1,
+      taille: 1
     },
     squelette: {
       id: 'squelette', nom: 'Squelettes', emoji: '💀', cout: 2,
       pv: 30, degats: 5, porte: 26, vitesseAttaque: 1.3,
-      vitesseMarche: 55, zoneDetection: 80, tempsActivation: 500, nombre: 3
+      vitesseMarche: 55, zoneDetection: 80, tempsActivation: 500, nombre: 3,
+      taille: 0.5
     }
   }
+
+  // Rayon (en px) d'une unité de taille 1. Tous les rayons d'unité se
+  // calculent en multipliant cette base par `taille`.
+  const RAYON_UNITE_BASE = 14
 
   // ─── État de la partie (test : or infini) ─────────────────────
   let or = Infinity
@@ -541,6 +553,7 @@
       pv: carte.pv, pvMax: carte.pv,
       degats: carte.degats,
       porte: carte.porte,
+      taille: carte.taille || 1,
       zoneDetection: carte.zoneDetection,
       vitesseMarche: carte.vitesseMarche,
       cooldownAttaqueBase: 1000 / carte.vitesseAttaque,
@@ -550,6 +563,11 @@
       etat: 'activation'
     }
     ;(team === 'joueur' ? unitesJoueur : unitesEnnemi).push(unite)
+  }
+
+  // Rayon effectif (hit box) d'une unité, selon sa taille.
+  function rayonUnite(unite) {
+    return RAYON_UNITE_BASE * (unite.taille || 1)
   }
 
   // Cherche, parmi le camp adverse, l'ennemi vivant le plus proche présent
@@ -580,7 +598,7 @@
     if (ennemiProche) {
       cibleX = ennemiProche.x; cibleY = ennemiProche.y
       distCible = Math.hypot(cibleX - unite.x, cibleY - unite.y)
-      rayonCible = 14
+      rayonCible = rayonUnite(ennemiProche)
     } else {
       const c = pointCastle(unite.team)
       cibleX = c.x; cibleY = c.y
@@ -618,31 +636,35 @@
   }
 
   function dessinerUnite(u) {
+    const r = rayonUnite(u)
     const couleur = u.team === 'joueur' ? '#2563eb' : '#dc2626'
     ctx.beginPath()
-    ctx.arc(u.x, u.y, 14, 0, Math.PI * 2)
+    ctx.arc(u.x, u.y, r, 0, Math.PI * 2)
     ctx.fillStyle = couleur
     ctx.fill()
     ctx.strokeStyle = '#00000088'
     ctx.lineWidth = 2
     ctx.stroke()
 
-    ctx.font = '13px sans-serif'
+    ctx.font = Math.round(13 * (u.taille || 1)) + 'px sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(u.emoji, u.x, u.y + 1)
 
+    // Barre de vie et icône d'activation : positionnées juste au-dessus
+    // du cercle de l'unité, quelle que soit sa taille.
     const w = 28, h = 4
+    const yBarre = u.y - r - 10
     const frac = Math.max(0, u.pv / u.pvMax)
     ctx.fillStyle = '#000000aa'
-    ctx.fillRect(u.x - w / 2, u.y - 24, w, h)
+    ctx.fillRect(u.x - w / 2, yBarre, w, h)
     ctx.fillStyle = frac > 0.5 ? '#22c55e' : (frac > 0.25 ? '#f59e0b' : '#ef4444')
-    ctx.fillRect(u.x - w / 2, u.y - 24, w * frac, h)
+    ctx.fillRect(u.x - w / 2, yBarre, w * frac, h)
 
     if (u.etat === 'activation') {
       ctx.font = '11px sans-serif'
       ctx.fillStyle = '#ffffffcc'
-      ctx.fillText('⏳', u.x, u.y - 30)
+      ctx.fillText('⏳', u.x, yBarre - 6)
     }
   }
 
