@@ -205,7 +205,7 @@
   // ─── Constantes de jeu ───────────────────────────────────────
   const COLS        = 7
   const ROWS        = 20
-  const CASTLE_PX   = 110   // hauteur en px de chaque zone château
+  const CASTLE_PX   = 78    // hauteur en px de chaque zone château (barre de vie + image)
   const MARGE       = 8     // marge horizontale
 
   // Palette de couleurs de l'arène (indépendante du thème du site)
@@ -381,31 +381,30 @@
 
   // ─── Château ─────────────────────────────────────────────────
   function drawCastle(isPlayer) {
-    const W   = canvas.width - 2 * MARGE
-    const x   = MARGE
-    const h   = CASTLE_PX - 8
-    const y   = isPlayer ? canvas.height - CASTLE_PX + 4 : 4
-    const img = isPlayer ? imgCastleJoueur : imgCastleEnemi
+    const W = canvas.width - 2 * MARGE
+    const x = MARGE
+    const BAR_H = 6   // hauteur de la barre de vie
+    const GAP   = 4   // petit espace entre la barre et l'image
 
-    // ── Image du château, hauteur réduite au tiers ──
-    // Collée à la grille : le château joueur touche le haut de sa zone
-    // (juste sous la grille), le château ennemi touche le bas de sa zone
-    // (juste au-dessus de la grille).
-    const imgH = h / 3
-    const imgY = isPlayer ? y : y + h - imgH
-    if (img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, x, imgY, W, imgH)
-    }
-
-    // ── Barre de PV : collée à l'image (au-dessus pour l'ennemi, en-dessous pour le joueur) ──
-    const hpBarY  = isPlayer ? imgY + imgH + 6 : imgY - 12
-    const pvFrac  = isPlayer
+    // ── Barre de PV : collée directement au bord de l'arène ──
+    // (tout en haut pour l'ennemi, tout en bas pour le joueur)
+    const hpBarY = isPlayer ? canvas.height - BAR_H : 0
+    const pvFrac = isPlayer
       ? Math.max(0, joueurChateauPV / joueurChateauPVMax)
       : Math.max(0, ennemiChateauPV / ennemiChateauPVMax)
     ctx.fillStyle = C.hp_bg
-    rect(0, hpBarY, canvas.width, 6)
+    rect(0, hpBarY, canvas.width, BAR_H)
     ctx.fillStyle = isPlayer ? C.hp_player : C.hp_enemy
-    rect(0, hpBarY, canvas.width * pvFrac, 6)
+    rect(0, hpBarY, canvas.width * pvFrac, BAR_H)
+
+    // ── Image du château : juste derrière la barre, occupe le reste de la
+    // zone jusqu'à la grille (plus d'espace vide entre le bord et la barre).
+    const imgH = CASTLE_PX - BAR_H - GAP
+    const imgY = isPlayer ? canvas.height - CASTLE_PX : BAR_H + GAP
+    const img  = isPlayer ? imgCastleJoueur : imgCastleEnemi
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, x, imgY, W, imgH)
+    }
   }
 
   // ─── Point de cible du château (utilisé pour la marche et l'attaque) ──
