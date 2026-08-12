@@ -113,6 +113,7 @@
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')
+      await window.chargerImagesChateau()
       initArena()
     })()
   </script>
@@ -155,6 +156,19 @@
   let HS  // espacement horizontal entre colonnes (flat-top) = 1.5*R
   let VS  // espacement vertical entre rangées (flat-top) = sqrt(3)*R
   let gridOffsetY  // y où commence la grille
+
+  // ─── Images des châteaux ───────────────────────────────────────
+  // castblue.png : porte + drapeaux tombants → château ennemi (en haut)
+  // castred.png  : drapeaux dressés → château joueur (en bas)
+  const imgCastleEnemi  = new Image()
+  const imgCastleJoueur = new Image()
+  function chargerImagesChateau() {
+    return Promise.all([
+      new Promise(res => { imgCastleEnemi.onload = res; imgCastleEnemi.onerror = res; imgCastleEnemi.src  = '../pictures/castblue.png' }),
+      new Promise(res => { imgCastleJoueur.onload = res; imgCastleJoueur.onerror = res; imgCastleJoueur.src = '../pictures/castred.png' })
+    ])
+  }
+  window.chargerImagesChateau = chargerImagesChateau
 
   // ─── Initialisation ──────────────────────────────────────────
   // Les colonnes paires ont une rangée de plus (ROWS+1) que les colonnes
@@ -258,76 +272,20 @@
 
   // ─── Château ─────────────────────────────────────────────────
   function drawCastle(isPlayer) {
-    const W   = canvas.width - 2 * MARGE
-    const x   = MARGE
-    const h   = CASTLE_PX - 8
-    const y   = isPlayer ? canvas.height - CASTLE_PX + 4 : 4
+    const W     = canvas.width - 2 * MARGE
+    const x     = MARGE
+    const h     = CASTLE_PX - 8
+    const y     = isPlayer ? canvas.height - CASTLE_PX + 4 : 4
+    const img   = isPlayer ? imgCastleJoueur : imgCastleEnemi
+    const label = isPlayer ? 'Votre château' : 'Château ennemi'
 
-    const stoneMain = isPlayer ? C.castlePStone   : C.castleEStone
-    const stoneDark = isPlayer ? C.castlePStoneDk : C.castleEStoneDk
-    const merlonC   = isPlayer ? C.castleMerlonP  : C.castleMerlon
-    const label     = isPlayer ? 'Votre château' : 'Château ennemi'
-
-    const merlonH   = Math.round(h * 0.28)
-    const merlonW   = Math.round(W / 11)
-    const merlonCount = 5
-    const merlonGap = (W - merlonCount * merlonW) / (merlonCount + 1)
-
-    // ── Corps du château ──
-    ctx.fillStyle = stoneDark
-    rect(x, y + merlonH, W, h - merlonH)
-
-    // Lignes de pierres (effet maçonnerie)
-    ctx.strokeStyle = '#ffffff0a'
-    ctx.lineWidth = 1
-    const blockH = Math.max(8, Math.round(h / 8))
-    for (let i = 1; i < 8; i++) {
-      const ly = y + merlonH + i * blockH
-      if (ly < y + h) {
-        ctx.beginPath(); ctx.moveTo(x, ly); ctx.lineTo(x + W, ly); ctx.stroke()
-      }
+    // ── Image du château (drapeaux + porte déjà dessinés dans l'image) ──
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, x, y, W, h)
     }
-    // Joints verticaux décalés (effet briques)
-    for (let row = 0; row < 8; row++) {
-      const ly = y + merlonH + row * blockH
-      const offset = row % 2 === 0 ? 0 : merlonW * 0.7
-      for (let bx = x + offset; bx < x + W; bx += merlonW * 2) {
-        const vly = ly + blockH
-        if (vly < y + h) {
-          ctx.beginPath(); ctx.moveTo(bx, ly); ctx.lineTo(bx, vly); ctx.stroke()
-        }
-      }
-    }
-
-    // ── Crénelage ──
-    for (let i = 0; i < merlonCount; i++) {
-      const mx = x + merlonGap + i * (merlonW + merlonGap)
-      ctx.fillStyle = merlonC
-      rect(mx, y, merlonW, merlonH + 2)
-    }
-
-    // ── Porte ──
-    const gateW = Math.round(W * 0.14)
-    const gateH = Math.round(h * 0.42)
-    const gateX = x + W / 2 - gateW / 2
-    const gateY = isPlayer ? y + merlonH + 2 : y + h - gateH
-
-    ctx.fillStyle = C.gateInner
-    ctx.beginPath()
-    ctx.rect(gateX, gateY + gateW / 2, gateW, gateH - gateW / 2)
-    ctx.arc(gateX + gateW / 2, gateY + gateW / 2, gateW / 2, Math.PI, 0)
-    ctx.fill()
-
-    // Ferrures de la porte
-    ctx.strokeStyle = '#ffffff18'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(gateX + gateW / 2, gateY + gateW / 2)
-    ctx.lineTo(gateX + gateW / 2, gateY + gateH)
-    ctx.stroke()
 
     // ── Barre de PV ──
-    const hpBarY  = isPlayer ? y + h - 10 : y + h - 10
+    const hpBarY  = y + h - 10
     const hpBarX  = x + 6
     const hpBarW  = W - 12
     ctx.fillStyle = C.hp_bg
@@ -341,10 +299,7 @@
     ctx.font = `700 ${fontSize}px system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const labelY = isPlayer
-      ? y + merlonH + (h - merlonH) / 2 - 4
-      : y + merlonH + (h - merlonH) / 2 - 4
-    ctx.fillText(label, x + W / 2, labelY)
+    ctx.fillText(label, x + W / 2, y + h / 2 - 4)
   }
 
   // ─── Fond de l'arène ─────────────────────────────────────────
