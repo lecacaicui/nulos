@@ -78,16 +78,82 @@
     .battlogy-bottombar {
       width: 100%;
       flex: 0 0 auto;
-      height: 84px;
-      border: 1px dashed var(--couleur-bordure);
+      min-height: 84px;
+      border: 1px solid var(--couleur-bordure);
       border-radius: 12px;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
+      gap: .75rem;
+      padding: .6rem .75rem;
       color: var(--couleur-texte-faible);
       font-size: .8rem;
       text-align: center;
+      background: var(--couleur-conteneur);
     }
+    .battlogy-or {
+      font-size: .85rem;
+      font-weight: 700;
+      color: var(--couleur-texte);
+      white-space: nowrap;
+      padding: 0 .5rem;
+      border-right: 1px solid var(--couleur-bordure);
+      margin-right: .25rem;
+    }
+    .carte-main {
+      width: 66px;
+      height: 78px;
+      flex: 0 0 auto;
+      background: var(--couleur-fond);
+      border: 2px solid var(--couleur-bouton);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .15rem;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      transition: filter .1s, transform .1s;
+    }
+    .carte-main:active { cursor: grabbing; transform: scale(0.96); }
+    .carte-main.indisponible { opacity: .4; cursor: not-allowed; }
+    .carte-main .carte-emoji { font-size: 1.5rem; }
+    .carte-main .carte-nom { font-size: .62rem; font-weight: 700; color: var(--couleur-texte); }
+    .carte-main .carte-cout {
+      font-size: .68rem;
+      font-weight: 700;
+      color: #92400e;
+      background: #fef3c7;
+      border-radius: 999px;
+      padding: 0 .4rem;
+    }
+    .carte-ghost {
+      position: fixed;
+      z-index: 2000;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      font-size: 1.8rem;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.4));
+    }
+    .battlogy-message {
+      position: fixed;
+      left: 50%;
+      bottom: 6.2rem;
+      transform: translateX(-50%);
+      background: #111827dd;
+      color: #fff;
+      font-size: .8rem;
+      padding: .5rem 1rem;
+      border-radius: 999px;
+      z-index: 2001;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+      white-space: nowrap;
+    }
+    .battlogy-message.visible { opacity: 1; }
   </style>
 </head>
 <body>
@@ -102,10 +168,17 @@
         <canvas id="game-canvas"></canvas>
       </div>
       <div class="battlogy-bottombar" id="battlogy-bottombar">
-        🪙 Or &amp; cartes — à venir
+        <div class="battlogy-or">🪙 Or : <span id="or-affiche">∞</span></div>
+        <div class="carte-main" id="carte-guerrier" data-carte="guerrier">
+          <span class="carte-emoji">⚔️</span>
+          <span class="carte-nom">Guerrier</span>
+          <span class="carte-cout">1</span>
+        </div>
       </div>
     </div>
   </main>
+
+  <div class="battlogy-message" id="battlogy-message"></div>
 
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
@@ -156,6 +229,29 @@
   let HS  // espacement horizontal entre colonnes (flat-top) = 1.5*R
   let VS  // espacement vertical entre rangées (flat-top) = sqrt(3)*R
   let gridOffsetY  // y où commence la grille
+  let gridH        // hauteur réelle de la grille
+  let zoneJoueurYMin, zoneJoueurYMax  // limites verticales où le joueur peut poser une carte
+
+  // ─── Cartes (données en dur, pour les tests) ──────────────────
+  // porte / zoneDetection en px, vitesseMarche en px/s, vitesseAttaque en
+  // attaques/seconde, tempsActivation en ms, cout en or, nombre = nombre
+  // d'unités invoquées par la carte (ex: 3 squelettes pour une seule carte).
+  const CARTES = {
+    guerrier: {
+      id: 'guerrier', nom: 'Guerrier', emoji: '⚔️', cout: 1,
+      pv: 100, degats: 10, porte: 34, vitesseAttaque: 1,
+      vitesseMarche: 45, zoneDetection: 90, tempsActivation: 800, nombre: 1
+    }
+  }
+
+  // ─── État de la partie (test : or infini) ─────────────────────
+  let or = Infinity
+  let joueurChateauPV = 1000, joueurChateauPVMax = 1000
+  let ennemiChateauPV = 1000, ennemiChateauPVMax = 1000
+  let unitesJoueur = []
+  let unitesEnnemi = []
+  let uniteIdCompteur = 0
+  let dernierTimestamp = null
 
   // ─── Images des châteaux ───────────────────────────────────────
   const imgCastleEnemi  = new Image()
@@ -191,14 +287,19 @@
 
     gridOffsetY = CASTLE_PX + 6
 
-    const gridH  = (ROWS + 1) * VS                       // hauteur réelle de la grille
+    gridH        = (ROWS + 1) * VS                       // hauteur réelle de la grille
     const gridW  = (1.5 * COLS + 0.5) * R + 2 * MARGE     // largeur réelle de la grille
 
     canvas.width  = Math.round(gridW)
     canvas.height = Math.round(gridOffsetY + gridH + 6 + CASTLE_PX)
 
+    // Zone où le joueur a le droit de poser une carte : la moitié basse de
+    // la grille (les 8 dernières rangées), avant le château joueur.
+    zoneJoueurYMin = gridOffsetY + (ROWS + 1) * VS - 8 * VS
+    zoneJoueurYMax = canvas.height - CASTLE_PX
+
     ctx = canvas.getContext('2d')
-    render()
+    if (!dernierTimestamp) requestAnimationFrame(boucleDeJeu)
   }
 
   // ─── Conversion coordonnées hexa → pixels ────────────────────
@@ -288,10 +389,165 @@
 
     // ── Barre de PV : collée à l'image (au-dessus pour l'ennemi, en-dessous pour le joueur) ──
     const hpBarY  = isPlayer ? imgY + imgH + 6 : imgY - 12
+    const pvFrac  = isPlayer
+      ? Math.max(0, joueurChateauPV / joueurChateauPVMax)
+      : Math.max(0, ennemiChateauPV / ennemiChateauPVMax)
     ctx.fillStyle = C.hp_bg
     rect(0, hpBarY, canvas.width, 6)
     ctx.fillStyle = isPlayer ? C.hp_player : C.hp_enemy
-    rect(0, hpBarY, canvas.width, 6) // 100% pour l'instant
+    rect(0, hpBarY, canvas.width * pvFrac, 6)
+  }
+
+  // ─── Point de cible du château (utilisé pour la marche et l'attaque) ──
+  function pointCastle(team) {
+    // team = camp qui VISE ce château (ex: 'joueur' vise le château ennemi)
+    return team === 'joueur'
+      ? { x: canvas.width / 2, y: CASTLE_PX * 0.5 }
+      : { x: canvas.width / 2, y: canvas.height - CASTLE_PX * 0.5 }
+  }
+
+  // ─── Unités ─────────────────────────────────────────────────
+  function poserCarte(carte, x, y, team) {
+    const n = carte.nombre || 1
+    for (let i = 0; i < n; i++) {
+      const decalage = (i - (n - 1) / 2) * 20
+      creerUnite(carte, x + decalage, y, team)
+    }
+  }
+
+  function creerUnite(carte, x, y, team) {
+    const cible = pointCastle(team)
+    const dx = cible.x - x, dy = cible.y - y
+    const dist = Math.hypot(dx, dy) || 1
+    const unite = {
+      id: ++uniteIdCompteur,
+      carteId: carte.id,
+      emoji: carte.emoji,
+      team,
+      x, y,
+      pv: carte.pv, pvMax: carte.pv,
+      degats: carte.degats,
+      porte: carte.porte,
+      zoneDetection: carte.zoneDetection,
+      vitesseMarche: carte.vitesseMarche,
+      cooldownAttaqueBase: 1000 / carte.vitesseAttaque,
+      cooldownAttaque: 0,
+      activation: carte.tempsActivation,
+      dirX: dx / dist, dirY: dy / dist,
+      etat: 'activation'
+    }
+    ;(team === 'joueur' ? unitesJoueur : unitesEnnemi).push(unite)
+  }
+
+  // Cherche, parmi le camp adverse, l'ennemi vivant le plus proche présent
+  // dans la zone de détection de l'unité (préparé pour de futures cartes
+  // ennemies — pour l'instant unitesEnnemi est toujours vide).
+  function ennemiLePlusProche(unite) {
+    const adversaires = unite.team === 'joueur' ? unitesEnnemi : unitesJoueur
+    let meilleur = null, meilleureDist = Infinity
+    for (const a of adversaires) {
+      const d = Math.hypot(a.x - unite.x, a.y - unite.y)
+      if (d <= unite.zoneDetection && d < meilleureDist) { meilleur = a; meilleureDist = d }
+    }
+    return meilleur
+  }
+
+  function mettreAJourUnite(unite, dt) {
+    if (unite.pv <= 0) return
+    if (unite.etat === 'activation') {
+      unite.activation -= dt
+      if (unite.activation <= 0) unite.etat = 'marche'
+      return
+    }
+
+    // Priorité à une unité ennemie détectée à portée, sinon le château adverse.
+    const ennemiProche = ennemiLePlusProche(unite)
+    let cibleX, cibleY, distCible, rayonCible
+
+    if (ennemiProche) {
+      cibleX = ennemiProche.x; cibleY = ennemiProche.y
+      distCible = Math.hypot(cibleX - unite.x, cibleY - unite.y)
+      rayonCible = 14
+    } else {
+      const c = pointCastle(unite.team)
+      cibleX = c.x; cibleY = c.y
+      distCible = Math.hypot(cibleX - unite.x, cibleY - unite.y)
+      rayonCible = 26
+    }
+
+    if (distCible - rayonCible <= unite.porte) {
+      unite.etat = 'attaque'
+      unite.cooldownAttaque -= dt
+      if (unite.cooldownAttaque <= 0) {
+        unite.cooldownAttaque = unite.cooldownAttaqueBase
+        if (ennemiProche) {
+          ennemiProche.pv = Math.max(0, ennemiProche.pv - unite.degats)
+        } else if (unite.team === 'joueur') {
+          ennemiChateauPV = Math.max(0, ennemiChateauPV - unite.degats)
+        } else {
+          joueurChateauPV = Math.max(0, joueurChateauPV - unite.degats)
+        }
+      }
+    } else {
+      unite.etat = 'marche'
+      // Déplacement en ligne droite fixée au moment de la pose, libre
+      // (non contraint par la grille hexagonale).
+      unite.x += unite.dirX * unite.vitesseMarche * dt / 1000
+      unite.y += unite.dirY * unite.vitesseMarche * dt / 1000
+    }
+  }
+
+  function mettreAJourUnites(dt) {
+    for (const u of unitesJoueur) mettreAJourUnite(u, dt)
+    for (const u of unitesEnnemi) mettreAJourUnite(u, dt)
+    unitesJoueur = unitesJoueur.filter(u => u.pv > 0)
+    unitesEnnemi = unitesEnnemi.filter(u => u.pv > 0)
+  }
+
+  function dessinerUnite(u) {
+    const couleur = u.team === 'joueur' ? '#2563eb' : '#dc2626'
+    ctx.beginPath()
+    ctx.arc(u.x, u.y, 14, 0, Math.PI * 2)
+    ctx.fillStyle = couleur
+    ctx.fill()
+    ctx.strokeStyle = '#00000088'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    ctx.font = '13px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(u.emoji, u.x, u.y + 1)
+
+    const w = 28, h = 4
+    const frac = Math.max(0, u.pv / u.pvMax)
+    ctx.fillStyle = '#000000aa'
+    ctx.fillRect(u.x - w / 2, u.y - 24, w, h)
+    ctx.fillStyle = frac > 0.5 ? '#22c55e' : (frac > 0.25 ? '#f59e0b' : '#ef4444')
+    ctx.fillRect(u.x - w / 2, u.y - 24, w * frac, h)
+
+    if (u.etat === 'activation') {
+      ctx.font = '11px sans-serif'
+      ctx.fillStyle = '#ffffffcc'
+      ctx.fillText('⏳', u.x, u.y - 30)
+    }
+  }
+
+  function dessinerUnites() {
+    for (const u of unitesJoueur) dessinerUnite(u)
+    for (const u of unitesEnnemi) dessinerUnite(u)
+  }
+
+  // ─── Zone de pose (surlignée pendant un glisser) ───────────────
+  let enTrainDeGlisser = false
+  function dessinerZoneDepot() {
+    if (!enTrainDeGlisser) return
+    ctx.fillStyle = '#2563eb22'
+    ctx.fillRect(MARGE, zoneJoueurYMin, canvas.width - 2 * MARGE, zoneJoueurYMax - zoneJoueurYMin)
+    ctx.strokeStyle = '#2563eb88'
+    ctx.setLineDash([5, 4])
+    ctx.strokeRect(MARGE, zoneJoueurYMin, canvas.width - 2 * MARGE, zoneJoueurYMax - zoneJoueurYMin)
+    ctx.setLineDash([])
   }
 
   // ─── Fond de l'arène ─────────────────────────────────────────
@@ -314,13 +570,105 @@
   function render() {
     drawBg()
     drawGrid()
+    dessinerZoneDepot()
     drawCastle(false) // ennemi (haut)
     drawCastle(true)  // joueur (bas)
+    dessinerUnites()
+  }
+
+  // ─── Boucle de jeu ──────────────────────────────────────────
+  function boucleDeJeu(timestamp) {
+    if (!dernierTimestamp) dernierTimestamp = timestamp
+    const dt = Math.min(50, timestamp - dernierTimestamp) // dt plafonné (onglet en arrière-plan)
+    dernierTimestamp = timestamp
+
+    mettreAJourUnites(dt)
+    render()
+
+    requestAnimationFrame(boucleDeJeu)
   }
 
   window.addEventListener('resize', () => {
     if (canvas) initArena()
   })
+
+  // ─── Glisser-déposer des cartes (souris + tactile via pointer events) ──
+  let carteEnCours = null
+  let ghostEl = null
+  let messageTimeout = null
+
+  function afficherMessage(texte) {
+    const el = document.getElementById('battlogy-message')
+    el.textContent = texte
+    el.classList.add('visible')
+    clearTimeout(messageTimeout)
+    messageTimeout = setTimeout(() => el.classList.remove('visible'), 1600)
+  }
+
+  function dansZoneJoueur(x, y) {
+    return x >= MARGE && x <= canvas.width - MARGE && y >= zoneJoueurYMin && y <= zoneJoueurYMax
+  }
+
+  function tenterPoserCarte(carteId, x, y) {
+    const carte = CARTES[carteId]
+    if (!carte) return
+    if (!dansZoneJoueur(x, y)) { afficherMessage('Pose ta carte dans ta zone (bas du terrain).'); return }
+    if (or < carte.cout) { afficherMessage("Pas assez d'or."); return }
+    if (or !== Infinity) or -= carte.cout
+    document.getElementById('or-affiche').textContent = or === Infinity ? '∞' : or
+    poserCarte(carte, x, y, 'joueur')
+  }
+
+  function initGlisserDeposer() {
+    const cartes = document.querySelectorAll('.carte-main')
+    cartes.forEach(el => {
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault()
+        carteEnCours = el.dataset.carte
+        ghostEl = document.createElement('div')
+        ghostEl.className = 'carte-ghost'
+        ghostEl.textContent = CARTES[carteEnCours]?.emoji || ''
+        document.body.appendChild(ghostEl)
+        deplacerGhost(e.clientX, e.clientY)
+        document.addEventListener('pointermove', pendantGlisser)
+        document.addEventListener('pointerup', finGlisser)
+      })
+    })
+  }
+
+  function deplacerGhost(cx, cy) {
+    if (!ghostEl) return
+    ghostEl.style.left = cx + 'px'
+    ghostEl.style.top = cy + 'px'
+  }
+
+  function pendantGlisser(e) {
+    enTrainDeGlisser = true
+    deplacerGhost(e.clientX, e.clientY)
+  }
+
+  function finGlisser(e) {
+    document.removeEventListener('pointermove', pendantGlisser)
+    document.removeEventListener('pointerup', finGlisser)
+    enTrainDeGlisser = false
+    if (ghostEl) { ghostEl.remove(); ghostEl = null }
+
+    if (carteEnCours && canvas) {
+      const rectCanvas = canvas.getBoundingClientRect()
+      if (e.clientX >= rectCanvas.left && e.clientX <= rectCanvas.right &&
+          e.clientY >= rectCanvas.top && e.clientY <= rectCanvas.bottom) {
+        const scaleX = canvas.width / rectCanvas.width
+        const scaleY = canvas.height / rectCanvas.height
+        const x = (e.clientX - rectCanvas.left) * scaleX
+        const y = (e.clientY - rectCanvas.top) * scaleY
+        tenterPoserCarte(carteEnCours, x, y)
+      }
+    }
+    carteEnCours = null
+  }
+
+  document.getElementById('or-affiche').textContent = or === Infinity ? '∞' : or
+  initGlisserDeposer()
   </script>
 </body>
 </html>
