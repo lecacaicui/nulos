@@ -25,17 +25,23 @@
   </script>
   <style>body { visibility: hidden; }</style>
   <style>
+    html, body { height: 100%; }
     .battlogy-wrap {
       max-width: 560px;
+      width: 100%;
       margin: 0 auto;
-      padding: 1.25rem 1rem 6rem;
+      height: 100%;
+      box-sizing: border-box;
+      padding: .75rem 1rem;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: .75rem;
+      gap: .6rem;
+      overflow: hidden;
     }
     .battlogy-topbar {
       width: 100%;
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -53,6 +59,11 @@
     }
     .arena-outer {
       width: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border: 2px solid var(--couleur-bordure);
       border-radius: 12px;
       overflow: hidden;
@@ -60,8 +71,22 @@
     }
     #game-canvas {
       display: block;
-      width: 100%;
+      max-width: 100%;
+      max-height: 100%;
       image-rendering: pixelated;
+    }
+    .battlogy-bottombar {
+      width: 100%;
+      flex: 0 0 auto;
+      height: 84px;
+      border: 1px dashed var(--couleur-bordure);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--couleur-texte-faible);
+      font-size: .8rem;
+      text-align: center;
     }
   </style>
 </head>
@@ -76,17 +101,18 @@
       <div class="arena-outer" id="arena-outer">
         <canvas id="game-canvas"></canvas>
       </div>
+      <div class="battlogy-bottombar" id="battlogy-bottombar">
+        🪙 Or &amp; cartes — à venir
+      </div>
     </div>
   </main>
-  <div id="footer-placeholder"></div>
 
   <script type="module">
-    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    import { chargerHeader, appliquerTheme } from '../script/header.js'
     ;(async () => {
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')
-      await chargerFooter('../')
       initArena()
     })()
   </script>
@@ -131,24 +157,33 @@
   let gridOffsetY  // y où commence la grille
 
   // ─── Initialisation ──────────────────────────────────────────
+  // Les colonnes paires ont une rangée de plus (ROWS+1) que les colonnes
+  // impaires (ROWS) : la grille commence ET finit par une ligne pleine,
+  // symétrique en haut et en bas.
   function initArena() {
     canvas = document.getElementById('game-canvas')
     const outer = document.getElementById('arena-outer')
-    const W = outer.clientWidth || 380
 
-    // Hexagones flat-top : ce sont les COLONNES qui sont décalées
-    // verticalement d'une demi-hauteur (et non plus les rangées
-    // horizontalement, comme en pointy-top).
-    // Largeur totale occupée : (1.5*COLS + 0.5) * R + 2*MARGE
-    R  = (W - 2 * MARGE) / (1.5 * COLS + 0.5)
+    const availW = outer.clientWidth  || 380
+    const availH = outer.clientHeight || 480
+
+    // R limité par la largeur disponible
+    const Rw = (availW - 2 * MARGE) / (1.5 * COLS + 0.5)
+    // R limité par la hauteur disponible (2 châteaux + grille, colonnes
+    // pleines = ROWS+1 rangées)
+    const Rh = (availH - 2 * CASTLE_PX - 12) / ((ROWS + 1) * Math.sqrt(3))
+
+    R  = Math.max(6, Math.min(Rw, Rh))
     HS = R * 1.5           // espacement horizontal entre centres de colonnes
     VS = R * Math.sqrt(3)  // espacement vertical entre centres de rangées
 
     gridOffsetY = CASTLE_PX + 6
 
-    const gridH = ROWS * VS + VS        // hauteur totale (+1 rangée pour le décalage des colonnes)
-    canvas.width  = W
-    canvas.height = gridOffsetY + gridH + 6 + CASTLE_PX
+    const gridH  = (ROWS + 1) * VS                       // hauteur réelle de la grille
+    const gridW  = (1.5 * COLS + 0.5) * R + 2 * MARGE     // largeur réelle de la grille
+
+    canvas.width  = Math.round(gridW)
+    canvas.height = Math.round(gridOffsetY + gridH + 6 + CASTLE_PX)
 
     ctx = canvas.getContext('2d')
     render()
@@ -181,38 +216,44 @@
   }
 
   // ─── Couleur d'un hex selon sa zone ──────────────────────────
+  // maxRow : dernière rangée existante pour cette colonne (ROWS pour les
+  // colonnes paires qui ont une rangée de plus, ROWS-1 pour les impaires).
   function couleurHex(row, col) {
     const dark = (row + col) % 2 === 0
-    if (row < 8)        return dark ? C.hexEnemyDark  : C.hexEnemy
-    if (row >= ROWS - 8) return dark ? C.hexPlayerDark : C.hexPlayer
+    const maxRow = (col % 2 === 0) ? ROWS : ROWS - 1
+    if (row <= 7)            return dark ? C.hexEnemyDark  : C.hexEnemy
+    if (row >= maxRow - 7)   return dark ? C.hexPlayerDark : C.hexPlayer
     return dark ? C.hexBaseDark : C.hexBase
   }
 
   // ─── Grille hexagonale ────────────────────────────────────────
+  // Colonnes paires : ROWS+1 rangées (0..ROWS) → ligne pleine en haut ET en bas.
+  // Colonnes impaires : ROWS rangées (0..ROWS-1), décalées d'une demi-hauteur.
   function drawGrid() {
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
+    for (let c = 0; c < COLS; c++) {
+      const rowsCol = (c % 2 === 0) ? ROWS + 1 : ROWS
+      for (let r = 0; r < rowsCol; r++) {
         const { x, y } = hexCenter(r, c)
         drawHex(x, y, R - 1.2, couleurHex(r, c), C.hexBord)
       }
     }
 
-    // Lignes de zone en pointillés
+    // Lignes de zone en pointillés (en y, pour rester alignées malgré le
+    // décalage entre colonnes paires/impaires)
     ctx.setLineDash([6, 4])
     ctx.lineWidth = 1.5
 
-    const drawZoneLine = (row, color) => {
-      const y = gridOffsetY + VS / 2 + row * VS
-      ctx.strokeStyle = color
-      ctx.beginPath()
-      ctx.moveTo(MARGE, y)
-      ctx.lineTo(canvas.width - MARGE, y)
-      ctx.stroke()
-    }
-
-    drawZoneLine(8,       '#ef444455')  // limite zone ennemi
-    drawZoneLine(ROWS - 8, '#3b82f655') // limite zone joueur
+    drawZoneLine(gridOffsetY + 8 * VS,                     '#ef444455') // limite zone ennemi
+    drawZoneLine(gridOffsetY + (ROWS + 1) * VS - 8 * VS,   '#3b82f655') // limite zone joueur
     ctx.setLineDash([])
+  }
+
+  function drawZoneLine(y, color) {
+    ctx.strokeStyle = color
+    ctx.beginPath()
+    ctx.moveTo(MARGE, y)
+    ctx.lineTo(canvas.width - MARGE, y)
+    ctx.stroke()
   }
 
   // ─── Château ─────────────────────────────────────────────────
