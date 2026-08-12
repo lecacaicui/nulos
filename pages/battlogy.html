@@ -816,11 +816,19 @@
       }
 
       // Un ennemi ayant percé entre notre château et notre allié le plus
-      // avancé referme la zone jusqu'à lui.
+      // avancé referme la zone jusqu'à lui — mais pas exactement à son
+      // niveau : la zone s'arrête 1.5 hexagone devant lui (vers notre
+      // château), pour que nos unités posées le croisent naturellement en
+      // marchant au lieu d'apparaître déjà à son contact.
       const ennemisEnPercee = unitesEnnemi.filter(u => u.pv > 0 && u.y > yMin && u.y < zoneJoueurYMax)
       if (ennemisEnPercee.length > 0) {
-        yMin = Math.max(yMin, Math.max(...ennemisEnPercee.map(u => u.y)))
+        yMin = Math.max(yMin, Math.max(...ennemisEnPercee.map(u => u.y)) + 1.5 * VS)
       }
+
+      // La zone de base (les 2 rangées qui collent notre château) ne peut
+      // jamais être réduite, même si un ennemi s'y trouve : on peut
+      // toujours y poser des unités.
+      yMin = Math.min(yMin, zoneJoueurYMax - profondeurZoneDepart)
 
       // Règle générale : jamais dans la moitié ennemie.
       yMin = Math.max(yMin, limiteMoitieEnnemie)
@@ -842,11 +850,17 @@
     }
 
     // Un joueur ayant percé entre le château ennemi et son allié le plus
-    // avancé referme la zone jusqu'à lui.
+    // avancé referme la zone jusqu'à lui — mais pas exactement à son
+    // niveau : la zone s'arrête 1.5 hexagone devant lui (vers le château
+    // ennemi), symétrique à la règle du camp joueur.
     const joueursEnPercee = unitesJoueur.filter(u => u.pv > 0 && u.y < yMax && u.y > yContreChateauEnnemi)
     if (joueursEnPercee.length > 0) {
-      yMax = Math.min(yMax, Math.min(...joueursEnPercee.map(u => u.y)))
+      yMax = Math.min(yMax, Math.min(...joueursEnPercee.map(u => u.y)) - 1.5 * VS)
     }
+
+    // La zone de base (les 2 rangées qui collent le château ennemi) ne
+    // peut jamais être réduite, même si un joueur s'y trouve.
+    yMax = Math.max(yMax, yContreChateauEnnemi + profondeurZoneDepart)
 
     // Règle générale : jamais dans la moitié joueur.
     yMax = Math.min(yMax, limiteMoitieJoueur)
@@ -1036,8 +1050,17 @@
   // ennemies — pour l'instant unitesEnnemi est toujours vide).
   function ennemiLePlusProche(unite) {
     const adversaires = unite.team === 'joueur' ? unitesEnnemi : unitesJoueur
+    // Marge de tolérance pour considérer un adversaire "au même niveau"
+    // (léger décalage devant l'unité inclus, voir projection ci-dessous).
+    const margeNiveau = VS * 0.5
     let meilleur = null, meilleureDist = Infinity
     for (const a of adversaires) {
+      // Ne cible que les adversaires devant l'unité ou à son niveau —
+      // jamais ceux déjà dépassés, dans son dos. On projette la position
+      // relative de l'adversaire sur la direction de marche de l'unité
+      // (dirY, fixée à la pose) : positif = devant, négatif = derrière.
+      const projection = (a.y - unite.y) * unite.dirY
+      if (projection < -margeNiveau) continue
       const d = Math.hypot(a.x - unite.x, a.y - unite.y)
       if (d <= unite.zoneDetection && d < meilleureDist) { meilleur = a; meilleureDist = d }
     }
@@ -1065,7 +1088,10 @@
       const c = pointCastle(unite.team)
       cibleX = c.x; cibleY = c.y
       distCible = Math.hypot(cibleX - unite.x, cibleY - unite.y)
-      rayonCible = 26
+      // La hitbox du château est resserrée vers son centre (26px de base),
+      // mais on ajoute ~1.5 hexagone de portée effective pour que les
+      // unités puissent l'attaquer d'un peu plus loin.
+      rayonCible = 26 + 1.5 * VS
     }
 
     if (distCible - rayonCible <= unite.porte) {
