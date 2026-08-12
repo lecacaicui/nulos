@@ -856,6 +856,11 @@
     const availW = outer.clientWidth  || 380
     const availH = outer.clientHeight || 480
 
+    // Échelle précédente (avant recalcul) : sert plus bas à repositionner
+    // les entités déjà sur le terrain, voir le commentaire après le calcul
+    // de canvas.width/height.
+    const ancienR = R
+
     // R limité par la largeur disponible
     const Rw = (availW - 2 * MARGE) / (1.5 * COLS + 0.5)
     // R limité par la hauteur disponible (2 châteaux + grille, colonnes
@@ -880,6 +885,36 @@
     zoneJoueurYMax = canvas.height - CASTLE_PX
 
     ctx = canvas.getContext('2d')
+
+    // ─── Anti-téléportation ────────────────────────────────────
+    // initArena() est réexécutée à chaque 'resize' (fenêtre redimensionnée,
+    // rotation d'écran… et aussi zoom du navigateur, qui déclenche lui
+    // aussi un 'resize'). Comme R (et donc HS/VS, la taille des hexagones)
+    // change, la grille entière change d'échelle — mais les entités déjà
+    // sur le terrain (unités, projectiles, éclats visuels) gardaient
+    // jusqu'ici leurs anciennes coordonnées en pixels, ce qui les faisait
+    // apparaître "téléportées" ailleurs sur le terrain dès qu'on dézoomait.
+    // La grille reste toujours ancrée au même point (MARGE, gridOffsetY) et
+    // ne fait que changer d'échelle avec R : on repositionne donc chaque
+    // entité proportionnellement à ce changement d'échelle pour qu'elle
+    // reste exactement à la même place relative sur le terrain, quel que
+    // soit l'état (zoom, taille de fenêtre) de la page.
+    if (ancienR && ancienR !== R) {
+      const echelle = R / ancienR
+      const reechelonner = (obj) => {
+        obj.x = MARGE + (obj.x - MARGE) * echelle
+        obj.y = gridOffsetY + (obj.y - gridOffsetY) * echelle
+      }
+      for (const u of unitesJoueur) reechelonner(u)
+      for (const u of unitesEnnemi) reechelonner(u)
+      for (const p of projectiles) {
+        reechelonner(p)
+        p.cibleXFixe = MARGE + (p.cibleXFixe - MARGE) * echelle
+        p.cibleYFixe = gridOffsetY + (p.cibleYFixe - gridOffsetY) * echelle
+      }
+      for (const e of effetsMelee) reechelonner(e)
+    }
+
     if (!dernierTimestamp) requestAnimationFrame(boucleDeJeu)
   }
 
@@ -894,20 +929,24 @@
   // Cherche dans une petite fenêtre de colonnes/rangées autour d'une
   // estimation, puis garde le centre d'hexagone le plus proche. Retourne
   // null si aucun hexagone n'est assez proche (curseur hors grille).
-  function trouverHexProche(x, y) {
+  // `seuilDistance` est paramétrable : par défaut R*1.15 (le point doit
+  // tomber quasiment pile sur la case), mais trouverHexPourPose() passe un
+  // seuil plus généreux pour "rattraper" une pose imprécise proche du bord
+  // de la grille (voir plus bas).
+  function trouverHexProche(x, y, seuilDistance = R * 1.15) {
     const colEstime = Math.round((x - MARGE - R) / HS)
     let meilleur = null, meilleureDist = Infinity
-    for (let c = Math.max(0, colEstime - 1); c <= Math.min(COLS - 1, colEstime + 1); c++) {
+    for (let c = Math.max(0, colEstime - 2); c <= Math.min(COLS - 1, colEstime + 2); c++) {
       const maxRow = (c % 2 === 0) ? ROWS : ROWS - 1
       const decalage = (c % 2 === 1) ? VS / 2 : 0
       const rowEstime = Math.round((y - gridOffsetY - VS / 2 - decalage) / VS)
-      for (let r = Math.max(0, rowEstime - 1); r <= Math.min(maxRow, rowEstime + 1); r++) {
+      for (let r = Math.max(0, rowEstime - 2); r <= Math.min(maxRow, rowEstime + 2); r++) {
         const { x: cx, y: cy } = hexCenter(r, c)
         const d = Math.hypot(cx - x, cy - y)
         if (d < meilleureDist) { meilleureDist = d; meilleur = { row: r, col: c, cx, cy } }
       }
     }
-    if (!meilleur || meilleureDist > R * 1.15) return null
+    if (!meilleur || meilleureDist > seuilDistance) return null
     return meilleur
   }
 
@@ -1044,6 +1083,47 @@
       }
     }
     return positions
+  }
+
+  // Distance maximale (en pixels canvas) au-delà de laquelle une pose hors
+  // zone n'est plus "rattrapée" par la case valide la plus proche : au-delà,
+  // l'utilisateur visait clairement autre chose et la pose est simplement
+  // refusée comme avant.
+  function distanceRattrapageMax() {
+    return R * 3
+  }
+
+  // Détermine la case à utiliser pour poser `carteId` (camp `team`) à partir
+  // d'un point (x, y) en pixels canvas — qui peut être légèrement hors de la
+  // grille, ou tomber sur une case en dehors de la zone de pose autorisée.
+  // Pour faciliter le placement (au doigt comme à la souris, sans devoir
+  // viser une case exacte) :
+  //  1. Si la case la plus proche du point est déjà valide, on la garde.
+  //  2. Sinon, on rattrape la pose sur la case VALIDE la plus proche du
+  //     point, à condition qu'elle reste raisonnablement proche.
+  // Retourne null si rien d'assez proche n'est disponible.
+  function trouverHexPourPose(carteId, x, y, team = 'joueur') {
+    if (x === null || x === undefined || y === null || y === undefined) return null
+    const carte = CARTES[carteId]
+    if (!carte) return null
+
+    const seuil = distanceRattrapageMax()
+
+    // Carte à placement libre (statue…) : toute la grille est valide, on se
+    // contente d'élargir un peu le seuil de recherche de la case la plus
+    // proche.
+    if (carte.placementLibre) return trouverHexProche(x, y, seuil)
+
+    const direct = trouverHexProche(x, y, seuil)
+    if (direct && estPositionValidePourPose(carteId, direct, team)) return direct
+
+    let meilleur = null, meilleureDist = Infinity
+    for (const p of positionsValidesPourEquipe(team)) {
+      const d = Math.hypot(p.x - x, p.y - y)
+      if (d < meilleureDist) { meilleureDist = d; meilleur = p }
+    }
+    if (!meilleur || meilleureDist > seuil) return null
+    return { cx: meilleur.x, cy: meilleur.y }
   }
 
   // ─── Dessin d'un hexagone (flat-top, càd pointy-top tourné de 90°) ──
@@ -1655,7 +1735,10 @@
   function clientVersCanvas(clientX, clientY) {
     if (!canvas) return null
     const r = canvas.getBoundingClientRect()
-    if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) return null
+    if (!r.width || !r.height) return null
+    // Ne renvoie plus null pour un point légèrement à l'extérieur du
+    // canvas : ça permet à trouverHexPourPose() de rattraper une pose
+    // imprécise proche du bord de l'arène au lieu de la refuser d'office.
     return {
       x: (clientX - r.left) * (canvas.width / r.width),
       y: (clientY - r.top) * (canvas.height / r.height)
@@ -1749,7 +1832,8 @@
     zone.classList.toggle('survolee', survolee)
 
     const pt = clientVersCanvas(e.clientX, e.clientY)
-    hexSurvole = survolee ? null : (pt ? trouverHexProche(pt.x, pt.y) : null)
+    const item = carteEnCours ? main.find(m => m.uid === carteEnCours) : null
+    hexSurvole = (survolee || !item || !pt) ? null : trouverHexPourPose(item.carteId, pt.x, pt.y)
   }
 
   function finGlisser(e) {
@@ -1771,8 +1855,9 @@
       if (survoleeDestruction) {
         detruireCarteMain(carteEnCours)
       } else {
+        const item = main.find(m => m.uid === carteEnCours)
         const pt = clientVersCanvas(e.clientX, e.clientY)
-        const hex = pt ? trouverHexProche(pt.x, pt.y) : null
+        const hex = (item && pt) ? trouverHexPourPose(item.carteId, pt.x, pt.y) : null
         tenterPoserCarte(carteEnCours, hex)
       }
     }
