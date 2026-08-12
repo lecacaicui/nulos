@@ -288,12 +288,10 @@
 
     // ── Barre de PV : collée à l'image (au-dessus pour l'ennemi, en-dessous pour le joueur) ──
     const hpBarY  = isPlayer ? imgY + imgH + 6 : imgY - 12
-    const hpBarX  = x
-    const hpBarW  = W
     ctx.fillStyle = C.hp_bg
-    rect(hpBarX, hpBarY, hpBarW, 6)
+    rect(0, hpBarY, canvas.width, 6)
     ctx.fillStyle = isPlayer ? C.hp_player : C.hp_enemy
-    rect(hpBarX, hpBarY, hpBarW, 6) // 100% pour l'instant
+    rect(0, hpBarY, canvas.width, 6) // 100% pour l'instant
   }
 
   // ─── Fond de l'arène ─────────────────────────────────────────
