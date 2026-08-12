@@ -136,6 +136,66 @@
       border-right: 1px solid var(--couleur-bordure);
       margin-right: .25rem;
     }
+
+    /* ═══ Jauge d'or : barre de progression current/max, lisible d'un coup d'œil ═══ */
+    .or-jauge {
+      position: relative;
+      flex: 0 0 auto;
+      width: 108px;
+      height: 30px;
+      border-radius: 999px;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      overflow: hidden;
+      margin-right: .4rem;
+    }
+    .or-jauge-remplissage {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      transition: width .25s ease;
+    }
+    .or-jauge-texte {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-size: .78rem;
+      font-weight: 700;
+      color: #1a1a1a;
+      text-shadow: 0 1px 0 rgba(255,255,255,.35);
+      white-space: nowrap;
+    }
+
+    /* ═══ Jauge de pioche : camembert qui se remplit jusqu'à la prochaine carte ═══ */
+    .pioche-jauge {
+      position: relative;
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--couleur-bordure);
+      margin-right: .5rem;
+    }
+    .pioche-camembert {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(var(--couleur-bouton) calc(var(--p, 0) * 1%), transparent 0);
+      transition: background .1s linear;
+    }
+    .pioche-icone {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .8rem;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,.6));
+    }
     .carte-main {
       width: 66px;
       height: 78px;
@@ -211,6 +271,52 @@
     }
     .battlogy-message.visible { opacity: 1; }
 
+    /* ═══ Animation de carte piochée (visualise la carte tirée du paquet,
+       et si la main est pleine, la carte perdue) ═══ */
+    .carte-pioche-anim {
+      position: fixed;
+      z-index: 2500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .2rem;
+      pointer-events: none;
+      animation: cartePiocheeGagnee 1.1s ease forwards;
+    }
+    .carte-pioche-anim .carte-pioche-emoji {
+      font-size: 1.9rem;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,.5));
+    }
+    .carte-pioche-anim .carte-pioche-label {
+      font-size: .66rem;
+      font-weight: 700;
+      color: #bbf7d0;
+      background: #111827dd;
+      padding: .15rem .55rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .carte-pioche-anim.perdue {
+      animation-name: cartePiocheePerdue;
+      animation-duration: 1.3s;
+    }
+    .carte-pioche-anim.perdue .carte-pioche-label { color: #fecaca; background: #7f1d1dcc; }
+    .carte-pioche-anim.perdue .carte-pioche-emoji { filter: grayscale(1) drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+
+    @keyframes cartePiocheeGagnee {
+      0%   { transform: translate(-50%, -50%) scale(.4); opacity: 0; }
+      18%  { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+      35%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -110%) scale(.7); opacity: 0; }
+    }
+    @keyframes cartePiocheePerdue {
+      0%   { transform: translate(-50%, -50%) scale(.4) rotate(0deg); opacity: 0; }
+      18%  { transform: translate(-50%, -50%) scale(1.2) rotate(-10deg); opacity: 1; }
+      35%  { transform: translate(-50%, -50%) scale(1) rotate(8deg); opacity: 1; }
+      55%  { transform: translate(-50%, -50%) scale(1) rotate(-6deg); opacity: 1; }
+      100% { transform: translate(-50%, 20%) scale(.6) rotate(0deg); opacity: 0; }
+    }
+
     /* ═══ Timer de phase ═══ */
     .battlogy-timer {
       font-size: .78rem;
@@ -246,30 +352,34 @@
     .btn-pioche-urgence:hover { filter: brightness(.92); }
     .btn-pioche-urgence:disabled { background: var(--couleur-bordure); color: var(--couleur-texte-faible); cursor: not-allowed; }
 
-    /* ═══ Zone de destruction (glisser une carte dessus pour la défausser) ═══ */
+    /* ═══ Zone de destruction : à droite du paquet de cartes, dans la barre du bas ═══ */
+    .battlogy-bottombar { position: relative; }
     .zone-destruction {
-      position: fixed;
-      left: 50%;
-      bottom: 6.2rem;
-      transform: translateX(-50%) scale(.85);
+      position: absolute;
+      right: .6rem;
+      top: 50%;
+      transform: translateY(-50%) scale(.8);
       display: none;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: .4rem;
+      gap: .15rem;
+      width: 68px;
+      height: 68px;
       background: #7f1d1dcc;
       color: #fecaca;
       border: 2px dashed #ef4444aa;
-      border-radius: 999px;
-      padding: .7rem 1.4rem;
-      font-size: .85rem;
+      border-radius: 16px;
+      font-size: 1.3rem;
       font-weight: 700;
       z-index: 1999;
       pointer-events: none;
       opacity: 0;
       transition: opacity .15s, transform .15s;
     }
-    .zone-destruction.visible { display: flex; opacity: 1; transform: translateX(-50%) scale(1); }
-    .zone-destruction.survolee { background: #b91c1cee; color: #fff; transform: translateX(-50%) scale(1.08); }
+    .zone-destruction span { font-size: .58rem; letter-spacing: .01em; }
+    .zone-destruction.visible { display: flex; opacity: 1; transform: translateY(-50%) scale(1); }
+    .zone-destruction.survolee { background: #b91c1cee; color: #fff; transform: translateY(-50%) scale(1.1); }
 
     /* ═══ Modale d'édition du deck ═══ */
     .modale-fond {
@@ -347,15 +457,22 @@
         </div>
       </div>
       <div class="battlogy-bottombar" id="battlogy-bottombar">
-        <div class="battlogy-or">🪙 <span id="or-affiche">0</span>/<span id="or-cap-affiche">3</span></div>
+        <div class="pioche-jauge" id="pioche-jauge" title="Prochaine carte piochée">
+          <div class="pioche-camembert" id="pioche-camembert"></div>
+          <span class="pioche-icone">🃏</span>
+        </div>
+        <div class="or-jauge" id="or-jauge" title="Or / capacité max">
+          <div class="or-jauge-remplissage" id="or-jauge-remplissage"></div>
+          <span class="or-jauge-texte">🪙 <span id="or-affiche">0</span>/<span id="or-cap-affiche">3</span></span>
+        </div>
         <div id="main-cartes"></div>
         <button class="btn-pioche-urgence" id="btn-pioche-urgence" style="display:none">⚡ Piocher (5)</button>
+        <div class="zone-destruction" id="zone-destruction">🗑️<span>Défausser</span></div>
       </div>
     </div>
   </main>
 
   <div class="battlogy-message" id="battlogy-message"></div>
-  <div class="zone-destruction" id="zone-destruction">🗑️ Relâcher pour détruire</div>
 
   <!-- ═══ Modale d'édition du deck ═══ -->
   <div class="modale-fond" id="modale-deck-fond" onclick="if(event.target===this) fermerModaleDeck()">
@@ -615,8 +732,10 @@
     if (!carteId) return
     if (main.length < MAIN_TAILLE_MAX) {
       ajouterCarteEnMain(carteId)
+      animerCartePiochee(carteId, false)
     } else {
       afficherMessage('Main pleine — carte perdue.')
+      animerCartePiochee(carteId, true)
     }
     orCapaciteMax = Math.min(OR_CAPACITE_MAX, orCapaciteMax + 1)
     renderMain()
@@ -638,7 +757,13 @@
     or -= PIOCHE_URGENCE_COUT
     for (let i = 0; i < PIOCHE_URGENCE_NB; i++) {
       const carteId = tirerCarteDuDeck(false)
-      if (carteId && main.length < MAIN_TAILLE_MAX) ajouterCarteEnMain(carteId)
+      if (!carteId) continue
+      if (main.length < MAIN_TAILLE_MAX) {
+        ajouterCarteEnMain(carteId)
+        animerCartePiochee(carteId, false)
+      } else {
+        animerCartePiochee(carteId, true)
+      }
     }
     renderMain()
   }
@@ -682,6 +807,8 @@
   function renderMain() {
     document.getElementById('or-affiche').textContent = or
     document.getElementById('or-cap-affiche').textContent = orCapaciteMax
+    document.getElementById('or-jauge-remplissage').style.width =
+      Math.min(100, (or / orCapaciteMax) * 100) + '%'
 
     const conteneur = document.getElementById('main-cartes')
     conteneur.innerHTML = main.map((item, i) => {
@@ -1347,6 +1474,39 @@
     dessinerEffetsMelee()
   }
 
+  // ─── Jauge de pioche (camembert) ────────────────────────────────
+  // Se remplit progressivement entre deux pioches automatiques, pour
+  // visualiser le temps restant avant la prochaine carte.
+  function actualiserJaugePioche() {
+    const el = document.getElementById('pioche-jauge')
+    if (!el) return
+    if (!partieCommencee || partieTerminee) {
+      el.style.setProperty('--p', 0)
+      return
+    }
+    const intervalle = intervallePiocheActuel()
+    const pourcentage = intervalle > 0 ? Math.min(100, (tempsDepuisPioche / intervalle) * 100) : 0
+    el.style.setProperty('--p', pourcentage)
+  }
+
+  // ─── Animation de carte piochée (gagnée ou perdue si main pleine) ──
+  function animerCartePiochee(carteId, perdue) {
+    const carte = CARTES[carteId]
+    if (!carte) return
+    const origine = document.getElementById('pioche-jauge')
+    if (!origine) return
+    const r = origine.getBoundingClientRect()
+    const el = document.createElement('div')
+    el.className = 'carte-pioche-anim' + (perdue ? ' perdue' : '')
+    el.style.left = (r.left + r.width / 2) + 'px'
+    el.style.top = (r.top + r.height / 2) + 'px'
+    el.innerHTML = `
+      <span class="carte-pioche-emoji">${carte.emoji}</span>
+      <span class="carte-pioche-label">${perdue ? '❌ ' + carte.nom + ' perdue' : '+ ' + carte.nom}</span>`
+    document.body.appendChild(el)
+    el.addEventListener('animationend', () => el.remove())
+  }
+
   // ─── Boucle de jeu ──────────────────────────────────────────
   function boucleDeJeu(timestamp) {
     if (!dernierTimestamp) dernierTimestamp = timestamp
@@ -1397,6 +1557,7 @@
       }
 
       actualiserAffichageTimer()
+      actualiserJaugePioche()
 
       if (ennemiChateauPV <= 0) {
         terminerPartie(true)
@@ -1530,11 +1691,18 @@
     document.removeEventListener('pointerup', finGlisser)
     enTrainDeGlisser = false
     if (ghostEl) { ghostEl.remove(); ghostEl = null }
+
+    // Important : on teste le survol de la zone de destruction AVANT de la
+    // masquer (classe 'visible' retirée juste après) — sinon son
+    // getBoundingClientRect() renvoie une zone nulle (display:none) et la
+    // défausse échoue systématiquement, retombant à tort sur une tentative
+    // de pose hors du terrain.
     const zone = document.getElementById('zone-destruction')
+    const survoleeDestruction = carteEnCours ? zoneDestructionSurvolee(e.clientX, e.clientY) : false
     zone.classList.remove('visible', 'survolee')
 
     if (carteEnCours) {
-      if (zoneDestructionSurvolee(e.clientX, e.clientY)) {
+      if (survoleeDestruction) {
         detruireCarteMain(carteEnCours)
       } else {
         const pt = clientVersCanvas(e.clientX, e.clientY)
