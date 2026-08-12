@@ -1268,7 +1268,11 @@
       // d'activation/marche/attaque : elle reste plantée, encaisse les
       // dégâts, un point c'est tout (voir mettreAJourUnite).
       immobile: !!carte.immobile,
-      etat: carte.immobile ? 'immobile' : 'activation'
+      etat: carte.immobile ? 'immobile' : 'activation',
+      // Côté (gauche/droite, -1/1) choisi pour contourner un allié bloquant
+      // en plein combat — voir allieBloquantEnCombat() / mettreAJourUnite().
+      // null = pas de contournement en cours.
+      coteContournement: null
     }
     ;(team === 'joueur' ? unitesJoueur : unitesEnnemi).push(unite)
   }
@@ -1288,6 +1292,18 @@
   // elles se repoussent l'une l'autre à chaque frame jusqu'à respecter
   // cette limite.
   const CHEVAUCHEMENT_MAX = 0.10
+
+  // "Masse" d'une unité pour le partage d'une poussée : une unité qui est
+  // en plein combat (état 'attaque') résiste bien plus qu'une unité qui
+  // marche simplement — elle cède peu de terrain à un allié qui la
+  // bousculerait par derrière, sans pour autant devenir totalement
+  // immobile (voir le partage dans separerPaire ci-dessous). C'est ce qui
+  // empêche une unité de pousser un allié engagé au corps-à-corps jusque
+  // dans le château adverse.
+  const MASSE_COMBAT = 5
+  function masseUnite(u) {
+    return u.etat === 'attaque' ? MASSE_COMBAT : 1
+  }
 
   // Écarte deux unités qui se chevauchent trop, le long de la droite qui
   // relie leurs centres. `bFixe` : b ne bouge jamais (obstacle immobile,
@@ -1315,10 +1331,18 @@
       a.x -= ux * chevauchement
       a.y -= uy * chevauchement
     } else {
-      a.x -= ux * chevauchement / 2
-      a.y -= uy * chevauchement / 2
-      b.x += ux * chevauchement / 2
-      b.y += uy * chevauchement / 2
+      // Partage proportionnel à la masse adverse : une unité "lourde"
+      // (en train de combattre) se déplace peu, l'autre absorbe le reste
+      // du chevauchement. Deux unités de masse égale (cas normal, aucune
+      // des deux en combat) retombent sur le partage 50/50 d'origine.
+      const ma = masseUnite(a), mb = masseUnite(b)
+      const total = ma + mb
+      const partA = mb / total
+      const partB = ma / total
+      a.x -= ux * chevauchement * partA
+      a.y -= uy * chevauchement * partA
+      b.x += ux * chevauchement * partB
+      b.y += uy * chevauchement * partB
     }
   }
 
@@ -1339,6 +1363,18 @@
       for (const fixe of immobiles) {
         separerPaire(m, fixe, true)
       }
+    }
+
+    // ─── Protection des châteaux ───────────────────────────────────
+    // Une poussée (allié qui bouscule un allié, ou tout autre cas) ne doit
+    // jamais faire franchir à une unité la ligne d'un château — ni le
+    // sien, ni celui de l'adversaire. On la replace juste devant si une
+    // séparation l'y avait fait entrer.
+    const limiteHaute = CASTLE_PX                  // frontière château ennemi (haut)
+    const limiteBasse = canvas.height - CASTLE_PX  // frontière château joueur (bas)
+    for (const m of mobiles) {
+      if (m.y < limiteHaute) m.y = limiteHaute
+      if (m.y > limiteBasse) m.y = limiteBasse
     }
   }
 
@@ -1365,6 +1401,38 @@
 
       const d = Math.hypot(a.x - unite.x, a.y - unite.y)
       if (d < meilleureDist) { meilleur = a; meilleureDist = d }
+    }
+    return meilleur
+  }
+
+  // Marge de détection (px) en avance du contact réel : permet d'amorcer
+  // le contournement un peu avant que les cercles ne se touchent, pour un
+  // mouvement plus fluide (pas de blocage net puis dérapage).
+  const DISTANCE_ANTICIPATION_CONTOURNEMENT = 18
+
+  // Cherche, dans le même camp, un allié situé juste devant l'unité, sur
+  // le même "axe" de marche (peu d'écart latéral par rapport à la somme
+  // des rayons), et qui est actuellement en plein combat (état
+  // 'attaque'). Sert à déclencher le contournement dans mettreAJourUnite :
+  // on ne pousse pas indéfiniment une unité engagée, on la dépasse par le
+  // côté. Un allié qui ne combat pas n'est PAS considéré comme bloquant :
+  // il reste possible de le pousser normalement (voir separerPaire).
+  function allieBloquantEnCombat(unite) {
+    const allies = unite.team === 'joueur' ? unitesJoueur : unitesEnnemi
+    const rayonU = rayonUnite(unite)
+    let meilleur = null, meilleureDist = Infinity
+    for (const a of allies) {
+      if (a === unite || a.pv <= 0 || a.etat !== 'attaque') continue
+      const dx = a.x - unite.x, dy = a.y - unite.y
+      const dist = Math.hypot(dx, dy)
+      if (dist === 0) continue
+      const proj = dx * unite.dirX + dy * unite.dirY   // devant = positif
+      if (proj <= 0) continue
+      const rayonSomme = rayonU + rayonUnite(a)
+      if (proj > rayonSomme + DISTANCE_ANTICIPATION_CONTOURNEMENT) continue
+      const lat = Math.abs(dx * -unite.dirY + dy * unite.dirX) // écart à l'axe
+      if (lat > rayonSomme) continue                    // pas vraiment sur le trajet
+      if (dist < meilleureDist) { meilleureDist = dist; meilleur = a }
     }
     return meilleur
   }
@@ -1406,9 +1474,37 @@
     } else {
       unite.etat = 'marche'
       // Déplacement en ligne droite fixée au moment de la pose, libre
-      // (non contraint par la grille hexagonale).
-      unite.x += unite.dirX * unite.vitesseMarche * dt / 1000
-      unite.y += unite.dirY * unite.vitesseMarche * dt / 1000
+      // (non contraint par la grille hexagonale) — sauf si un allié est
+      // juste devant, sur le même axe, en train de combattre : dans ce
+      // cas on ne le pousse pas indéfiniment (voir la résistance dans
+      // separerPaire), on le contourne par le côté à la place.
+      const vitesse = unite.vitesseMarche * dt / 1000
+      const bloqueur = allieBloquantEnCombat(unite)
+
+      if (bloqueur) {
+        if (unite.coteContournement === null) {
+          // Côté (gauche/droite) choisi une bonne fois pour toutes au
+          // début du contournement, pour éviter que l'unité n'oscille
+          // d'un côté à l'autre d'une frame sur l'autre.
+          const dx = bloqueur.x - unite.x, dy = bloqueur.y - unite.y
+          const cote = unite.dirX * dy - unite.dirY * dx  // signe = côté du bloqueur
+          unite.coteContournement = Math.abs(cote) > 0.01
+            ? Math.sign(cote)
+            : (unite.id % 2 === 0 ? 1 : -1)  // bloqueur pile dans l'axe : côté arbitraire mais stable
+        }
+        // Vecteur perpendiculaire à la direction de marche, orienté vers
+        // le côté choisi : l'unité avance surtout latéralement (elle
+        // contourne) et un peu vers l'avant, plutôt que de rester plaquée
+        // contre l'allié bloquant.
+        const perpX = -unite.dirY * unite.coteContournement
+        const perpY =  unite.dirX * unite.coteContournement
+        unite.x += (perpX * 0.8 + unite.dirX * 0.2) * vitesse
+        unite.y += (perpY * 0.8 + unite.dirY * 0.2) * vitesse
+      } else {
+        unite.coteContournement = null
+        unite.x += unite.dirX * vitesse
+        unite.y += unite.dirY * vitesse
+      }
     }
   }
 
