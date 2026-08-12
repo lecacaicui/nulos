@@ -78,12 +78,38 @@
       border-radius: 12px;
       overflow: hidden;
       background: #0b160b;
+      position: relative;
     }
     #game-canvas {
       display: block;
       max-width: 100%;
       max-height: 100%;
       image-rendering: pixelated;
+    }
+    .arena-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 1rem;
+    }
+    .arena-overlay.cachee { display: none; }
+    .arena-overlay-carte {
+      background: var(--couleur-conteneur);
+      border-radius: 12px;
+      padding: 1.75rem 2rem;
+      text-align: center;
+      max-width: 280px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.35);
+    }
+    .arena-overlay-carte h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+    .arena-overlay-carte p {
+      color: var(--couleur-texte-faible);
+      font-size: .85rem;
+      margin-bottom: 1.25rem;
     }
     .battlogy-bottombar {
       width: 100%;
@@ -177,13 +203,30 @@
       </div>
       <div class="arena-outer" id="arena-outer">
         <canvas id="game-canvas"></canvas>
+        <div class="arena-overlay" id="arena-overlay">
+          <div class="arena-overlay-carte">
+            <h2 id="overlay-titre">Battlogy</h2>
+            <p id="overlay-texte">Pose tes unités pour détruire le château ennemi avant qu'il ne détruise le tien.</p>
+            <button class="btn btn-primary" id="btn-lancer">Lancer la partie</button>
+          </div>
+        </div>
       </div>
       <div class="battlogy-bottombar" id="battlogy-bottombar">
         <div class="battlogy-or">🪙 Or : <span id="or-affiche">∞</span></div>
-        <div class="carte-main" id="carte-guerrier" data-carte="guerrier">
+        <div class="carte-main indisponible" data-carte="guerrier">
           <span class="carte-emoji">⚔️</span>
           <span class="carte-nom">Guerrier</span>
           <span class="carte-cout">1</span>
+        </div>
+        <div class="carte-main indisponible" data-carte="archer">
+          <span class="carte-emoji">🏹</span>
+          <span class="carte-nom">Archer</span>
+          <span class="carte-cout">2</span>
+        </div>
+        <div class="carte-main indisponible" data-carte="squelette">
+          <span class="carte-emoji">💀</span>
+          <span class="carte-nom">Squelettes</span>
+          <span class="carte-cout">2</span>
         </div>
       </div>
     </div>
@@ -252,6 +295,16 @@
       id: 'guerrier', nom: 'Guerrier', emoji: '⚔️', cout: 1,
       pv: 100, degats: 10, porte: 34, vitesseAttaque: 1,
       vitesseMarche: 45, zoneDetection: 90, tempsActivation: 800, nombre: 1
+    },
+    archer: {
+      id: 'archer', nom: 'Archer', emoji: '🏹', cout: 2,
+      pv: 55, degats: 12, porte: 120, vitesseAttaque: 0.9,
+      vitesseMarche: 40, zoneDetection: 140, tempsActivation: 900, nombre: 1
+    },
+    squelette: {
+      id: 'squelette', nom: 'Squelettes', emoji: '💀', cout: 2,
+      pv: 30, degats: 5, porte: 26, vitesseAttaque: 1.3,
+      vitesseMarche: 55, zoneDetection: 80, tempsActivation: 500, nombre: 3
     }
   }
 
@@ -270,6 +323,11 @@
 
   // Case survolée pendant le glisser d'une carte (mise en surbrillance).
   let hexSurvole = null
+
+  // Cycle de vie de la partie : rien ne bouge tant que le joueur n'a pas
+  // cliqué sur « Lancer la partie » ; tout s'arrête dès qu'un château tombe.
+  let partieCommencee = false
+  let partieTerminee = false
 
   // ─── Images des châteaux ───────────────────────────────────────
   const imgCastleEnemi  = new Image()
@@ -649,12 +707,20 @@
     const dt = Math.min(50, timestamp - dernierTimestamp) // dt plafonné (onglet en arrière-plan)
     dernierTimestamp = timestamp
 
-    mettreAJourUnites(dt)
+    if (partieCommencee && !partieTerminee) {
+      mettreAJourUnites(dt)
 
-    tempsDepuisSpawnEnnemi += dt
-    if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
-      tempsDepuisSpawnEnnemi -= INTERVALLE_SPAWN_ENNEMI
-      spawnEnnemiAleatoire()
+      tempsDepuisSpawnEnnemi += dt
+      if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
+        tempsDepuisSpawnEnnemi -= INTERVALLE_SPAWN_ENNEMI
+        spawnEnnemiAleatoire()
+      }
+
+      if (ennemiChateauPV <= 0) {
+        terminerPartie(true)
+      } else if (joueurChateauPV <= 0) {
+        terminerPartie(false)
+      }
     }
 
     render()
@@ -707,6 +773,7 @@
     const cartes = document.querySelectorAll('.carte-main')
     cartes.forEach(el => {
       el.addEventListener('pointerdown', (e) => {
+        if (!partieCommencee || partieTerminee) return
         e.preventDefault()
         carteEnCours = el.dataset.carte
         ghostEl = document.createElement('div')
@@ -748,6 +815,48 @@
     hexSurvole = null
     carteEnCours = null
   }
+
+  // ─── Écran de démarrage / fin de partie ────────────────────────
+  function actualiserCartesDisponibles(disponible) {
+    document.querySelectorAll('.carte-main').forEach(el => el.classList.toggle('indisponible', !disponible))
+  }
+
+  function afficherEcran(titre, texte, texteBouton) {
+    document.getElementById('overlay-titre').textContent = titre
+    document.getElementById('overlay-texte').textContent = texte
+    document.getElementById('btn-lancer').textContent = texteBouton
+    document.getElementById('arena-overlay').classList.remove('cachee')
+    actualiserCartesDisponibles(false)
+  }
+
+  function masquerEcran() {
+    document.getElementById('arena-overlay').classList.add('cachee')
+  }
+
+  function demarrerPartie() {
+    // Réinitialise entièrement la partie (utile aussi pour « Rejouer »).
+    unitesJoueur = []
+    unitesEnnemi = []
+    joueurChateauPV = joueurChateauPVMax
+    ennemiChateauPV = ennemiChateauPVMax
+    tempsDepuisSpawnEnnemi = 0
+    hexSurvole = null
+    partieTerminee = false
+    partieCommencee = true
+    masquerEcran()
+    actualiserCartesDisponibles(true)
+  }
+
+  function terminerPartie(victoire) {
+    partieTerminee = true
+    afficherEcran(
+      victoire ? '🏆 Victoire !' : '💀 Défaite…',
+      victoire ? 'Le château ennemi est détruit.' : 'Ton château a été détruit.',
+      'Rejouer'
+    )
+  }
+
+  document.getElementById('btn-lancer').addEventListener('click', demarrerPartie)
 
   document.getElementById('or-affiche').textContent = or === Infinity ? '∞' : or
   initGlisserDeposer()
