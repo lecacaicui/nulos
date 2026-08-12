@@ -210,6 +210,118 @@
       white-space: nowrap;
     }
     .battlogy-message.visible { opacity: 1; }
+
+    /* ═══ Timer de phase ═══ */
+    .battlogy-timer {
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--couleur-texte-faible);
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 999px;
+      padding: .3rem .8rem;
+      white-space: nowrap;
+    }
+    .battlogy-timer.mort-subite { color: #ef4444; border-color: #ef444455; background: #ef444418; }
+
+    /* ═══ Bouton "éditer le deck" à côté de "Lancer la partie" ═══ */
+    .arena-overlay-carte .btn-group { margin-top: 0; }
+
+    /* ═══ Barre du bas : or, main dynamique, pioche d'urgence ═══ */
+    #main-cartes { display: flex; align-items: center; gap: .5rem; flex: 1 1 auto; flex-wrap: wrap; }
+    .carte-main.cout-eleve { filter: grayscale(.5); }
+    .btn-pioche-urgence {
+      flex: 0 0 auto;
+      font-size: .72rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      padding: .5rem .6rem;
+      background: #f59e0b;
+      color: #1a1a1a;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: filter .15s;
+    }
+    .btn-pioche-urgence:hover { filter: brightness(.92); }
+    .btn-pioche-urgence:disabled { background: var(--couleur-bordure); color: var(--couleur-texte-faible); cursor: not-allowed; }
+
+    /* ═══ Zone de destruction (glisser une carte dessus pour la défausser) ═══ */
+    .zone-destruction {
+      position: fixed;
+      left: 50%;
+      bottom: 6.2rem;
+      transform: translateX(-50%) scale(.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      background: #7f1d1dcc;
+      color: #fecaca;
+      border: 2px dashed #ef4444aa;
+      border-radius: 999px;
+      padding: .7rem 1.4rem;
+      font-size: .85rem;
+      font-weight: 700;
+      z-index: 1999;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .15s, transform .15s;
+    }
+    .zone-destruction.visible { display: flex; opacity: 1; transform: translateX(-50%) scale(1); }
+    .zone-destruction.survolee { background: #b91c1cee; color: #fff; transform: translateX(-50%) scale(1.08); }
+
+    /* ═══ Modale d'édition du deck ═══ */
+    .modale-fond {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      padding: 1rem;
+    }
+    .modale-fond.ouverte { display: flex; }
+    .modale-deck {
+      background: var(--couleur-conteneur);
+      border-radius: 14px;
+      padding: 1.75rem;
+      max-width: 480px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.35);
+    }
+    .modale-deck h2 { font-size: 1.15rem; margin-bottom: .25rem; }
+    .modale-deck-compteur { font-size: .85rem; color: var(--couleur-texte-faible); margin-bottom: 1.25rem; }
+    .modale-fermer {
+      position: absolute; top: .85rem; right: 1rem;
+      background: none; border: none; font-size: 1.3rem;
+      color: var(--couleur-texte-faible); cursor: pointer; line-height: 1;
+    }
+    .modale-fermer:hover { color: var(--couleur-texte); }
+    .deck-liste { display: flex; flex-direction: column; gap: .6rem; }
+    .deck-ligne {
+      display: flex; align-items: center; gap: .75rem;
+      background: var(--couleur-fond); border: 1px solid var(--couleur-bordure);
+      border-radius: 10px; padding: .6rem .8rem;
+    }
+    .deck-ligne .deck-emoji { font-size: 1.4rem; }
+    .deck-ligne .deck-infos { flex: 1; }
+    .deck-ligne .deck-nom { font-size: .88rem; font-weight: 700; }
+    .deck-ligne .deck-cout { font-size: .72rem; color: var(--couleur-texte-faible); }
+    .deck-stepper { display: flex; align-items: center; gap: .5rem; }
+    .deck-stepper button {
+      width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--couleur-bordure);
+      background: var(--couleur-conteneur); color: var(--couleur-texte); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; line-height: 1;
+    }
+    .deck-stepper button:disabled { opacity: .35; cursor: not-allowed; }
+    .deck-stepper span { min-width: 1.2em; text-align: center; font-weight: 700; font-size: .9rem; }
+    .modale-deck-actions { display: flex; gap: .6rem; margin-top: 1.5rem; }
+    .modale-deck-actions .btn { flex: 1; }
   </style>
 </head>
 <body>
@@ -218,6 +330,7 @@
     <div class="battlogy-wrap">
       <div class="battlogy-topbar">
         <h1>⚔️ Battlogy</h1>
+        <span class="battlogy-timer" id="battlogy-timer" style="display:none"></span>
         <span class="battlogy-beta">BÊTA</span>
       </div>
       <div class="arena-outer" id="arena-outer">
@@ -226,41 +339,37 @@
           <div class="arena-overlay-carte">
             <h2 id="overlay-titre">Battlogy</h2>
             <p id="overlay-texte">Pose tes unités pour détruire le château ennemi avant qu'il ne détruise le tien.</p>
-            <button class="btn btn-primary" id="btn-lancer">Lancer la partie</button>
+            <div class="btn-group">
+              <button class="btn btn-primary" id="btn-lancer">Lancer la partie</button>
+              <button class="btn btn-secondary" id="btn-editer-deck">🃏 Éditer mon deck</button>
+            </div>
           </div>
         </div>
       </div>
       <div class="battlogy-bottombar" id="battlogy-bottombar">
-        <div class="battlogy-or">🪙 Or : <span id="or-affiche">∞</span></div>
-        <div class="carte-main indisponible" data-carte="guerrier">
-          <span class="carte-touche">&amp;</span>
-          <span class="carte-emoji">⚔️</span>
-          <span class="carte-nom">Guerrier</span>
-          <span class="carte-cout">1</span>
-        </div>
-        <div class="carte-main indisponible" data-carte="archer">
-          <span class="carte-touche">é</span>
-          <span class="carte-emoji">🏹</span>
-          <span class="carte-nom">Archer</span>
-          <span class="carte-cout">2</span>
-        </div>
-        <div class="carte-main indisponible" data-carte="squelette">
-          <span class="carte-touche">"</span>
-          <span class="carte-emoji">💀</span>
-          <span class="carte-nom">Squelettes</span>
-          <span class="carte-cout">2</span>
-        </div>
-        <div class="carte-main indisponible" data-carte="statue">
-          <span class="carte-touche">'</span>
-          <span class="carte-emoji">🗿</span>
-          <span class="carte-nom">Statue</span>
-          <span class="carte-cout">3</span>
-        </div>
+        <div class="battlogy-or">🪙 <span id="or-affiche">0</span>/<span id="or-cap-affiche">3</span></div>
+        <div id="main-cartes"></div>
+        <button class="btn-pioche-urgence" id="btn-pioche-urgence" style="display:none">⚡ Piocher (5)</button>
       </div>
     </div>
   </main>
 
   <div class="battlogy-message" id="battlogy-message"></div>
+  <div class="zone-destruction" id="zone-destruction">🗑️ Relâcher pour détruire</div>
+
+  <!-- ═══ Modale d'édition du deck ═══ -->
+  <div class="modale-fond" id="modale-deck-fond" onclick="if(event.target===this) fermerModaleDeck()">
+    <div class="modale-deck">
+      <button class="modale-fermer" onclick="fermerModaleDeck()">✕</button>
+      <h2>🃏 Éditer mon deck</h2>
+      <div class="modale-deck-compteur"><span id="deck-compteur">0</span>/10 cartes</div>
+      <div class="deck-liste" id="deck-liste"></div>
+      <div class="modale-deck-actions">
+        <button class="btn btn-secondary" id="btn-deck-reset">Réinitialiser</button>
+        <button class="btn btn-primary" id="btn-deck-sauver">Enregistrer</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
@@ -363,8 +472,51 @@
   // calculent en multipliant cette base par `taille`.
   const RAYON_UNITE_BASE = 14
 
-  // ─── État de la partie (test : or infini) ─────────────────────
-  let or = Infinity
+  // ─── Deck / Main / Or : constantes de jeu ──────────────────────
+  const DECK_TAILLE           = 10
+  const MAIN_TAILLE_MAX       = 5
+  const POIDS_DEPART          = 1
+  const POIDS_MIN             = 0
+  const POIDS_MAX             = 2.5
+  const POIDS_BAISSE_TIRAGE   = 0.9   // appliqué à la carte tirée
+  const POIDS_HAUSSE_AUTRES   = 0.1   // appliqué à toutes les autres cartes du deck
+  const MULT_COUT_TROP_CHER   = 0.7   // malus de tirage si coût > capacité max d'or actuelle
+  const MULT_INITIAL_PAS_CHER = 2     // bonus de tirage (main de départ uniquement) si coût <= 3
+  const OR_CAPACITE_DEPART    = 3
+  const OR_CAPACITE_MAX       = 12
+  const PIOCHE_URGENCE_COUT   = 5
+  const PIOCHE_URGENCE_NB     = 2
+
+  const PIOCHE_INTERVALLE_PHASE1 = 8000  // ms, 1 carte / 8s
+  const PIOCHE_INTERVALLE_PHASE2 = 4000  // ms, 1 carte / 4s (dès 1m30)
+  const OR_INTERVALLE_PHASE1     = 1500  // ms, 1 or / 1.5s
+  const OR_INTERVALLE_PHASE2     = 1000  // ms, 1 or / 1s (dès 1m30)
+  const OR_INTERVALLE_PHASE3     = 500   // ms, 1 or / 0.5s (dès 3min)
+
+  const PHASE_2_T          = 90000   // 1m30
+  const PHASE_3_T          = 180000  // 3min
+  const MORT_SUBITE_T      = 270000  // 4m30
+  const MORT_SUBITE_TAUX   = 0.035   // % des PV max perdus / seconde, par château
+
+  const DECK_STORAGE_KEY = 'battlogy_deck_v1'
+  // Composition de base fournie par défaut tant que le joueur n'a pas
+  // enregistré son propre deck (voir modale d'édition).
+  const DECK_PAR_DEFAUT = [
+    'guerrier', 'guerrier', 'guerrier',
+    'archer', 'archer', 'archer',
+    'squelette', 'squelette',
+    'statue', 'statue'
+  ]
+
+  // ─── État de la partie ──────────────────────────────────────────
+  let or = 0
+  let orCapaciteMax = OR_CAPACITE_DEPART
+  let deckSlots = []      // [{ carteId, poids }, ...] (10 emplacements, poids remis à 1 à chaque partie)
+  let main = []           // [{ uid, carteId }, ...] jusqu'à 5 cartes
+  let uidMainCompteur = 0
+  let tempsDepuisGeneration = 0
+  let tempsDepuisPioche = 0
+  let tempsCombat = 0     // durée écoulée depuis le début du combat (indépendant de dernierTimestamp)
   let joueurChateauPV = 1000, joueurChateauPVMax = 1000
   let ennemiChateauPV = 1000, ennemiChateauPVMax = 1000
   let unitesJoueur = []
@@ -390,6 +542,170 @@
   // cliqué sur « Lancer la partie » ; tout s'arrête dès qu'un château tombe.
   let partieCommencee = false
   let partieTerminee = false
+
+  // ─── Deck : chargement / sauvegarde (localStorage) ─────────────
+  function chargerCompositionDeck() {
+    try {
+      const brut = localStorage.getItem(DECK_STORAGE_KEY)
+      if (!brut) return DECK_PAR_DEFAUT.slice()
+      const liste = JSON.parse(brut)
+      if (!Array.isArray(liste) || liste.length === 0) return DECK_PAR_DEFAUT.slice()
+      return liste.filter(id => !!CARTES[id]).slice(0, DECK_TAILLE)
+    } catch (e) { return DECK_PAR_DEFAUT.slice() }
+  }
+
+  function sauvegarderCompositionDeck(liste) {
+    localStorage.setItem(DECK_STORAGE_KEY, JSON.stringify(liste))
+  }
+
+  // ─── Tirage pondéré dans le deck ────────────────────────────────
+  // `bonusPetitCout` : uniquement utilisé pour la main de départ (3
+  // cartes), applique un bonus x2 aux cartes coûtant 3 or ou moins, en
+  // plus (et indépendamment) du malus des cartes trop chères.
+  function poidsEffectifDeck(bonusPetitCout) {
+    return deckSlots.map(slot => {
+      const carte = CARTES[slot.carteId]
+      let p = Math.max(POIDS_MIN, slot.poids)
+      if (carte.cout > orCapaciteMax) p *= MULT_COUT_TROP_CHER
+      if (bonusPetitCout && carte.cout <= 3) p *= MULT_INITIAL_PAS_CHER
+      return p
+    })
+  }
+
+  function tirerCarteDuDeck(bonusPetitCout = false) {
+    if (deckSlots.length === 0) return null
+    const poids = poidsEffectifDeck(bonusPetitCout)
+    const total = poids.reduce((a, b) => a + b, 0)
+    let index
+    if (total <= 0) {
+      // Cas limite (tous les poids sont à 0) : tirage uniforme de secours.
+      index = Math.floor(Math.random() * deckSlots.length)
+    } else {
+      let tirage = Math.random() * total
+      index = deckSlots.length - 1
+      for (let i = 0; i < deckSlots.length; i++) {
+        tirage -= poids[i]
+        if (tirage <= 0) { index = i; break }
+      }
+    }
+
+    // Mise à jour des poids stockés : la carte tirée baisse, toutes les
+    // autres remontent légèrement (bornées entre POIDS_MIN et POIDS_MAX).
+    for (let i = 0; i < deckSlots.length; i++) {
+      if (i === index) {
+        deckSlots[i].poids = Math.max(POIDS_MIN, deckSlots[i].poids - POIDS_BAISSE_TIRAGE)
+      } else {
+        deckSlots[i].poids = Math.min(POIDS_MAX, deckSlots[i].poids + POIDS_HAUSSE_AUTRES)
+      }
+    }
+
+    return deckSlots[index].carteId
+  }
+
+  // ─── Main : ajout / retrait ─────────────────────────────────────
+  function ajouterCarteEnMain(carteId) {
+    main.push({ uid: ++uidMainCompteur, carteId })
+    renderMain()
+  }
+
+  // Pioche automatique (timer) : la capacité max d'or augmente à chaque
+  // fois (que la carte tienne dans la main ou non), sauf si déjà au max.
+  function piocherCarteAutomatique() {
+    const carteId = tirerCarteDuDeck(false)
+    if (!carteId) return
+    if (main.length < MAIN_TAILLE_MAX) {
+      ajouterCarteEnMain(carteId)
+    } else {
+      afficherMessage('Main pleine — carte perdue.')
+    }
+    orCapaciteMax = Math.min(OR_CAPACITE_MAX, orCapaciteMax + 1)
+    renderMain()
+  }
+
+  function remplirMainInitiale() {
+    main = []
+    for (let i = 0; i < 3; i++) {
+      const carteId = tirerCarteDuDeck(true)
+      if (carteId) main.push({ uid: ++uidMainCompteur, carteId })
+    }
+  }
+
+  // Pioche d'urgence : payante, ne touche ni au cooldown de pioche
+  // normal ni à la capacité max d'or. Seulement possible main vide.
+  function piocherUrgence() {
+    if (main.length > 0) return
+    if (or < PIOCHE_URGENCE_COUT) { afficherMessage("Pas assez d'or."); return }
+    or -= PIOCHE_URGENCE_COUT
+    for (let i = 0; i < PIOCHE_URGENCE_NB; i++) {
+      const carteId = tirerCarteDuDeck(false)
+      if (carteId && main.length < MAIN_TAILLE_MAX) ajouterCarteEnMain(carteId)
+    }
+    renderMain()
+  }
+
+  // ─── Phase de combat en cours (déduite du temps écoulé) ─────────
+  function intervallePiocheActuel() {
+    return tempsCombat < PHASE_2_T ? PIOCHE_INTERVALLE_PHASE1 : PIOCHE_INTERVALLE_PHASE2
+  }
+  function intervalleOrActuel() {
+    if (tempsCombat < PHASE_2_T) return OR_INTERVALLE_PHASE1
+    if (tempsCombat < PHASE_3_T) return OR_INTERVALLE_PHASE2
+    return OR_INTERVALLE_PHASE3
+  }
+  function enMortSubite() {
+    return tempsCombat >= MORT_SUBITE_T
+  }
+
+  function formaterCompteARebours(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000))
+    const m = Math.floor(s / 60)
+    const r = s % 60
+    return m + ':' + String(r).padStart(2, '0')
+  }
+
+  function texteTimerPhase() {
+    if (tempsCombat < PHASE_2_T)  return '⏱️ ' + formaterCompteARebours(PHASE_2_T - tempsCombat) + ' → Phase 2'
+    if (tempsCombat < PHASE_3_T)  return '⏱️ ' + formaterCompteARebours(PHASE_3_T - tempsCombat) + ' → Phase 3'
+    if (tempsCombat < MORT_SUBITE_T) return '⏱️ ' + formaterCompteARebours(MORT_SUBITE_T - tempsCombat) + ' → Mort subite'
+    return '💀 Mort subite !'
+  }
+
+  function actualiserAffichageTimer() {
+    const el = document.getElementById('battlogy-timer')
+    if (!partieCommencee || partieTerminee) { el.style.display = 'none'; return }
+    el.style.display = 'inline-block'
+    el.textContent = texteTimerPhase()
+    el.classList.toggle('mort-subite', enMortSubite())
+  }
+
+  // ─── Rendu de la barre du bas (or + main + pioche d'urgence) ────
+  function renderMain() {
+    document.getElementById('or-affiche').textContent = or
+    document.getElementById('or-cap-affiche').textContent = orCapaciteMax
+
+    const conteneur = document.getElementById('main-cartes')
+    conteneur.innerHTML = main.map((item, i) => {
+      const carte = CARTES[item.carteId]
+      const touche = TOUCHES_CARTES_LABEL[i] || ''
+      const tropCher = or < carte.cout
+      return `
+        <div class="carte-main${(!partieCommencee || partieTerminee) ? ' indisponible' : ''}${tropCher ? ' cout-eleve' : ''}" data-uid="${item.uid}">
+          <span class="carte-touche">${touche}</span>
+          <span class="carte-emoji">${carte.emoji}</span>
+          <span class="carte-nom">${carte.nom}</span>
+          <span class="carte-cout">${carte.cout}</span>
+        </div>`
+    }).join('')
+    initGlisserDeposer()
+
+    const btnUrgence = document.getElementById('btn-pioche-urgence')
+    if (partieCommencee && !partieTerminee && main.length === 0) {
+      btnUrgence.style.display = 'inline-block'
+      btnUrgence.disabled = or < PIOCHE_URGENCE_COUT
+    } else {
+      btnUrgence.style.display = 'none'
+    }
+  }
 
   // ─── Images des châteaux ───────────────────────────────────────
   const imgCastleEnemi  = new Image()
@@ -1022,6 +1338,40 @@
         spawnEnnemiAleatoire()
       }
 
+      tempsCombat += dt
+
+      // Génération d'or continue, plafonnée à orCapaciteMax, dont le rythme
+      // accélère par palier (voir intervalleOrActuel).
+      tempsDepuisGeneration += dt
+      const intervalleOr = intervalleOrActuel()
+      let orAAffiche = false
+      while (tempsDepuisGeneration >= intervalleOr) {
+        tempsDepuisGeneration -= intervalleOr
+        if (or < orCapaciteMax) { or += 1; orAAffiche = true }
+      }
+
+      // Pioche automatique de cartes, dont le rythme accélère à 1m30.
+      tempsDepuisPioche += dt
+      const intervallePioche = intervallePiocheActuel()
+      let mainAAfficher = false
+      while (tempsDepuisPioche >= intervallePioche) {
+        tempsDepuisPioche -= intervallePioche
+        piocherCarteAutomatique()
+        mainAAfficher = true
+      }
+
+      if (orAAffiche && !mainAAfficher) renderMain()
+
+      // Mort subite (dès 4m30) : les deux châteaux perdent en continu un
+      // pourcentage de leurs PV max par seconde, jusqu'à destruction de l'un.
+      if (enMortSubite()) {
+        const perte = (dt / 1000) * MORT_SUBITE_TAUX
+        joueurChateauPV = Math.max(0, joueurChateauPV - joueurChateauPVMax * perte)
+        ennemiChateauPV = Math.max(0, ennemiChateauPV - ennemiChateauPVMax * perte)
+      }
+
+      actualiserAffichageTimer()
+
       if (ennemiChateauPV <= 0) {
         terminerPartie(true)
       } else if (joueurChateauPV <= 0) {
@@ -1063,11 +1413,16 @@
     }
   }
 
-  function tenterPoserCarte(carteId, hex) {
-    const carte = CARTES[carteId]
+  // `uid` identifie l'exemplaire précis dans la main (indispensable dès
+  // qu'on autorise les doublons : deux cartes "guerrier" en main ont
+  // chacune leur propre uid).
+  function tenterPoserCarte(uid, hex) {
+    const item = main.find(m => m.uid === uid)
+    if (!item) return
+    const carte = CARTES[item.carteId]
     if (!carte) return
     if (!hex) { afficherMessage('Pose ta carte sur une case du terrain.'); return }
-    if (!estPositionValidePourPose(carteId, hex)) {
+    if (!estPositionValidePourPose(item.carteId, hex)) {
       afficherMessage(
         carte.placementLibre
           ? 'Case invalide.'
@@ -1076,13 +1431,25 @@
       return
     }
     if (or < carte.cout) { afficherMessage("Pas assez d'or."); return }
-    if (or !== Infinity) or -= carte.cout
-    document.getElementById('or-affiche').textContent = or === Infinity ? '∞' : or
+    or -= carte.cout
+    main = main.filter(m => m.uid !== uid)
+    renderMain()
     // La carte est posée exactement au centre de la case (pas à l'endroit
     // précis du curseur/doigt).
     poserCarte(carte, hex.cx, hex.cy, 'joueur')
   }
 
+  // Détruire volontairement une carte (zone de destruction) : aucun impact
+  // sur l'or ni sur les poids de tirage — juste un retrait de la main.
+  function detruireCarteMain(uid) {
+    if (!main.some(m => m.uid === uid)) return
+    main = main.filter(m => m.uid !== uid)
+    renderMain()
+    afficherMessage('Carte détruite.')
+  }
+
+  // `carteEnCours` contient désormais l'uid de la carte en main en cours
+  // de glisser (et non plus son carteId), pour distinguer les doublons.
   function initGlisserDeposer() {
     const cartes = document.querySelectorAll('.carte-main')
     cartes.forEach(el => {
@@ -1090,10 +1457,13 @@
         if (!partieCommencee || partieTerminee) return
         if (carteEnCours) return // un glisser (souris ou clavier) est déjà en cours
         e.preventDefault()
-        carteEnCours = el.dataset.carte
+        const uid = Number(el.dataset.uid)
+        const item = main.find(m => m.uid === uid)
+        if (!item) return
+        carteEnCours = uid
         ghostEl = document.createElement('div')
         ghostEl.className = 'carte-ghost'
-        ghostEl.textContent = CARTES[carteEnCours]?.emoji || ''
+        ghostEl.textContent = CARTES[item.carteId]?.emoji || ''
         document.body.appendChild(ghostEl)
         deplacerGhost(e.clientX, e.clientY)
         document.addEventListener('pointermove', pendantGlisser)
@@ -1108,12 +1478,25 @@
     ghostEl.style.top = cy + 'px'
   }
 
+  // La zone de destruction n'apparaît que pendant un glisser, et se
+  // surligne si le pointeur la survole (glisser-déposer pour défausser).
+  function zoneDestructionSurvolee(cx, cy) {
+    const zone = document.getElementById('zone-destruction')
+    const r = zone.getBoundingClientRect()
+    return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom
+  }
+
   function pendantGlisser(e) {
     enTrainDeGlisser = true
     deplacerGhost(e.clientX, e.clientY)
 
+    const zone = document.getElementById('zone-destruction')
+    zone.classList.add('visible')
+    const survolee = zoneDestructionSurvolee(e.clientX, e.clientY)
+    zone.classList.toggle('survolee', survolee)
+
     const pt = clientVersCanvas(e.clientX, e.clientY)
-    hexSurvole = pt ? trouverHexProche(pt.x, pt.y) : null
+    hexSurvole = survolee ? null : (pt ? trouverHexProche(pt.x, pt.y) : null)
   }
 
   function finGlisser(e) {
@@ -1121,27 +1504,34 @@
     document.removeEventListener('pointerup', finGlisser)
     enTrainDeGlisser = false
     if (ghostEl) { ghostEl.remove(); ghostEl = null }
+    const zone = document.getElementById('zone-destruction')
+    zone.classList.remove('visible', 'survolee')
 
     if (carteEnCours) {
-      const pt = clientVersCanvas(e.clientX, e.clientY)
-      const hex = pt ? trouverHexProche(pt.x, pt.y) : null
-      tenterPoserCarte(carteEnCours, hex)
+      if (zoneDestructionSurvolee(e.clientX, e.clientY)) {
+        detruireCarteMain(carteEnCours)
+      } else {
+        const pt = clientVersCanvas(e.clientX, e.clientY)
+        const hex = pt ? trouverHexProche(pt.x, pt.y) : null
+        tenterPoserCarte(carteEnCours, hex)
+      }
     }
     hexSurvole = null
     carteEnCours = null
   }
 
   // ─── Raccourcis clavier : touches du rang des chiffres ────────────────
-  // Sur un clavier AZERTY ce rang affiche &, é, ", ', (, -, è, _, ç, à — on
-  // se base donc sur `event.code` (Digit1, Digit2…), qui correspond à
-  // l'emplacement physique de la touche et pas au caractère affiché, pour
-  // que « la touche au-dessus de la lettre A » fonctionne quel que soit le
-  // clavier (AZERTY, QWERTY…). Digit1 (« & » en AZERTY) prend la 1ère carte
-  // de la barre du bas, Digit2 (« é ») la 2ème, etc. La carte se retrouve
+  // Sur un clavier AZERTY ce rang affiche &, é, ", ', ( — on se base donc
+  // sur `event.code` (Digit1, Digit2…), qui correspond à l'emplacement
+  // physique de la touche et pas au caractère affiché, pour que « la
+  // touche au-dessus de la lettre A » fonctionne quel que soit le clavier
+  // (AZERTY, QWERTY…). Digit1 prend la 1ère carte de la main, Digit2 la
+  // 2ème, etc. (main limitée à 5 cartes désormais). La carte se retrouve
   // directement « en main » (comme si on avait commencé à la glisser) tant
   // que la touche reste enfoncée ; la relâcher la pose, exactement comme un
   // glisser-déposer classique.
-  const TOUCHES_CARTES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6']
+  const TOUCHES_CARTES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']
+  const TOUCHES_CARTES_LABEL = ['1', '2', '3', '4', '5']
   let toucheCarteEnCours = null
   const dernierPointeur = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
 
@@ -1155,25 +1545,21 @@
     if (toucheCarteEnCours) pendantGlisser(e)
   })
 
-  function ordreCartesDom() {
-    return Array.from(document.querySelectorAll('.carte-main')).map(el => el.dataset.carte)
-  }
-
   document.addEventListener('keydown', (e) => {
     if (e.repeat) return
     const index = TOUCHES_CARTES.indexOf(e.code)
     if (index === -1) return
     if (!partieCommencee || partieTerminee) return
     if (carteEnCours) return // un glisser (souris ou clavier) est déjà en cours
-    const carteId = ordreCartesDom()[index]
-    if (!carteId || !CARTES[carteId]) return
+    const item = main[index]
+    if (!item || !CARTES[item.carteId]) return
 
     e.preventDefault()
     toucheCarteEnCours = e.code
-    carteEnCours = carteId
+    carteEnCours = item.uid
     ghostEl = document.createElement('div')
     ghostEl.className = 'carte-ghost'
-    ghostEl.textContent = CARTES[carteEnCours]?.emoji || ''
+    ghostEl.textContent = CARTES[item.carteId]?.emoji || ''
     document.body.appendChild(ghostEl)
     pendantGlisser({ clientX: dernierPointeur.x, clientY: dernierPointeur.y })
   })
@@ -1184,9 +1570,11 @@
     finGlisser({ clientX: dernierPointeur.x, clientY: dernierPointeur.y })
   })
 
+  document.getElementById('btn-pioche-urgence').addEventListener('click', piocherUrgence)
+
   // ─── Écran de démarrage / fin de partie ────────────────────────
   function actualiserCartesDisponibles(disponible) {
-    document.querySelectorAll('.carte-main').forEach(el => el.classList.toggle('indisponible', !disponible))
+    renderMain()
   }
 
   function afficherEcran(titre, texte, texteBouton) {
@@ -1213,8 +1601,20 @@
     effetsMelee = []
     partieTerminee = false
     partieCommencee = true
+
+    // Deck/main/or : remis à zéro à chaque partie (les poids ne persistent
+    // pas d'une partie à l'autre, seule la composition du deck est sauvée).
+    or = 0
+    orCapaciteMax = OR_CAPACITE_DEPART
+    deckSlots = chargerCompositionDeck().map(carteId => ({ carteId, poids: POIDS_DEPART }))
+    tempsDepuisGeneration = 0
+    tempsDepuisPioche = 0
+    tempsCombat = 0
+    remplirMainInitiale()
+
     masquerEcran()
     actualiserCartesDisponibles(true)
+    actualiserAffichageTimer()
   }
 
   function terminerPartie(victoire) {
@@ -1228,8 +1628,84 @@
 
   document.getElementById('btn-lancer').addEventListener('click', demarrerPartie)
 
-  document.getElementById('or-affiche').textContent = or === Infinity ? '∞' : or
-  initGlisserDeposer()
+  renderMain()
+
+  // ─── Modale d'édition du deck ───────────────────────────────────
+  // État temporaire d'édition : { carteId: quantité }, initialisé depuis
+  // la composition sauvegardée (ou celle par défaut) à chaque ouverture.
+  let editionDeck = {}
+
+  function compositionVersCompte(liste) {
+    const compte = {}
+    for (const id of liste) compte[id] = (compte[id] || 0) + 1
+    return compte
+  }
+
+  function totalEditionDeck() {
+    return Object.values(editionDeck).reduce((a, b) => a + b, 0)
+  }
+
+  function renderModaleDeck() {
+    const total = totalEditionDeck()
+    document.getElementById('deck-compteur').textContent = total
+    document.getElementById('deck-liste').innerHTML = Object.values(CARTES).map(carte => {
+      const qte = editionDeck[carte.id] || 0
+      const peutAjouter = total < DECK_TAILLE
+      return `
+        <div class="deck-ligne">
+          <span class="deck-emoji">${carte.emoji}</span>
+          <div class="deck-infos">
+            <div class="deck-nom">${carte.nom}</div>
+            <div class="deck-cout">Coût ${carte.cout} or</div>
+          </div>
+          <div class="deck-stepper">
+            <button type="button" data-action="moins" data-carte="${carte.id}" ${qte <= 0 ? 'disabled' : ''}>−</button>
+            <span>${qte}</span>
+            <button type="button" data-action="plus" data-carte="${carte.id}" ${!peutAjouter ? 'disabled' : ''}>+</button>
+          </div>
+        </div>`
+    }).join('')
+  }
+
+  function ouvrirModaleDeck() {
+    editionDeck = compositionVersCompte(chargerCompositionDeck())
+    renderModaleDeck()
+    document.getElementById('modale-deck-fond').classList.add('ouverte')
+  }
+
+  window.fermerModaleDeck = function() {
+    document.getElementById('modale-deck-fond').classList.remove('ouverte')
+  }
+
+  document.getElementById('btn-editer-deck').addEventListener('click', ouvrirModaleDeck)
+
+  document.getElementById('deck-liste').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]')
+    if (!btn) return
+    const carteId = btn.dataset.carte
+    const total = totalEditionDeck()
+    if (btn.dataset.action === 'plus' && total < DECK_TAILLE) {
+      editionDeck[carteId] = (editionDeck[carteId] || 0) + 1
+    } else if (btn.dataset.action === 'moins' && (editionDeck[carteId] || 0) > 0) {
+      editionDeck[carteId] = editionDeck[carteId] - 1
+    }
+    renderModaleDeck()
+  })
+
+  document.getElementById('btn-deck-reset').addEventListener('click', () => {
+    editionDeck = compositionVersCompte(DECK_PAR_DEFAUT)
+    renderModaleDeck()
+  })
+
+  document.getElementById('btn-deck-sauver').addEventListener('click', () => {
+    const liste = []
+    for (const [carteId, qte] of Object.entries(editionDeck)) {
+      for (let i = 0; i < qte; i++) liste.push(carteId)
+    }
+    sauvegarderCompositionDeck(liste)
+    afficherMessage('Deck enregistré.')
+    fermerModaleDeck()
+  })
 
   /* ════════════════════════════════════════════════════════════════════
    *  BATTLOGY — RÉSUMÉ DES RÈGLES DU JEU
@@ -1289,16 +1765,75 @@
    *  RACCOURCIS CLAVIER
    *  -------------------
    *  Les touches du rang des chiffres (au-dessus des lettres — &, é, ", '
-   *  en AZERTY) prennent la carte à la position correspondante directement
-   *  "en main", comme si on avait commencé à la glisser à la souris. Tant
-   *  que la touche est maintenue, la carte suit le curseur ; la relâcher la
-   *  pose à l'endroit visé (ou annule si l'endroit n'est pas valide). Basé
-   *  sur `event.code` (Digit1, Digit2…), donc indépendant de la disposition
-   *  du clavier.
+   *  en AZERTY) prennent la carte à la position correspondante dans la MAIN
+   *  (5 emplacements max désormais) directement "en main", comme si on
+   *  avait commencé à la glisser à la souris. Tant que la touche est
+   *  maintenue, la carte suit le curseur ; la relâcher la pose à l'endroit
+   *  visé (ou annule si l'endroit n'est pas valide, ou la détruit si la
+   *  zone de destruction est survolée). Basé sur `event.code` (Digit1,
+   *  Digit2…), donc indépendant de la disposition du clavier.
+   *
+   *  DECK (choisi par le joueur, jusqu'à 10 emplacements, doublons
+   *  autorisés pour l'instant — limite finale visée : 2 exemplaires par
+   *  carte, pas encore appliquée)
+   *  ------------------------------------------------------------------
+   *  - Édité via la modale "Éditer mon deck" (bouton à côté de "Lancer la
+   *    partie"), sauvegardé en localStorage (DECK_STORAGE_KEY). Un deck de
+   *    base est fourni par défaut tant que rien n'a été enregistré.
+   *  - C'est un "paquet infini" à tirage pondéré : chaque emplacement (même
+   *    en cas de doublon) a son propre poids, indépendant des autres.
+   *    Poids de départ 1, borné entre 0 (POIDS_MIN) et 2.5 (POIDS_MAX).
+   *  - À chaque tirage : la carte tirée perd 0.9 de poids (plancher 0),
+   *    toutes les AUTRES cartes du deck gagnent +0.1 (plafond 2.5).
+   *  - Malus de tirage (appliqué uniquement au moment du tirage, n'altère
+   *    pas le poids stocké) : ×0.7 pour toute carte dont le coût dépasse
+   *    la capacité max d'or actuelle du joueur (orCapaciteMax).
+   *
+   *  MAIN
+   *  ----
+   *  - 5 cartes maximum. Jouer une carte (la poser sur le terrain) ou la
+   *    détruire (zone de destruction) la retire de la main.
+   *  - Pioche automatique : 1 carte/8s en phase 1, 1 carte/4s dès 1m30 de
+   *    combat (voir PHASES ci-dessous). Chaque pioche automatique augmente
+   *    orCapaciteMax de 1 (jusqu'à 12), que la carte tienne dans la main ou
+   *    non — si la main est déjà pleine, la carte est piochée (les poids
+   *    sont mis à jour normalement) puis aussitôt détruite.
+   *  - Main de départ : 3 cartes tirées immédiatement au lancement de la
+   *    partie, avec un bonus ×2 de poids pour les cartes coûtant ≤ 3 or
+   *    (bonus qui ne s'applique qu'à ce tirage initial).
+   *  - Pioche d'urgence : possible uniquement si la main est VIDE. Coûte 5
+   *    or, tire 2 cartes instantanément. Met à jour les poids normalement,
+   *    mais ne relance PAS le cooldown de pioche automatique et n'augmente
+   *    PAS orCapaciteMax.
+   *  - Destruction volontaire (glisser une carte sur la zone de
+   *    destruction) : aucun impact sur l'or ni sur les poids de tirage.
    *
    *  OR
    *  --
-   *  Illimité pour l'instant (phase de test) — `or = Infinity`.
+   *  - Génération continue, plafonnée à orCapaciteMax : 1 or/1.5s en phase
+   *    1, 1 or/1s dès 1m30, 1 or/0.5s dès 3min de combat.
+   *  - orCapaciteMax démarre à 3, +1 par pioche automatique (jusqu'à un
+   *    maximum absolu de 12 — atteint après 9 pioches automatiques).
+   *  - Poser une unité consomme son coût en or ; impossible si le stock
+   *    actuel (or, pas orCapaciteMax) est insuffisant.
+   *
+   *  PHASES & MORT SUBITE (temps de combat total, indépendant du temps
+   *  réel si l'onglet est en arrière-plan — dt plafonné à 50ms/frame)
+   *  ------------------------------------------------------------------
+   *  - 0 → 1m30 (PHASE_2_T)     : phase 1 (or 1.5s, pioche 8s).
+   *  - 1m30 → 3min (PHASE_3_T)  : phase 2 (or 1s, pioche 4s).
+   *  - 3min → 4m30 (MORT_SUBITE_T) : phase 3 (or 0.5s, pioche 4s inchangée).
+   *  - Dès 4m30 : mort subite — les DEUX châteaux perdent en continu 3.5 %
+   *    de leurs PV MAX par seconde (indépendamment des combats), jusqu'à
+   *    la destruction de l'un des deux. Les rythmes d'or/pioche de la
+   *    phase 3 restent inchangés en parallèle.
+   *  - Un compte à rebours vers la prochaine phase est affiché en haut de
+   *    l'écran (élément #battlogy-timer) pendant toute la partie.
+   *
+   *  IA ENNEMIE
+   *  ----------
+   *  Inchangée : spawn d'un guerrier toutes les 10s (INTERVALLE_SPAWN_ENNEMI),
+   *  totalement indépendante du deck/main/or du joueur.
    * ════════════════════════════════════════════════════════════════════ */
   </script>
 </body>
