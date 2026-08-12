@@ -26,6 +26,16 @@
   <style>body { visibility: hidden; }</style>
   <style>
     html, body { height: 100%; }
+    body {
+      height: 100vh;
+      height: 100dvh; /* tient compte des barres d'adresse mobiles (iOS/Android) */
+      overflow: hidden;
+    }
+    /* Cette page ne charge pas de footer : le header (en haut) et
+       <main> (flex:1) se partagent donc toute la hauteur d'écran fixée
+       ci-dessus, et l'arène (flex:1 dans .battlogy-wrap) récupère
+       exactement ce qui reste après le titre et la barre de cartes. */
+    main { flex: 1 1 auto; min-height: 0; display: flex; }
     .battlogy-wrap {
       max-width: 560px;
       width: 100%;
