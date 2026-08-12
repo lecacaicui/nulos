@@ -158,14 +158,12 @@
   let gridOffsetY  // y où commence la grille
 
   // ─── Images des châteaux ───────────────────────────────────────
-  // castblue.png : porte + drapeaux tombants → château ennemi (en haut)
-  // castred.png  : drapeaux dressés → château joueur (en bas)
   const imgCastleEnemi  = new Image()
   const imgCastleJoueur = new Image()
   function chargerImagesChateau() {
     return Promise.all([
-      new Promise(res => { imgCastleEnemi.onload = res; imgCastleEnemi.onerror = res; imgCastleEnemi.src  = '../pictures/castblue.png' }),
-      new Promise(res => { imgCastleJoueur.onload = res; imgCastleJoueur.onerror = res; imgCastleJoueur.src = '../pictures/castred.png' })
+      new Promise(res => { imgCastleEnemi.onload = res; imgCastleEnemi.onerror = res; imgCastleEnemi.src  = '../pictures/castred.png' }),
+      new Promise(res => { imgCastleJoueur.onload = res; imgCastleJoueur.onerror = res; imgCastleJoueur.src = '../pictures/castblue.png' })
     ])
   }
   window.chargerImagesChateau = chargerImagesChateau
@@ -272,16 +270,19 @@
 
   // ─── Château ─────────────────────────────────────────────────
   function drawCastle(isPlayer) {
-    const W     = canvas.width - 2 * MARGE
-    const x     = MARGE
-    const h     = CASTLE_PX - 8
-    const y     = isPlayer ? canvas.height - CASTLE_PX + 4 : 4
-    const img   = isPlayer ? imgCastleJoueur : imgCastleEnemi
-    const label = isPlayer ? 'Votre château' : 'Château ennemi'
+    const W   = canvas.width - 2 * MARGE
+    const x   = MARGE
+    const h   = CASTLE_PX - 8
+    const y   = isPlayer ? canvas.height - CASTLE_PX + 4 : 4
+    const img = isPlayer ? imgCastleJoueur : imgCastleEnemi
 
-    // ── Image du château (drapeaux + porte déjà dessinés dans l'image) ──
+    // ── Image du château, hauteur réduite au tiers ──
+    // Ancrée en haut pour l'ennemi (porte côté grille en bas de l'image),
+    // ancrée en bas pour le joueur (porte côté bord d'écran).
+    const imgH = h / 3
+    const imgY = isPlayer ? y + h - imgH : y
     if (img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, x, y, W, h)
+      ctx.drawImage(img, x, imgY, W, imgH)
     }
 
     // ── Barre de PV ──
@@ -292,14 +293,6 @@
     rect(hpBarX, hpBarY, hpBarW, 6)
     ctx.fillStyle = isPlayer ? C.hp_player : C.hp_enemy
     rect(hpBarX, hpBarY, hpBarW, 6) // 100% pour l'instant
-
-    // ── Label ──
-    const fontSize = Math.max(11, Math.round(R * 0.55))
-    ctx.fillStyle = C.text
-    ctx.font = `700 ${fontSize}px system-ui, sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, x + W / 2, y + h / 2 - 4)
   }
 
   // ─── Fond de l'arène ─────────────────────────────────────────
