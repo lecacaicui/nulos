@@ -995,6 +995,30 @@
     return { yMin: yContreChateauEnnemi, yMax }
   }
 
+  // Fraction (0..1) de l'aire d'un hexagone flat-top (centré en cy, de
+  // rayon r) comprise entre yMinZone et yMaxZone. Utilisé pour n'autoriser
+  // la pose que sur des hexagones majoritairement inclus dans la zone
+  // valide (voir SEUIL_HEX_DANS_ZONE) — un simple débordement du centre ne
+  // suffit plus.
+  function fractionHexDansZone(cy, r, yMinZone, yMaxZone) {
+    const h = r * Math.sqrt(3) / 2   // demi-hauteur de l'hexagone (flat-top)
+    const N = 40
+    let aireTotale = 0, aireDansZone = 0
+    for (let i = 0; i < N; i++) {
+      const t = (i + 0.5) / N
+      const yLocal = -h + t * (2 * h)
+      const largeur = 2 * r - (r / h) * Math.abs(yLocal)
+      const yAbs = cy + yLocal
+      aireTotale += largeur
+      if (yAbs >= yMinZone && yAbs <= yMaxZone) aireDansZone += largeur
+    }
+    return aireTotale > 0 ? aireDansZone / aireTotale : 0
+  }
+
+  // Un hexagone doit désormais être au moins 80% inclus dans la zone de
+  // pose pour être considéré posable (plus de simple débordement partiel).
+  const SEUIL_HEX_DANS_ZONE = 0.8
+
   // Un hexagone est-il posable pour cette carte et ce camp, compte tenu des
   // règles ci-dessus (ou de placementLibre pour les cartes qui les contournent) ?
   function estPositionValidePourPose(carteId, hex, team = 'joueur') {
@@ -1003,7 +1027,7 @@
     if (!carte) return false
     if (carte.placementLibre) return true
     const { yMin, yMax } = calculerZonePose(team)
-    return hex.cy >= yMin - 1 && hex.cy <= yMax + 1
+    return fractionHexDansZone(hex.cy, R, yMin, yMax) >= SEUIL_HEX_DANS_ZONE
   }
 
   // Toutes les positions (centres d'hexagones) actuellement valides pour la
@@ -1016,7 +1040,7 @@
       const rowsCol = (c % 2 === 0) ? ROWS + 1 : ROWS
       for (let r = 0; r < rowsCol; r++) {
         const { x, y } = hexCenter(r, c)
-        if (y >= yMin - 1 && y <= yMax + 1) positions.push({ x, y })
+        if (fractionHexDansZone(y, R, yMin, yMax) >= SEUIL_HEX_DANS_ZONE) positions.push({ x, y })
       }
     }
     return positions
@@ -1129,9 +1153,12 @@
 
   // Fait apparaître un guerrier ennemi, en respectant les mêmes règles de
   // placement que le joueur (voir calculerZonePose) : parmi les cases
-  // actuellement valides pour le camp ennemi, on en choisit une au hasard.
+  // actuellement valides pour le camp ennemi (et non déjà occupées à plus
+  // de 50% par une autre unité), on en choisit une au hasard.
   function spawnEnnemiAleatoire() {
+    const rayon = RAYON_UNITE_BASE * (CARTES.guerrier.taille || 1)
     const positions = positionsValidesPourEquipe('ennemi')
+      .filter(pos => positionLibrePourUnite(pos.x, pos.y, rayon))
     if (positions.length === 0) return
     const pos = positions[Math.floor(Math.random() * positions.length)]
     poserCarte(CARTES.guerrier, pos.x, pos.y, 'ennemi')
@@ -1172,9 +1199,42 @@
     return RAYON_UNITE_BASE * (unite.taille || 1)
   }
 
+  // Aire d'intersection entre deux cercles de rayons r1/r2 dont les centres
+  // sont distants de d (formule standard de l'aire de lentille circulaire).
+  function aireIntersectionCercles(r1, r2, d) {
+    if (d >= r1 + r2) return 0
+    if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2
+    const alpha = 2 * Math.acos((d * d + r1 * r1 - r2 * r2) / (2 * d * r1))
+    const beta  = 2 * Math.acos((d * d + r2 * r2 - r1 * r1) / (2 * d * r2))
+    return 0.5 * r1 * r1 * (alpha - Math.sin(alpha)) + 0.5 * r2 * r2 * (beta - Math.sin(beta))
+  }
+
+  // Les unités ne peuvent jamais se chevaucher à plus de 50% : il faut
+  // toujours qu'au moins la moitié de la surface de l'unité posée reste
+  // visible (pas de "stack" complet d'unités les unes sur les autres).
+  const VISIBILITE_MIN_UNITE = 0.5
+
+  // Vérifie qu'une future unité (centrée en x,y, de rayon r) ne chevauche
+  // aucune unité déjà présente (vivante, tout camp confondu) à plus de
+  // 50% de sa propre surface.
+  function positionLibrePourUnite(x, y, r) {
+    const toutes = unitesJoueur.concat(unitesEnnemi)
+    for (const u of toutes) {
+      if (u.pv <= 0) continue
+      const ru = rayonUnite(u)
+      const d = Math.hypot(u.x - x, u.y - y)
+      const aire = aireIntersectionCercles(r, ru, d)
+      if (aire > VISIBILITE_MIN_UNITE * Math.PI * r * r) return false
+    }
+    return true
+  }
+
   // Cherche, parmi le camp adverse, l'ennemi vivant le plus proche présent
-  // dans la zone de détection de l'unité (préparé pour de futures cartes
-  // ennemies — pour l'instant unitesEnnemi est toujours vide).
+  // dans la zone de détection de l'unité. Cette zone n'est plus un simple
+  // rayon circulaire : elle couvre toute la largeur de la ligne (aucune
+  // limite latérale), sur une profondeur de zoneDetection devant l'unité
+  // (+ une petite marge derrière, pour "le même niveau") — impossible pour
+  // un ennemi de passer à côté sans être vu et engagé.
   function ennemiLePlusProche(unite) {
     const adversaires = unite.team === 'joueur' ? unitesEnnemi : unitesJoueur
     // Marge de tolérance pour considérer un adversaire "au même niveau"
@@ -1182,14 +1242,16 @@
     const margeNiveau = VS * 0.5
     let meilleur = null, meilleureDist = Infinity
     for (const a of adversaires) {
-      // Ne cible que les adversaires devant l'unité ou à son niveau —
-      // jamais ceux déjà dépassés, dans son dos. On projette la position
-      // relative de l'adversaire sur la direction de marche de l'unité
-      // (dirY, fixée à la pose) : positif = devant, négatif = derrière.
-      const projection = (a.y - unite.y) * unite.dirY
-      if (projection < -margeNiveau) continue
+      // Distance projetée sur la direction de marche de l'unité (dirX/dirY,
+      // fixée à la pose) : positif = devant, négatif = derrière. Aucune
+      // contrainte latérale (x) : la bande de détection couvre toute la
+      // largeur du terrain.
+      const projection = (a.x - unite.x) * unite.dirX + (a.y - unite.y) * unite.dirY
+      if (projection < -margeNiveau) continue          // franchement derrière : ignoré
+      if (projection > unite.zoneDetection) continue   // pas encore assez proche devant
+
       const d = Math.hypot(a.x - unite.x, a.y - unite.y)
-      if (d <= unite.zoneDetection && d < meilleureDist) { meilleur = a; meilleureDist = d }
+      if (d < meilleureDist) { meilleur = a; meilleureDist = d }
     }
     return meilleur
   }
@@ -1615,6 +1677,10 @@
           ? 'Case invalide.'
           : "Tu ne peux pas poser cette unité ici pour l'instant."
       )
+      return
+    }
+    if (!positionLibrePourUnite(hex.cx, hex.cy, RAYON_UNITE_BASE * (carte.taille || 1))) {
+      afficherMessage('Trop proche d\'une autre unité.')
       return
     }
     if (or < carte.cout) { afficherMessage("Pas assez d'or."); return }
