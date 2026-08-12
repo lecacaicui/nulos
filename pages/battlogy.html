@@ -126,8 +126,8 @@
 
   let canvas, ctx
   let R   // hex circumradius
-  let HW  // hex width (flat-to-flat horizontal for pointy-top) = sqrt(3)*R
-  let VS  // vertical spacing = 1.5*R
+  let HS  // espacement horizontal entre colonnes (flat-top) = 1.5*R
+  let VS  // espacement vertical entre rangées (flat-top) = sqrt(3)*R
   let gridOffsetY  // y où commence la grille
 
   // ─── Initialisation ──────────────────────────────────────────
@@ -136,15 +136,17 @@
     const outer = document.getElementById('arena-outer')
     const W = outer.clientWidth || 380
 
-    // Calcul de la taille des hexagones pour remplir la largeur
-    // Largeur totale occupée : (COLS + 0.5) * HW + 2*MARGE
-    HW = (W - 2 * MARGE) / (COLS + 0.5)
-    R  = HW / Math.sqrt(3)
-    VS = R * 1.5
+    // Hexagones flat-top : ce sont les COLONNES qui sont décalées
+    // verticalement d'une demi-hauteur (et non plus les rangées
+    // horizontalement, comme en pointy-top).
+    // Largeur totale occupée : (1.5*COLS + 0.5) * R + 2*MARGE
+    R  = (W - 2 * MARGE) / (1.5 * COLS + 0.5)
+    HS = R * 1.5           // espacement horizontal entre centres de colonnes
+    VS = R * Math.sqrt(3)  // espacement vertical entre centres de rangées
 
     gridOffsetY = CASTLE_PX + 6
 
-    const gridH = ROWS * VS + R         // hauteur totale de la grille
+    const gridH = ROWS * VS + VS        // hauteur totale (+1 rangée pour le décalage des colonnes)
     canvas.width  = W
     canvas.height = gridOffsetY + gridH + 6 + CASTLE_PX
 
@@ -154,16 +156,16 @@
 
   // ─── Conversion coordonnées hexa → pixels ────────────────────
   function hexCenter(row, col) {
-    const x = MARGE + col * HW + (row % 2 === 1 ? HW / 2 : 0) + HW / 2
-    const y = gridOffsetY + row * VS + R
+    const x = MARGE + R + col * HS
+    const y = gridOffsetY + VS / 2 + row * VS + (col % 2 === 1 ? VS / 2 : 0)
     return { x, y }
   }
 
-  // ─── Dessin d'un hexagone (pointy-top) ───────────────────────
+  // ─── Dessin d'un hexagone (flat-top, càd pointy-top tourné de 90°) ──
   function drawHex(cx, cy, r, fill, stroke) {
     ctx.beginPath()
     for (let i = 0; i < 6; i++) {
-      const a = Math.PI / 180 * (60 * i - 90)
+      const a = Math.PI / 180 * (60 * i)
       const px = cx + r * Math.cos(a)
       const py = cy + r * Math.sin(a)
       i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
@@ -200,7 +202,7 @@
     ctx.lineWidth = 1.5
 
     const drawZoneLine = (row, color) => {
-      const y = gridOffsetY + row * VS
+      const y = gridOffsetY + VS / 2 + row * VS
       ctx.strokeStyle = color
       ctx.beginPath()
       ctx.moveTo(MARGE, y)
