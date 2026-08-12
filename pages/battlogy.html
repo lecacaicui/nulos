@@ -152,6 +152,7 @@
       user-select: none;
       touch-action: none;
       transition: filter .1s, transform .1s;
+      position: relative;
     }
     .carte-main:active { cursor: grabbing; transform: scale(0.96); }
     .carte-main.indisponible { opacity: .4; cursor: not-allowed; }
@@ -164,6 +165,24 @@
       background: #fef3c7;
       border-radius: 999px;
       padding: 0 .4rem;
+    }
+    /* Petit indice du raccourci clavier (touche du rang des chiffres) associé
+       à cette carte — purement indicatif, n'a aucun effet sur le jeu. */
+    .carte-main .carte-touche {
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      color: var(--couleur-texte-faible);
+      font-size: .62rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .carte-ghost {
       position: fixed;
@@ -214,21 +233,25 @@
       <div class="battlogy-bottombar" id="battlogy-bottombar">
         <div class="battlogy-or">🪙 Or : <span id="or-affiche">∞</span></div>
         <div class="carte-main indisponible" data-carte="guerrier">
+          <span class="carte-touche">&amp;</span>
           <span class="carte-emoji">⚔️</span>
           <span class="carte-nom">Guerrier</span>
           <span class="carte-cout">1</span>
         </div>
         <div class="carte-main indisponible" data-carte="archer">
+          <span class="carte-touche">é</span>
           <span class="carte-emoji">🏹</span>
           <span class="carte-nom">Archer</span>
           <span class="carte-cout">2</span>
         </div>
         <div class="carte-main indisponible" data-carte="squelette">
+          <span class="carte-touche">"</span>
           <span class="carte-emoji">💀</span>
           <span class="carte-nom">Squelettes</span>
           <span class="carte-cout">2</span>
         </div>
         <div class="carte-main indisponible" data-carte="statue">
+          <span class="carte-touche">'</span>
           <span class="carte-emoji">🗿</span>
           <span class="carte-nom">Statue</span>
           <span class="carte-cout">3</span>
@@ -1065,6 +1088,7 @@
     cartes.forEach(el => {
       el.addEventListener('pointerdown', (e) => {
         if (!partieCommencee || partieTerminee) return
+        if (carteEnCours) return // un glisser (souris ou clavier) est déjà en cours
         e.preventDefault()
         carteEnCours = el.dataset.carte
         ghostEl = document.createElement('div')
@@ -1106,6 +1130,59 @@
     hexSurvole = null
     carteEnCours = null
   }
+
+  // ─── Raccourcis clavier : touches du rang des chiffres ────────────────
+  // Sur un clavier AZERTY ce rang affiche &, é, ", ', (, -, è, _, ç, à — on
+  // se base donc sur `event.code` (Digit1, Digit2…), qui correspond à
+  // l'emplacement physique de la touche et pas au caractère affiché, pour
+  // que « la touche au-dessus de la lettre A » fonctionne quel que soit le
+  // clavier (AZERTY, QWERTY…). Digit1 (« & » en AZERTY) prend la 1ère carte
+  // de la barre du bas, Digit2 (« é ») la 2ème, etc. La carte se retrouve
+  // directement « en main » (comme si on avait commencé à la glisser) tant
+  // que la touche reste enfoncée ; la relâcher la pose, exactement comme un
+  // glisser-déposer classique.
+  const TOUCHES_CARTES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6']
+  let toucheCarteEnCours = null
+  const dernierPointeur = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+
+  // Suivi permanent (indépendant d'un glisser en cours) de la position du
+  // curseur, nécessaire car les évènements clavier ne portent pas de
+  // coordonnées : on doit connaître la dernière position connue de la
+  // souris pour faire apparaître le fantôme de la carte au bon endroit.
+  document.addEventListener('pointermove', (e) => {
+    dernierPointeur.x = e.clientX
+    dernierPointeur.y = e.clientY
+    if (toucheCarteEnCours) pendantGlisser(e)
+  })
+
+  function ordreCartesDom() {
+    return Array.from(document.querySelectorAll('.carte-main')).map(el => el.dataset.carte)
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.repeat) return
+    const index = TOUCHES_CARTES.indexOf(e.code)
+    if (index === -1) return
+    if (!partieCommencee || partieTerminee) return
+    if (carteEnCours) return // un glisser (souris ou clavier) est déjà en cours
+    const carteId = ordreCartesDom()[index]
+    if (!carteId || !CARTES[carteId]) return
+
+    e.preventDefault()
+    toucheCarteEnCours = e.code
+    carteEnCours = carteId
+    ghostEl = document.createElement('div')
+    ghostEl.className = 'carte-ghost'
+    ghostEl.textContent = CARTES[carteEnCours]?.emoji || ''
+    document.body.appendChild(ghostEl)
+    pendantGlisser({ clientX: dernierPointeur.x, clientY: dernierPointeur.y })
+  })
+
+  document.addEventListener('keyup', (e) => {
+    if (e.code !== toucheCarteEnCours) return
+    toucheCarteEnCours = null
+    finGlisser({ clientX: dernierPointeur.x, clientY: dernierPointeur.y })
+  })
 
   // ─── Écran de démarrage / fin de partie ────────────────────────
   function actualiserCartesDisponibles(disponible) {
@@ -1153,6 +1230,76 @@
 
   document.getElementById('or-affiche').textContent = or === Infinity ? '∞' : or
   initGlisserDeposer()
+
+  /* ════════════════════════════════════════════════════════════════════
+   *  BATTLOGY — RÉSUMÉ DES RÈGLES DU JEU
+   *  (commentaire purement informatif : rien ici n'est exécuté, aucun
+   *  impact sur le jeu — juste un pense-bête pour s'y retrouver dans le
+   *  code plus tard.)
+   * ════════════════════════════════════════════════════════════════════
+   *
+   *  BUT DU JEU
+   *  ----------
+   *  Détruire le château ennemi (en haut) avant que le sien (en bas, celui
+   *  du joueur) ne soit détruit. Chaque château a 1000 PV.
+   *
+   *  LES CARTES
+   *  ----------
+   *  - Guerrier ⚔️  (coût 1) : mêlée, 100 PV, 10 dégâts, taille normale.
+   *  - Archer   🏹  (coût 2) : distance (120px de portée), 55 PV, 12 dégâts.
+   *  - Squelettes 💀 (coût 2) : mêlée, invoque 3 unités d'un coup, 30 PV et
+   *    5 dégâts chacune, 2x plus petites que les autres (taille 0.5) —
+   *    donc une hit box plus petite, plus dures à toucher pour l'adversaire.
+   *  - Statue   🗿  (coût 3) : catégorisée comme un SORT, pas une troupe.
+   *    Ne bouge jamais, n'attaque jamais : encaisse juste les dégâts
+   *    (120 PV). Contourne toutes les règles de placement ci-dessous
+   *    (posable n'importe où sur le terrain, y compris en zone ennemie).
+   *    Reste comptée comme une alliée pour tout le reste (elle peut donc
+   *    "ouvrir la route" à d'autres troupes si elle est posée loin devant).
+   *
+   *  RÈGLES DE PLACEMENT (identiques pour le joueur ET le bot ennemi,
+   *  simplement inversées de camp)
+   *  ------------------------------------------------------------------
+   *  1. Aucune unité alliée sur le terrain → on ne peut poser que sur les
+   *     2 rangées d'hexagones qui collent son propre château.
+   *  2. Dès qu'une unité alliée est présente → on peut poser n'importe où
+   *     entre le château et cette unité (la plus avancée, s'il y en a
+   *     plusieurs) — le "front" avance avec l'armée.
+   *  3. Si un ennemi s'est infiltré entre le château et l'unité alliée la
+   *     plus avancée, la zone de pose se referme jusqu'à lui : on ne peut
+   *     plus poser qu'entre cet ennemi et son propre château (impossible
+   *     de renforcer au-delà d'un ennemi qui a percé les lignes).
+   *  4. Dans tous les cas : jamais dans la moitié du terrain adverse — sauf
+   *     capacité spéciale de type "placementLibre" (voir la Statue).
+   *
+   *  COMBAT
+   *  ------
+   *  - Chaque unité active un rayon de détection (zoneDetection) : si un
+   *    ennemi y entre, elle le vise en priorité ; sinon elle vise le
+   *    château adverse.
+   *  - Une unité "immobile" (statue) ne fait jamais rien d'autre qu'exister
+   *    et perdre des PV.
+   *  - Attaque au CORPS À CORPS : dégâts appliqués immédiatement, avec un
+   *    petit éclat visuel (effetsMelee) au point de contact.
+   *  - Attaque à DISTANCE : une flèche (projectile) est tirée vers la
+   *    cible ; les dégâts ne sont infligés qu'à l'IMPACT du projectile, pas
+   *    au moment du tir. Si la cible meurt avant l'impact, la flèche finit
+   *    sa course sans rien toucher.
+   *
+   *  RACCOURCIS CLAVIER
+   *  -------------------
+   *  Les touches du rang des chiffres (au-dessus des lettres — &, é, ", '
+   *  en AZERTY) prennent la carte à la position correspondante directement
+   *  "en main", comme si on avait commencé à la glisser à la souris. Tant
+   *  que la touche est maintenue, la carte suit le curseur ; la relâcher la
+   *  pose à l'endroit visé (ou annule si l'endroit n'est pas valide). Basé
+   *  sur `event.code` (Digit1, Digit2…), donc indépendant de la disposition
+   *  du clavier.
+   *
+   *  OR
+   *  --
+   *  Illimité pour l'instant (phase de test) — `or = Infinity`.
+   * ════════════════════════════════════════════════════════════════════ */
   </script>
 </body>
 </html>
