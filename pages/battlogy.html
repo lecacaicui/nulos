@@ -286,8 +286,8 @@
       ctx.drawImage(img, x, imgY, W, imgH)
     }
 
-    // ── Barre de PV : au-dessus du château ennemi, en-dessous du château joueur ──
-    const hpBarY  = isPlayer ? y + h - 10 : y + 4
+    // ── Barre de PV : collée à l'image (au-dessus pour l'ennemi, en-dessous pour le joueur) ──
+    const hpBarY  = isPlayer ? imgY + imgH + 6 : imgY - 12
     const hpBarX  = x + 6
     const hpBarW  = W - 12
     ctx.fillStyle = C.hp_bg
