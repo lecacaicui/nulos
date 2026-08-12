@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battlogy</title>
+  <link rel="stylesheet" href="../style/style.css">
+  <script>
+  (function(){
+    var t = localStorage.getItem('theme_couleurs');
+    if (!t) return;
+    try {
+      var c = JSON.parse(t);
+      var r = document.documentElement.style;
+      r.setProperty('--couleur-fond', c.couleur_fond);
+      r.setProperty('--couleur-conteneur', c.couleur_conteneur);
+      r.setProperty('--couleur-bordure', c.couleur_bordure);
+      r.setProperty('--couleur-bouton', c.couleur_bouton);
+      var h = c.couleur_fond.replace('#','');
+      var lum=(0.299*parseInt(h.substring(0,2),16)+0.587*parseInt(h.substring(2,4),16)+0.114*parseInt(h.substring(4,6),16))/255;
+      r.setProperty('--couleur-texte', lum < 0.5 ? '#f1f1f1' : '#1a1a1a');
+      r.setProperty('--couleur-texte-faible', lum < 0.5 ? '#9ca3af' : '#6b7280');
+    } catch(e) {}
+  })();
+  </script>
+  <style>body { visibility: hidden; }</style>
+  <style>
+    .battlogy-wrap {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 6rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .75rem;
+    }
+    .battlogy-topbar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .battlogy-topbar h1 { margin: 0; font-size: 1.4rem; }
+    .battlogy-beta {
+      font-size: .72rem;
+      font-weight: 700;
+      color: #f59e0b;
+      background: #f59e0b22;
+      border: 1px solid #f59e0b55;
+      border-radius: 999px;
+      padding: .2rem .65rem;
+      letter-spacing: .05em;
+    }
+    .arena-outer {
+      width: 100%;
+      border: 2px solid var(--couleur-bordure);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0b160b;
+    }
+    #game-canvas {
+      display: block;
+      width: 100%;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+  <main>
+    <div class="battlogy-wrap">
+      <div class="battlogy-topbar">
+        <h1>⚔️ Battlogy</h1>
+        <span class="battlogy-beta">BÊTA</span>
+      </div>
+      <div class="arena-outer" id="arena-outer">
+        <canvas id="game-canvas"></canvas>
+      </div>
+    </div>
+  </main>
+  <div id="footer-placeholder"></div>
+
+  <script type="module">
+    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    ;(async () => {
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()
+      await chargerHeader('../')
+      await chargerFooter('../')
+      initArena()
+    })()
+  </script>
+
+  <script>
+  // ─── Constantes de jeu ───────────────────────────────────────
+  const COLS        = 5
+  const ROWS        = 30
+  const CASTLE_PX   = 110   // hauteur en px de chaque zone château
+  const MARGE       = 8     // marge horizontale
+
+  // Palette de couleurs de l'arène (indépendante du thème du site)
+  const C = {
+    bg:             '#0b160b',
+    hexBase:        '#1f3d1f',
+    hexBaseDark:    '#193319',
+    hexBord:        '#142b14',
+    hexEnemy:       '#3d1414',
+    hexEnemyDark:   '#321010',
+    hexPlayer:      '#14243d',
+    hexPlayerDark:  '#101e32',
+    zoneLine:       '#ffffff22',
+    castleEStone:   '#7f1d1d',
+    castleEStoneDk: '#6b1818',
+    castlePStone:   '#1e3a8a',
+    castlePStoneDk: '#172f70',
+    castleMerlon:   '#9b2a2a',  // créneau ennemi
+    castleMerlonP:  '#2563eb',  // créneau joueur
+    stoneAccent:    '#4b5563',
+    hp_bg:          '#374151',
+    hp_enemy:       '#ef4444',
+    hp_player:      '#22c55e',
+    text:           '#f1f1f1',
+    textSoft:       '#9ca3af',
+    gateInner:      '#050d05',
+  }
+
+  let canvas, ctx
+  let R   // hex circumradius
+  let HW  // hex width (flat-to-flat horizontal for pointy-top) = sqrt(3)*R
+  let VS  // vertical spacing = 1.5*R
+  let gridOffsetY  // y où commence la grille
+
+  // ─── Initialisation ──────────────────────────────────────────
+  function initArena() {
+    canvas = document.getElementById('game-canvas')
+    const outer = document.getElementById('arena-outer')
+    const W = outer.clientWidth || 380
+
+    // Calcul de la taille des hexagones pour remplir la largeur
+    // Largeur totale occupée : (COLS + 0.5) * HW + 2*MARGE
+    HW = (W - 2 * MARGE) / (COLS + 0.5)
+    R  = HW / Math.sqrt(3)
+    VS = R * 1.5
+
+    gridOffsetY = CASTLE_PX + 6
+
+    const gridH = ROWS * VS + R         // hauteur totale de la grille
+    canvas.width  = W
+    canvas.height = gridOffsetY + gridH + 6 + CASTLE_PX
+
+    ctx = canvas.getContext('2d')
+    render()
+  }
+
+  // ─── Conversion coordonnées hexa → pixels ────────────────────
+  function hexCenter(row, col) {
+    const x = MARGE + col * HW + (row % 2 === 1 ? HW / 2 : 0) + HW / 2
+    const y = gridOffsetY + row * VS + R
+    return { x, y }
+  }
+
+  // ─── Dessin d'un hexagone (pointy-top) ───────────────────────
+  function drawHex(cx, cy, r, fill, stroke) {
+    ctx.beginPath()
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 180 * (60 * i - 90)
+      const px = cx + r * Math.cos(a)
+      const py = cy + r * Math.sin(a)
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
+    }
+    ctx.closePath()
+    ctx.fillStyle = fill
+    ctx.fill()
+    if (stroke) {
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
+  }
+
+  // ─── Couleur d'un hex selon sa zone ──────────────────────────
+  function couleurHex(row, col) {
+    const dark = (row + col) % 2 === 0
+    if (row < 8)        return dark ? C.hexEnemyDark  : C.hexEnemy
+    if (row >= ROWS - 8) return dark ? C.hexPlayerDark : C.hexPlayer
+    return dark ? C.hexBaseDark : C.hexBase
+  }
+
+  // ─── Grille hexagonale ────────────────────────────────────────
+  function drawGrid() {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const { x, y } = hexCenter(r, c)
+        drawHex(x, y, R - 1.2, couleurHex(r, c), C.hexBord)
+      }
+    }
+
+    // Lignes de zone en pointillés
+    ctx.setLineDash([6, 4])
+    ctx.lineWidth = 1.5
+
+    const drawZoneLine = (row, color) => {
+      const y = gridOffsetY + row * VS
+      ctx.strokeStyle = color
+      ctx.beginPath()
+      ctx.moveTo(MARGE, y)
+      ctx.lineTo(canvas.width - MARGE, y)
+      ctx.stroke()
+    }
+
+    drawZoneLine(8,       '#ef444455')  // limite zone ennemi
+    drawZoneLine(ROWS - 8, '#3b82f655') // limite zone joueur
+    ctx.setLineDash([])
+  }
+
+  // ─── Château ─────────────────────────────────────────────────
+  function drawCastle(isPlayer) {
+    const W   = canvas.width - 2 * MARGE
+    const x   = MARGE
+    const h   = CASTLE_PX - 8
+    const y   = isPlayer ? canvas.height - CASTLE_PX + 4 : 4
+
+    const stoneMain = isPlayer ? C.castlePStone   : C.castleEStone
+    const stoneDark = isPlayer ? C.castlePStoneDk : C.castleEStoneDk
+    const merlonC   = isPlayer ? C.castleMerlonP  : C.castleMerlon
+    const label     = isPlayer ? 'Votre château' : 'Château ennemi'
+
+    const merlonH   = Math.round(h * 0.28)
+    const merlonW   = Math.round(W / 11)
+    const merlonCount = 5
+    const merlonGap = (W - merlonCount * merlonW) / (merlonCount + 1)
+
+    // ── Corps du château ──
+    ctx.fillStyle = stoneDark
+    rect(x, y + merlonH, W, h - merlonH)
+
+    // Lignes de pierres (effet maçonnerie)
+    ctx.strokeStyle = '#ffffff0a'
+    ctx.lineWidth = 1
+    const blockH = Math.max(8, Math.round(h / 8))
+    for (let i = 1; i < 8; i++) {
+      const ly = y + merlonH + i * blockH
+      if (ly < y + h) {
+        ctx.beginPath(); ctx.moveTo(x, ly); ctx.lineTo(x + W, ly); ctx.stroke()
+      }
+    }
+    // Joints verticaux décalés (effet briques)
+    for (let row = 0; row < 8; row++) {
+      const ly = y + merlonH + row * blockH
+      const offset = row % 2 === 0 ? 0 : merlonW * 0.7
+      for (let bx = x + offset; bx < x + W; bx += merlonW * 2) {
+        const vly = ly + blockH
+        if (vly < y + h) {
+          ctx.beginPath(); ctx.moveTo(bx, ly); ctx.lineTo(bx, vly); ctx.stroke()
+        }
+      }
+    }
+
+    // ── Crénelage ──
+    for (let i = 0; i < merlonCount; i++) {
+      const mx = x + merlonGap + i * (merlonW + merlonGap)
+      ctx.fillStyle = merlonC
+      rect(mx, y, merlonW, merlonH + 2)
+    }
+
+    // ── Porte ──
+    const gateW = Math.round(W * 0.14)
+    const gateH = Math.round(h * 0.42)
+    const gateX = x + W / 2 - gateW / 2
+    const gateY = isPlayer ? y + merlonH + 2 : y + h - gateH
+
+    ctx.fillStyle = C.gateInner
+    ctx.beginPath()
+    ctx.rect(gateX, gateY + gateW / 2, gateW, gateH - gateW / 2)
+    ctx.arc(gateX + gateW / 2, gateY + gateW / 2, gateW / 2, Math.PI, 0)
+    ctx.fill()
+
+    // Ferrures de la porte
+    ctx.strokeStyle = '#ffffff18'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(gateX + gateW / 2, gateY + gateW / 2)
+    ctx.lineTo(gateX + gateW / 2, gateY + gateH)
+    ctx.stroke()
+
+    // ── Barre de PV ──
+    const hpBarY  = isPlayer ? y + h - 10 : y + h - 10
+    const hpBarX  = x + 6
+    const hpBarW  = W - 12
+    ctx.fillStyle = C.hp_bg
+    rect(hpBarX, hpBarY, hpBarW, 6)
+    ctx.fillStyle = isPlayer ? C.hp_player : C.hp_enemy
+    rect(hpBarX, hpBarY, hpBarW, 6) // 100% pour l'instant
+
+    // ── Label ──
+    const fontSize = Math.max(11, Math.round(R * 0.55))
+    ctx.fillStyle = C.text
+    ctx.font = `700 ${fontSize}px system-ui, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const labelY = isPlayer
+      ? y + merlonH + (h - merlonH) / 2 - 4
+      : y + merlonH + (h - merlonH) / 2 - 4
+    ctx.fillText(label, x + W / 2, labelY)
+  }
+
+  // ─── Fond de l'arène ─────────────────────────────────────────
+  function drawBg() {
+    ctx.fillStyle = C.bg
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // Séparateurs visuels château / grille
+    ctx.fillStyle = '#ffffff08'
+    ctx.fillRect(0, CASTLE_PX, canvas.width, 4)
+    ctx.fillRect(0, canvas.height - CASTLE_PX - 4, canvas.width, 4)
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────
+  function rect(x, y, w, h) {
+    ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
+  }
+
+  // ─── Rendu principal ─────────────────────────────────────────
+  function render() {
+    drawBg()
+    drawGrid()
+    drawCastle(false) // ennemi (haut)
+    drawCastle(true)  // joueur (bas)
+  }
+
+  window.addEventListener('resize', () => {
+    if (canvas) initArena()
+  })
+  </script>
+</body>
+</html>
