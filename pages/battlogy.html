@@ -541,9 +541,12 @@
   let zoneJoueurYMax  // limite basse (haut du château) de la grille jouable
 
   // ─── Cartes (données en dur, pour les tests) ──────────────────
-  // porte / zoneDetection en px, vitesseMarche en px/s, vitesseAttaque en
-  // attaques/seconde, tempsActivation en ms, cout en or, nombre = nombre
-  // d'unités invoquées par la carte (ex: 3 squelettes pour une seule carte).
+  // porte en px, vitesseMarche en px/s, vitesseAttaque en attaques/seconde,
+  // tempsActivation en ms, cout en or, nombre = nombre d'unités invoquées
+  // par la carte (ex: 3 squelettes pour une seule carte). La portée de
+  // détection n'est plus une valeur par carte : elle est calculée
+  // dynamiquement (voir porteeDetectionEffective) à partir de la portée
+  // d'attaque et de la largeur du plateau.
   // `taille` : multiplicateur appliqué au rayon de base d'une unité
   // (RAYON_UNITE_BASE, voir plus bas). Affecte à la fois le dessin (cercle,
   // police, barre de vie) ET la hit box utilisée pour le combat (la
@@ -553,19 +556,19 @@
     guerrier: {
       id: 'guerrier', nom: 'Guerrier', emoji: '⚔️', cout: 1,
       pv: 100, degats: 10, porte: 34, vitesseAttaque: 1,
-      vitesseMarche: 45, zoneDetection: 90, tempsActivation: 800, nombre: 1,
+      vitesseMarche: 45, tempsActivation: 800, nombre: 1,
       taille: 1, typeAttaque: 'melee'
     },
     archer: {
       id: 'archer', nom: 'Archer', emoji: '🏹', cout: 2,
       pv: 55, degats: 12, porte: 120, vitesseAttaque: 0.9,
-      vitesseMarche: 40, zoneDetection: 140, tempsActivation: 900, nombre: 1,
+      vitesseMarche: 40, tempsActivation: 900, nombre: 1,
       taille: 1, typeAttaque: 'distance'
     },
     squelette: {
       id: 'squelette', nom: 'Squelettes', emoji: '💀', cout: 2,
       pv: 30, degats: 5, porte: 26, vitesseAttaque: 1.3,
-      vitesseMarche: 55, zoneDetection: 80, tempsActivation: 500, nombre: 3,
+      vitesseMarche: 55, tempsActivation: 500, nombre: 3,
       taille: 0.5, typeAttaque: 'melee'
     },
     // Carte spéciale, catégorisée comme un "sort" (fait apparaître une
@@ -580,7 +583,7 @@
       id: 'statue', nom: 'Statue', emoji: '🗿', cout: 3,
       categorie: 'sort', placementLibre: true, immobile: true,
       pv: 120, degats: 0, porte: 0, vitesseAttaque: 0,
-      vitesseMarche: 0, zoneDetection: 0, tempsActivation: 0, nombre: 1,
+      vitesseMarche: 0, tempsActivation: 0, nombre: 1,
       taille: 1
     }
   }
@@ -1245,8 +1248,6 @@
 
   function creerUnite(carte, x, y, team) {
     const cible = pointCastle(team)
-    const dx = cible.x - x, dy = cible.y - y
-    const dist = Math.hypot(dx, dy) || 1
     const unite = {
       id: ++uniteIdCompteur,
       carteId: carte.id,
@@ -1258,12 +1259,15 @@
       porte: carte.porte,
       taille: carte.taille || 1,
       typeAttaque: carte.typeAttaque || 'melee',
-      zoneDetection: carte.zoneDetection,
       vitesseMarche: carte.vitesseMarche,
       cooldownAttaqueBase: 1000 / (carte.vitesseAttaque || 1),
       cooldownAttaque: 0,
       activation: carte.tempsActivation,
-      dirX: dx / dist, dirY: dy / dist,
+      // Direction de marche "par défaut" (tant qu'aucune cible n'est
+      // détectée) : purement verticale, vers le château adverse — jamais
+      // en diagonale, même si l'unité est posée décalée par rapport au
+      // centre du château (voir mettreAJourUnite).
+      dirX: 0, dirY: cible.y >= y ? 1 : -1,
       // Une unité immobile (ex: la statue) ne passe jamais par l'état
       // d'activation/marche/attaque : elle reste plantée, encaisse les
       // dégâts, un point c'est tout (voir mettreAJourUnite).
@@ -1374,17 +1378,17 @@
     }
 
     // ─── Protection des bords de l'arène et des châteaux ───────────
-    // Une poussée (allié qui bouscule un allié, ou tout autre cas) ne doit
-    // jamais faire sortir une unité de la zone jouable : ni par les bords
-    // gauche/droite de la carte, ni en la faisant franchir la ligne d'un
-    // château (le sien ou celui de l'adversaire). On la replace juste à
-    // l'intérieur si une séparation l'y avait fait sortir.
-    const limiteHaute  = CASTLE_PX                    // frontière château ennemi (haut)
-    const limiteBasse  = canvas.height - CASTLE_PX    // frontière château joueur (bas)
+    // Un château se comporte comme un vrai mur pour toute unité (qu'elle
+    // soit en train de marcher, ou simplement poussée par une autre) : ni
+    // le sien, ni celui de l'adversaire, ne peuvent être traversés — comme
+    // pour les bords gauche/droite de l'arène. Position toujours replacée
+    // juste à l'intérieur de la zone jouable si jamais elle en était sortie.
     for (const m of mobiles) {
       const r = rayonUnite(m)
       const limiteGauche = MARGE + r
       const limiteDroite = canvas.width - MARGE - r
+      const limiteHaute  = CASTLE_PX + r                 // mur du château ennemi (haut)
+      const limiteBasse  = canvas.height - CASTLE_PX - r // mur du château joueur (bas)
       if (m.x < limiteGauche) m.x = limiteGauche
       if (m.x > limiteDroite) m.x = limiteDroite
       if (m.y < limiteHaute) m.y = limiteHaute
@@ -1392,31 +1396,56 @@
     }
   }
 
-  // Cherche, parmi le camp adverse, l'ennemi vivant le plus proche présent
-  // dans la zone de détection de l'unité. Cette zone n'est plus un simple
-  // rayon circulaire : elle couvre toute la largeur de la ligne (aucune
-  // limite latérale), sur une profondeur de zoneDetection devant l'unité
-  // (+ une petite marge derrière, pour "le même niveau") — impossible pour
-  // un ennemi de passer à côté sans être vu et engagé.
+  // Facteur minimal appliqué à la portée d'attaque pour obtenir la portée
+  // de détection : une unité doit toujours détecter légèrement plus loin
+  // qu'elle n'attaque, jamais l'inverse (sinon elle attaquerait des cibles
+  // qu'elle n'a jamais "vues" venir).
+  const FACTEUR_DETECTION_MIN_PORTE = 1.15
+
+  // Portée de détection effective d'une unité : au minimum un peu plus loin
+  // que sa portée d'attaque (FACTEUR_DETECTION_MIN_PORTE), et au minimum
+  // égale à la largeur du plateau — pour qu'un ennemi qui arrive à son
+  // niveau, même à l'autre bout du terrain, ne puisse jamais rester
+  // invisible. La statue (immobile) ne détecte jamais rien : elle ne
+  // marche ni n'attaque.
+  function porteeDetectionEffective(unite) {
+    if (unite.immobile) return 0
+    return Math.max(unite.porte * FACTEUR_DETECTION_MIN_PORTE, canvas.width)
+  }
+
+  // Une cible (unité ou point de château) est "détectée" si elle est à
+  // l'intérieur du rayon de détection ET pas franchement derrière l'unité
+  // (demi-cercle tourné vers l'avant, avec une petite tolérance pour
+  // considérer une cible "à son niveau" comme détectée même si elle est
+  // très légèrement en retrait). Impossible de détecter — ni d'être
+  // détecté par — quelqu'un strictement dans son dos.
+  function estDetectable(unite, cibleX, cibleY) {
+    const dx = cibleX - unite.x, dy = cibleY - unite.y
+    const projection = dx * unite.dirX + dy * unite.dirY   // devant = positif
+    const margeNiveau = VS * 0.5
+    if (projection < -margeNiveau) return false            // franchement derrière : ignoré
+    return Math.hypot(dx, dy) <= porteeDetectionEffective(unite)
+  }
+
+  // Cherche, parmi le camp adverse, l'ennemi vivant le plus proche détecté
+  // (voir estDetectable).
   function ennemiLePlusProche(unite) {
     const adversaires = unite.team === 'joueur' ? unitesEnnemi : unitesJoueur
-    // Marge de tolérance pour considérer un adversaire "au même niveau"
-    // (léger décalage devant l'unité inclus, voir projection ci-dessous).
-    const margeNiveau = VS * 0.5
     let meilleur = null, meilleureDist = Infinity
     for (const a of adversaires) {
-      // Distance projetée sur la direction de marche de l'unité (dirX/dirY,
-      // fixée à la pose) : positif = devant, négatif = derrière. Aucune
-      // contrainte latérale (x) : la bande de détection couvre toute la
-      // largeur du terrain.
-      const projection = (a.x - unite.x) * unite.dirX + (a.y - unite.y) * unite.dirY
-      if (projection < -margeNiveau) continue          // franchement derrière : ignoré
-      if (projection > unite.zoneDetection) continue   // pas encore assez proche devant
-
+      if (a.pv <= 0) continue
+      if (!estDetectable(unite, a.x, a.y)) continue
       const d = Math.hypot(a.x - unite.x, a.y - unite.y)
       if (d < meilleureDist) { meilleur = a; meilleureDist = d }
     }
     return meilleur
+  }
+
+  // Le château adverse n'est une cible que s'il est lui-même détecté
+  // (même règle que pour un ennemi : rayon de détection + pas derrière).
+  function chateauEstDetecte(unite) {
+    const c = pointCastle(unite.team)
+    return estDetectable(unite, c.x, c.y)
   }
 
   function mettreAJourUnite(unite, dt) {
@@ -1428,39 +1457,55 @@
       return
     }
 
-    // Priorité à une unité ennemie détectée à portée, sinon le château adverse.
+    // Priorité à un ennemi détecté ; sinon le château adverse, mais
+    // seulement s'il est lui-même détecté ; sinon, rien n'est détecté du
+    // tout et l'unité continue simplement sa marche verticale par défaut.
     const ennemiProche = ennemiLePlusProche(unite)
-    let cibleX, cibleY, distCible, rayonCible
+    let cibleX, cibleY, rayonCible, cibleDetectee = true
 
     if (ennemiProche) {
       cibleX = ennemiProche.x; cibleY = ennemiProche.y
-      distCible = Math.hypot(cibleX - unite.x, cibleY - unite.y)
       rayonCible = rayonUnite(ennemiProche)
-    } else {
+    } else if (chateauEstDetecte(unite)) {
       const c = pointCastle(unite.team)
       cibleX = c.x; cibleY = c.y
-      distCible = Math.hypot(cibleX - unite.x, cibleY - unite.y)
       // La hitbox du château est resserrée vers son centre (26px de base),
       // mais on ajoute ~1.5 hexagone de portée effective pour que les
       // unités puissent l'attaquer d'un peu plus loin.
       rayonCible = 26 + 1.5 * VS
+    } else {
+      cibleDetectee = false
     }
 
-    if (distCible - rayonCible <= unite.porte) {
+    const distCible = cibleDetectee ? Math.hypot(cibleX - unite.x, cibleY - unite.y) : Infinity
+
+    if (cibleDetectee && distCible - rayonCible <= unite.porte) {
       unite.etat = 'attaque'
       unite.cooldownAttaque -= dt
       if (unite.cooldownAttaque <= 0) {
         unite.cooldownAttaque = unite.cooldownAttaqueBase
         declencherAttaque(unite, ennemiProche, cibleX, cibleY)
       }
+      return
+    }
+
+    unite.etat = 'marche'
+    const vitesse = unite.vitesseMarche * dt / 1000
+
+    if (cibleDetectee) {
+      // Une cible a été détectée (ennemi ou château) mais reste hors de
+      // portée d'attaque : l'unité fonce droit dessus, quitte à quitter
+      // sa ligne verticale d'origine.
+      const dx = cibleX - unite.x, dy = cibleY - unite.y
+      const d = Math.hypot(dx, dy) || 1
+      unite.x += (dx / d) * vitesse
+      unite.y += (dy / d) * vitesse
     } else {
-      unite.etat = 'marche'
-      // Marche en ligne droite vers sa cible (direction fixée à la pose) —
-      // le contournement d'un allié bloqué en combat n'est pas un
+      // Rien détecté : marche purement verticale vers le château adverse
+      // (le contournement d'un allié bloqué en combat n'est pas un
       // comportement à part : c'est un simple effet de la collision
-      // normale (separerPaire), qui résiste surtout sur l'axe de marche
-      // d'une unité en plein combat et cède librement sur le côté.
-      const vitesse = unite.vitesseMarche * dt / 1000
+      // normale, voir separerPaire, qui résiste surtout sur l'axe de
+      // marche d'une unité en plein combat et cède librement sur le côté).
       unite.x += unite.dirX * vitesse
       unite.y += unite.dirY * vitesse
     }
@@ -2197,9 +2242,18 @@
    *
    *  COMBAT
    *  ------
-   *  - Chaque unité active un rayon de détection (zoneDetection) : si un
-   *    ennemi y entre, elle le vise en priorité ; sinon elle vise le
-   *    château adverse.
+   *  - Chaque unité a une portée de détection calculée dynamiquement
+   *    (porteeDetectionEffective) : toujours un peu plus loin que sa
+   *    portée d'attaque, et au moins aussi large que le plateau, pour
+   *    qu'aucun ennemi à son niveau ne reste invisible. Tant que rien
+   *    n'est détecté, l'unité marche en ligne purement verticale vers le
+   *    château adverse ; dès qu'un ennemi (ou le château adverse) entre
+   *    dans cette zone, elle fonce droit dessus ; dès que quelqu'un entre
+   *    dans sa portée d'attaque, elle l'attaque. Impossible de détecter
+   *    quelqu'un strictement dans son dos (et réciproquement).
+   *  - Les châteaux se comportent comme des murs infranchissables (comme
+   *    les bords de l'arène) : aucune unité, alliée ou ennemie, ne peut
+   *    être poussée à l'intérieur.
    *  - Une unité "immobile" (statue) ne fait jamais rien d'autre qu'exister
    *    et perdre des PV.
    *  - Attaque au CORPS À CORPS : dégâts appliqués immédiatement, avec un
