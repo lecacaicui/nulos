@@ -418,6 +418,7 @@
       background: var(--couleur-fond); border: 1px solid var(--couleur-bordure);
       border-radius: 10px; padding: .6rem .8rem;
     }
+    .deck-ligne-verrouillee { opacity: .45; filter: grayscale(.6); }
     .deck-ligne .deck-emoji { font-size: 1.4rem; }
     .deck-ligne .deck-infos { flex: 1; }
     .deck-ligne .deck-nom { font-size: .88rem; font-weight: 700; }
@@ -490,10 +491,32 @@
 
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
+    import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck } from '../script/battlogy.js'
+
     ;(async () => {
+      if (!localStorage.getItem('username')) {
+        window.location.href = 'connexion.html'
+        return
+      }
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')
+
+      const { data: session } = await db.auth.getUser()
+      const userId = session?.user?.id ?? null
+
+      // Rend la sauvegarde accessible au script de jeu (classique, pas
+      // module) plus bas dans la page — voir sauvegarderCompositionDeck.
+      window.BattlogyDB = { userId, sauvegarderDeck }
+
+      if (userId) {
+        const [cartes, deck] = await Promise.all([
+          garantirCartesDeDepart(userId),
+          chargerDeck(userId)
+        ])
+        window.appliquerDonneesBattlogy(cartes, deck)
+      }
+
       await window.chargerImagesChateau()
       initArena()
     })()
@@ -658,9 +681,9 @@
   const MORT_SUBITE_T      = 270000  // 4m30
   const MORT_SUBITE_TAUX   = 0.035   // % des PV max perdus / seconde, par château
 
-  const DECK_STORAGE_KEY = 'battlogy_deck_v1'
   // Composition de base fournie par défaut tant que le joueur n'a pas
-  // enregistré son propre deck (voir modale d'édition).
+  // enregistré son propre deck en BDD (voir modale d'édition, et le
+  // module script/battlogy.js pour le chargement/la sauvegarde).
   const DECK_PAR_DEFAUT = [
     'guerrier', 'guerrier',
     'archer', 'archer',
@@ -708,19 +731,31 @@
   let partieCommencee = false
   let partieTerminee = false
 
-  // ─── Deck : chargement / sauvegarde (localStorage) ─────────────
+  // ─── Deck & cartes débloquées : chargement / sauvegarde (Supabase) ─────
+  // Alimentés de façon asynchrone par le script module en haut de la page
+  // (voir window.appliquerDonneesBattlogy) une fois la session utilisateur
+  // et la BDD interrogées. En attendant que ça arrive (quelques centaines
+  // de ms tout au plus), on part du principe que tout est débloqué — un
+  // joueur ne peut de toute façon pas cliquer plus vite que ça.
+  let cartesDebloquees = new Set(Object.keys(CARTES))
+  let deckSauvegarde = null   // liste d'id sauvegardée en BDD, ou null si aucune (→ DECK_PAR_DEFAUT)
+
+  window.appliquerDonneesBattlogy = function(cartes, deck) {
+    if (cartes) cartesDebloquees = cartes
+    deckSauvegarde = (Array.isArray(deck) && deck.length > 0) ? deck : null
+  }
+
   function chargerCompositionDeck() {
-    try {
-      const brut = localStorage.getItem(DECK_STORAGE_KEY)
-      if (!brut) return DECK_PAR_DEFAUT.slice()
-      const liste = JSON.parse(brut)
-      if (!Array.isArray(liste) || liste.length === 0) return DECK_PAR_DEFAUT.slice()
-      return liste.filter(id => !!CARTES[id]).slice(0, DECK_TAILLE)
-    } catch (e) { return DECK_PAR_DEFAUT.slice() }
+    const source = deckSauvegarde ?? DECK_PAR_DEFAUT
+    const filtree = source.filter(id => !!CARTES[id] && cartesDebloquees.has(id)).slice(0, DECK_TAILLE)
+    return filtree.length > 0 ? filtree : DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)).slice(0, DECK_TAILLE)
   }
 
   function sauvegarderCompositionDeck(liste) {
-    localStorage.setItem(DECK_STORAGE_KEY, JSON.stringify(liste))
+    deckSauvegarde = liste
+    if (window.BattlogyDB?.userId) {
+      window.BattlogyDB.sauvegarderDeck(window.BattlogyDB.userId, liste)
+    }
   }
 
   // ─── Tirage pondéré dans le deck ────────────────────────────────
@@ -2294,14 +2329,15 @@
     const total = totalEditionDeck()
     document.getElementById('deck-compteur').textContent = total
     document.getElementById('deck-liste').innerHTML = Object.values(CARTES).map(carte => {
-      const qte = editionDeck[carte.id] || 0
-      const peutAjouter = total < DECK_TAILLE
+      const verrouillee = !cartesDebloquees.has(carte.id)
+      const qte = verrouillee ? 0 : (editionDeck[carte.id] || 0)
+      const peutAjouter = !verrouillee && total < DECK_TAILLE
       return `
-        <div class="deck-ligne">
+        <div class="deck-ligne${verrouillee ? ' deck-ligne-verrouillee' : ''}">
           <span class="deck-emoji">${carte.emoji}</span>
           <div class="deck-infos">
-            <div class="deck-nom">${carte.nom}</div>
-            <div class="deck-cout">Coût ${carte.cout} or</div>
+            <div class="deck-nom">${carte.nom}${verrouillee ? ' 🔒' : ''}</div>
+            <div class="deck-cout">${verrouillee ? 'Non débloquée' : 'Coût ' + carte.cout + ' or'}</div>
           </div>
           <div class="deck-stepper">
             <button type="button" data-action="moins" data-carte="${carte.id}" ${qte <= 0 ? 'disabled' : ''}>−</button>
@@ -2338,7 +2374,7 @@
   })
 
   document.getElementById('btn-deck-reset').addEventListener('click', () => {
-    editionDeck = compositionVersCompte(DECK_PAR_DEFAUT)
+    editionDeck = compositionVersCompte(DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)))
     renderModaleDeck()
   })
 
@@ -2433,8 +2469,12 @@
    *  carte, pas encore appliquée)
    *  ------------------------------------------------------------------
    *  - Édité via la modale "Éditer mon deck" (bouton à côté de "Lancer la
-   *    partie"), sauvegardé en localStorage (DECK_STORAGE_KEY). Un deck de
-   *    base est fourni par défaut tant que rien n'a été enregistré.
+   *    partie"), sauvegardé en BDD (Supabase, table battlogy_decks, une
+   *    ligne par joueur — voir script/battlogy.js). Un deck de base est
+   *    fourni par défaut tant que rien n'a été enregistré. Seules les
+   *    cartes débloquées par le joueur (table battlogy_cartes_utilisateurs)
+   *    peuvent être ajoutées au deck ; les autres apparaissent verrouillées
+   *    🔒 dans la modale.
    *  - C'est un "paquet infini" à tirage pondéré : chaque emplacement (même
    *    en cas de doublon) a son propre poids, indépendant des autres.
    *    Poids de départ 1, borné entre 0 (POIDS_MIN) et 2.5 (POIDS_MAX).
