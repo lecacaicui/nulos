@@ -571,6 +571,24 @@
       vitesseMarche: 55, tempsActivation: 500, nombre: 3,
       taille: 0.5, typeAttaque: 'melee'
     },
+    magicien: {
+      id: 'magicien', nom: 'Magicien', emoji: '🧙', cout: 5,
+      pv: 50, degats: 30, porte: 110, vitesseAttaque: 0.8,
+      vitesseMarche: 38, tempsActivation: 1000, nombre: 1,
+      taille: 1, typeAttaque: 'distance',
+      // Attaque à distance qui éclabousse : tout ennemi (et le château,
+      // sans réduction — c'est une troupe, pas un sort) dans ce rayon
+      // autour du point d'impact du projectile encaisse les dégâts, pas
+      // seulement la cible visée (voir zoneAttaqueHex, converti en px à
+      // la création de l'unité).
+      zoneAttaque: true, zoneAttaqueHex: 1.3
+    },
+    golem: {
+      id: 'golem', nom: 'Golem', emoji: '🪨', cout: 4,
+      pv: 280, degats: 8, porte: 32, vitesseAttaque: 0.8,
+      vitesseMarche: 22, tempsActivation: 1100, nombre: 1,
+      taille: 1.3, typeAttaque: 'melee'
+    },
     // Carte spéciale, catégorisée comme un "sort" (fait apparaître une
     // statue plutôt que de recruter une troupe classique). Contourne les
     // règles de placement (posable sur n'importe quel hexagone du terrain,
@@ -585,6 +603,28 @@
       pv: 120, degats: 0, porte: 0, vitesseAttaque: 0,
       vitesseMarche: 0, tempsActivation: 0, nombre: 1,
       taille: 1
+    },
+    // ── Sorts à effet instantané ──────────────────────────────────
+    // Contrairement à la Statue (aussi un "sort", mais qui fait apparaître
+    // une unité), ceux-ci n'invoquent rien : `effetInstantane` déclenche
+    // dans tenterPoserCarte un appel direct à lancerSortZone (dégâts +
+    // éventuellement repoussée) au lieu de poserCarte. `placementLibre`
+    // leur permet d'être lancés n'importe où sur le terrain, y compris en
+    // zone ennemie. `degatsChateauMult` réduit les dégâts au château par
+    // rapport aux dégâts infligés aux troupes (les sorts sont moins
+    // efficaces contre un château qu'une troupe qui l'attaque directement).
+    boule_de_feu: {
+      id: 'boule_de_feu', nom: 'Boule de feu', emoji: '🔥', cout: 4,
+      categorie: 'sort', placementLibre: true, effetInstantane: true,
+      degats: 60, zoneHex: 2, degatsChateauMult: 0.4
+    },
+    bombe_a_eau: {
+      id: 'bombe_a_eau', nom: 'Bombe à eau', emoji: '💧', cout: 2,
+      categorie: 'sort', placementLibre: true, effetInstantane: true,
+      degats: 15, zoneHex: 2, degatsChateauMult: 0.4,
+      // Force (px) de la poussée appliquée aux unités touchées, dans l'axe
+      // centre d'impact → unité (les repousse loin du point d'impact).
+      repousse: 90
     }
   }
 
@@ -622,10 +662,12 @@
   // Composition de base fournie par défaut tant que le joueur n'a pas
   // enregistré son propre deck (voir modale d'édition).
   const DECK_PAR_DEFAUT = [
-    'guerrier', 'guerrier', 'guerrier',
-    'archer', 'archer', 'archer',
-    'squelette', 'squelette',
-    'statue', 'statue'
+    'guerrier', 'guerrier',
+    'archer', 'archer',
+    'squelette',
+    'magicien', 'golem',
+    'statue',
+    'boule_de_feu', 'bombe_a_eau'
   ]
 
   // ─── État de la partie ──────────────────────────────────────────
@@ -649,6 +691,9 @@
   // éclat visuel affiché brièvement au contact, sans délai (dégâts immédiats).
   let projectiles = []
   let effetsMelee = []
+  // Éclat visuel des sorts à effet de zone (Boule de feu, Bombe à eau…) —
+  // voir lancerSortZone / dessinerEffetsSort.
+  let effetsSort = []
   const VITESSE_PROJECTILE = 340 // px/s
 
   // Apparition automatique d'un guerrier ennemi, pour les tests.
@@ -908,14 +953,16 @@
         obj.x = MARGE + (obj.x - MARGE) * echelle
         obj.y = gridOffsetY + (obj.y - gridOffsetY) * echelle
       }
-      for (const u of unitesJoueur) reechelonner(u)
-      for (const u of unitesEnnemi) reechelonner(u)
+      for (const u of unitesJoueur) { reechelonner(u); if (u.zoneAttaque) u.zoneAttaquePx *= echelle }
+      for (const u of unitesEnnemi) { reechelonner(u); if (u.zoneAttaque) u.zoneAttaquePx *= echelle }
       for (const p of projectiles) {
         reechelonner(p)
         p.cibleXFixe = MARGE + (p.cibleXFixe - MARGE) * echelle
         p.cibleYFixe = gridOffsetY + (p.cibleYFixe - gridOffsetY) * echelle
+        if (p.zoneAttaque) p.zoneAttaquePx *= echelle
       }
       for (const e of effetsMelee) reechelonner(e)
+      for (const e of effetsSort) { reechelonner(e); e.rayon *= echelle }
     }
 
     if (!dernierTimestamp) requestAnimationFrame(boucleDeJeu)
@@ -1234,16 +1281,41 @@
     }
   }
 
-  // Fait apparaître un guerrier ennemi, en respectant les mêmes règles de
-  // placement que le joueur (voir calculerZonePose) : parmi les cases
-  // actuellement valides pour le camp ennemi, on en choisit une au hasard.
-  // Si elle tombe sur une unité déjà présente, la collision physique (voir
-  // resoudreCollisions) les écarte automatiquement l'une de l'autre.
+  // ─── Sorts à effet instantané (Boule de feu, Bombe à eau…) ────
+  // Contrairement à poserCarte, n'invoque aucune unité : applique tout de
+  // suite les dégâts (et l'éventuelle repoussée) sur la zone visée, puis
+  // ajoute un éclat visuel (voir effetsSort / dessinerEffetsSort).
+  function lancerSortZone(carte, x, y, team) {
+    const rayonPx = carte.zoneHex * VS
+    appliquerDegatsZone(x, y, rayonPx, team, carte.degats, {
+      multChateau: carte.degatsChateauMult ?? 1,
+      repousse: carte.repousse || 0
+    })
+    effetsSort.push({
+      x, y, rayon: rayonPx,
+      couleur: carte.repousse ? '#38bdf8' : '#f97316',
+      dureeRestante: 260, dureeTotale: 260
+    })
+  }
+
+  // Pool des troupes que le bot ennemi peut faire apparaître (les sorts à
+  // effet instantané et la Statue en sont exclus : le bot ne "pose" que des
+  // unités de terrain classiques). Le guerrier apparaît deux fois pour
+  // rester la troupe la plus fréquente, comme avant l'ajout des autres.
+  const POOL_SPAWN_ENNEMI = ['guerrier', 'guerrier', 'archer', 'squelette', 'golem', 'magicien']
+
+  // Fait apparaître une troupe ennemie aléatoire (voir POOL_SPAWN_ENNEMI),
+  // en respectant les mêmes règles de placement que le joueur (voir
+  // calculerZonePose) : parmi les cases actuellement valides pour le camp
+  // ennemi, on en choisit une au hasard. Si elle tombe sur une unité déjà
+  // présente, la collision physique (voir resoudreCollisions) les écarte
+  // automatiquement l'une de l'autre.
   function spawnEnnemiAleatoire() {
     const positions = positionsValidesPourEquipe('ennemi')
     if (positions.length === 0) return
     const pos = positions[Math.floor(Math.random() * positions.length)]
-    poserCarte(CARTES.guerrier, pos.x, pos.y, 'ennemi')
+    const carteId = POOL_SPAWN_ENNEMI[Math.floor(Math.random() * POOL_SPAWN_ENNEMI.length)]
+    poserCarte(CARTES[carteId], pos.x, pos.y, 'ennemi')
   }
 
   function creerUnite(carte, x, y, team) {
@@ -1259,6 +1331,12 @@
       porte: carte.porte,
       taille: carte.taille || 1,
       typeAttaque: carte.typeAttaque || 'melee',
+      // Attaque à distance avec éclaboussure (ex: le Magicien) : tout
+      // ennemi dans ce rayon (px, converti depuis zoneAttaqueHex — voir
+      // CARTES) autour du point d'impact du projectile est touché, pas
+      // seulement la cible visée (voir mettreAJourProjectiles).
+      zoneAttaque: !!carte.zoneAttaque,
+      zoneAttaquePx: carte.zoneAttaque ? carte.zoneAttaqueHex * VS : 0,
       vitesseMarche: carte.vitesseMarche,
       cooldownAttaqueBase: 1000 / (carte.vitesseAttaque || 1),
       cooldownAttaque: 0,
@@ -1536,7 +1614,11 @@
         cibleUnite: ennemiProche || null,
         // Point visé au moment du tir : sert de repli si la cible (unité)
         // meurt avant l'impact, et de cible fixe s'il s'agit d'un château.
-        cibleXFixe: cibleX, cibleYFixe: cibleY
+        cibleXFixe: cibleX, cibleYFixe: cibleY,
+        // Attaque à éclaboussure (Magicien) : à l'impact, tout ennemi dans
+        // ce rayon est touché — voir mettreAJourProjectiles.
+        zoneAttaque: unite.zoneAttaque,
+        zoneAttaquePx: unite.zoneAttaquePx
       })
     } else {
       appliquerDegatsSurCible(unite, ennemiProche)
@@ -1559,6 +1641,40 @@
     }
   }
 
+  // Inflige des dégâts de zone à toutes les unités ADVERSES du camp `team`
+  // situées dans un rayon (px) autour d'un point d'impact (x, y), et,
+  // sauf si `multChateau` vaut 0, une part de ces dégâts au château visé
+  // par ce camp s'il est dans le rayon d'effet. Utilisée à la fois par
+  // l'attaque à éclaboussure du Magicien (voir mettreAJourProjectiles,
+  // multChateau: 1 — c'est une troupe, pas de réduction) et par les sorts
+  // à effet de zone (voir lancerSortZone, multChateau réduit).
+  // `repousse` (optionnel, px) : en plus des dégâts, pousse les unités
+  // touchées loin du point d'impact (voir la Bombe à eau) — le château,
+  // lui, ne bouge évidemment jamais.
+  function appliquerDegatsZone(x, y, rayon, team, degats, { multChateau = 1, repousse = 0 } = {}) {
+    const adversaires = team === 'joueur' ? unitesEnnemi : unitesJoueur
+    for (const u of adversaires) {
+      if (u.pv <= 0) continue
+      const dx = u.x - x, dy = u.y - y
+      const d = Math.hypot(dx, dy)
+      if (d > rayon + rayonUnite(u)) continue
+      u.pv = Math.max(0, u.pv - degats)
+      if (repousse > 0 && u.pv > 0 && !u.immobile) {
+        const n = d > 0.001 ? d : 1
+        u.x += (dx / n) * repousse
+        u.y += (dy / n) * repousse
+      }
+    }
+    if (multChateau > 0) {
+      const c = pointCastle(team)
+      if (Math.hypot(c.x - x, c.y - y) <= rayon + 26) {
+        const degatsChateau = Math.round(degats * multChateau)
+        if (team === 'joueur') ennemiChateauPV = Math.max(0, ennemiChateauPV - degatsChateau)
+        else joueurChateauPV = Math.max(0, joueurChateauPV - degatsChateau)
+      }
+    }
+  }
+
   function mettreAJourProjectiles(dt) {
     for (const p of projectiles) {
       // Cible actuelle : suit l'unité visée tant qu'elle est vivante,
@@ -1575,7 +1691,9 @@
       if (dist <= Math.max(pas, 5)) {
         // Impact : les dégâts n'arrivent que maintenant, à l'atteinte de
         // la cible — jamais au moment du tir.
-        if (p.cibleUnite) {
+        if (p.zoneAttaque) {
+          appliquerDegatsZone(p.x, p.y, p.zoneAttaquePx, p.team, p.degats, { multChateau: 1 })
+        } else if (p.cibleUnite) {
           if (cibleVivante) p.cibleUnite.pv = Math.max(0, p.cibleUnite.pv - p.degats)
         } else if (p.team === 'joueur') {
           ennemiChateauPV = Math.max(0, ennemiChateauPV - p.degats)
@@ -1595,6 +1713,11 @@
   function mettreAJourEffetsMelee(dt) {
     for (const e of effetsMelee) e.dureeRestante -= dt
     effetsMelee = effetsMelee.filter(e => e.dureeRestante > 0)
+  }
+
+  function mettreAJourEffetsSort(dt) {
+    for (const e of effetsSort) e.dureeRestante -= dt
+    effetsSort = effetsSort.filter(e => e.dureeRestante > 0)
   }
 
   // Petite flèche orientée vers sa direction de vol.
@@ -1643,6 +1766,29 @@
 
   function dessinerEffetsMelee() {
     for (const e of effetsMelee) dessinerEffetMelee(e)
+  }
+
+  // Cercle qui grandit et s'estompe sur la zone d'effet d'un sort
+  // (Boule de feu, Bombe à eau…) — simple retour visuel sur l'endroit et
+  // l'étendue touchés.
+  function dessinerEffetSort(e) {
+    const frac = Math.max(0, e.dureeRestante / e.dureeTotale)
+    ctx.save()
+    ctx.globalAlpha = frac * 0.7
+    ctx.strokeStyle = e.couleur
+    ctx.fillStyle = e.couleur
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(e.x, e.y, e.rayon * (1 - frac * 0.35), 0, Math.PI * 2)
+    ctx.globalAlpha = frac * 0.15
+    ctx.fill()
+    ctx.globalAlpha = frac * 0.7
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  function dessinerEffetsSort() {
+    for (const e of effetsSort) dessinerEffetSort(e)
   }
 
   function dessinerUnite(u) {
@@ -1753,6 +1899,7 @@
     dessinerUnites()
     dessinerProjectiles()
     dessinerEffetsMelee()
+    dessinerEffetsSort()
   }
 
   // ─── Jauge de pioche (camembert) ────────────────────────────────
@@ -1798,6 +1945,7 @@
       mettreAJourUnites(dt)
       mettreAJourProjectiles(dt)
       mettreAJourEffetsMelee(dt)
+      mettreAJourEffetsSort(dt)
 
       tempsDepuisSpawnEnnemi += dt
       if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
@@ -1919,7 +2067,11 @@
     renderMain()
     // La carte est posée exactement au centre de la case (pas à l'endroit
     // précis du curseur/doigt).
-    poserCarte(carte, hex.cx, hex.cy, 'joueur')
+    if (carte.effetInstantane) {
+      lancerSortZone(carte, hex.cx, hex.cy, 'joueur')
+    } else {
+      poserCarte(carte, hex.cx, hex.cy, 'joueur')
+    }
   }
 
   // Détruire volontairement une carte (zone de destruction) : aucun impact
@@ -2091,6 +2243,7 @@
     hexSurvole = null
     projectiles = []
     effetsMelee = []
+    effetsSort = []
     partieTerminee = false
     partieCommencee = true
 
