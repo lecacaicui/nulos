@@ -25,9 +25,8 @@ export const db = createClient(SUPABASE_URL, SUPABASE_KEY)
  * doit voir et modifier que ses propres cartes/deck.
  *
  * NOTE : les cartes elles-mêmes (stats, coût, etc.) restent en dur dans
- * battlogy.html (objet CARTES) pour l'instant — seule la liste des cartes
- * DÉBLOQUÉES par joueur est en BDD. Migrer les cartes elles-mêmes en BDD
- * est prévu plus tard (avec un système de règles/mécaniques par carte).
+ * battlogy.html (objet CARTES_SECOURS) tant que la table `battlogy_cartes`
+ * est vide/inaccessible — voir chargerCartesJeu plus bas.
  */
 
 // Cartes débloquées d'office pour tout nouveau joueur (voir
@@ -105,35 +104,37 @@ export async function sauvegarderDeck(userId, liste) {
 // ===== Cartes (définitions de jeu) — gestion complète en BDD =============
 // ===========================================================================
 /**
- * Schéma attendu côté Supabase (table `battlogy_cartes`) :
+ * Schéma réel côté Supabase (table `battlogy_cartes`), colonnes typées pour
+ * les propriétés de sort/troupe + `options` en réserve pour tout le reste
+ * (ex: zoneAttaque/zoneAttaqueHex du Magicien, qui n'ont pas de colonne
+ * dédiée) :
  *
- * create table battlogy_cartes (
- *   id text primary key,
+ * create table public.battlogy_cartes (
+ *   id text not null,
  *   nom text not null,
- *   image text,                                    -- nom de fichier dans le
- *                                                    -- bucket Storage "pictures"
- *                                                    -- (voir urlImage dans lootbox.js)
- *   cout integer not null default 1,
- *   pv integer not null default 0,
- *   degats integer not null default 0,
- *   porte integer not null default 0,
- *   vitesse_attaque numeric not null default 1,
- *   vitesse_marche integer not null default 0,
- *   temps_activation integer not null default 0,
- *   nombre integer not null default 1,              -- unités invoquées par carte
+ *   emoji text null,
+ *   cout integer not null,
+ *   categorie text not null default 'troupe'::text,
+ *   pv integer null,
+ *   degats integer null,
+ *   porte integer null,
+ *   vitesse_attaque numeric null,
+ *   vitesse_marche numeric null,
+ *   temps_activation integer null,
+ *   nombre integer not null default 1,
  *   taille numeric not null default 1,
- *   type_attaque text not null default 'melee',      -- 'melee' | 'distance'
- *   categorie text not null default 'troupe',        -- 'troupe' | 'sort'
- *   options jsonb not null default '{}'::jsonb,      -- propriétés avancées,
- *                                                     -- réservées aux sorts :
- *                                                     -- placementLibre, immobile,
- *                                                     -- effetInstantane, zoneHex,
- *                                                     -- degatsChateauMult, repousse,
- *                                                     -- zoneAttaque, zoneAttaqueHex
+ *   type_attaque text null,
+ *   placement_libre boolean not null default false,
+ *   immobile boolean not null default false,
+ *   effet_instantane boolean not null default false,
+ *   zone_hex numeric null,
+ *   degats_chateau_mult numeric null,
+ *   repousse numeric null,
+ *   actif boolean not null default true,
  *   ordre integer not null default 0,
- *   actif boolean not null default true               -- si false, la carte
- *                                                       -- disparaît du jeu
- *                                                       -- (mais reste en BDD)
+ *   image text null,
+ *   options jsonb not null default '{}'::jsonb,
+ *   constraint battlogy_cartes_pkey primary key (id)
  * );
  *
  * Penser à activer la RLS et à n'autoriser l'écriture (insert/update/delete)
@@ -145,11 +146,20 @@ export async function sauvegarderDeck(userId, liste) {
  * automatiquement (voir le commentaire sur CARTES_DEPART).
  */
 
-/** Convertit une ligne BDD vers le format attendu par le moteur de jeu (objet CARTES, voir battlogy.html). */
+/**
+ * Convertit une ligne BDD vers le format attendu par le moteur de jeu (objet
+ * CARTES, voir battlogy.html). Lit d'abord les colonnes dédiées
+ * (placement_libre, immobile, effet_instantane, zone_hex,
+ * degats_chateau_mult, repousse), puis étale `options` par-dessus en
+ * dernier : ça laisse `options` disponible pour tout ce qui n'a pas de
+ * colonne dédiée (ex: zoneAttaque/zoneAttaqueHex du Magicien), et permet
+ * aussi de surcharger ponctuellement une colonne typée si jamais besoin.
+ */
 function convertirCarteBDD(ligne) {
   return {
     id: ligne.id,
     nom: ligne.nom,
+    emoji: ligne.emoji || null,
     image: ligne.image || null,
     cout: ligne.cout,
     pv: ligne.pv,
@@ -162,6 +172,12 @@ function convertirCarteBDD(ligne) {
     taille: Number(ligne.taille),
     typeAttaque: ligne.type_attaque,
     categorie: ligne.categorie,
+    placementLibre: !!ligne.placement_libre,
+    immobile: !!ligne.immobile,
+    effetInstantane: !!ligne.effet_instantane,
+    ...(ligne.zone_hex != null ? { zoneHex: Number(ligne.zone_hex) } : {}),
+    ...(ligne.degats_chateau_mult != null ? { degatsChateauMult: Number(ligne.degats_chateau_mult) } : {}),
+    ...(ligne.repousse != null ? { repousse: Number(ligne.repousse) } : {}),
     ...(ligne.options || {})
   }
 }
