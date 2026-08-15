@@ -217,6 +217,7 @@
     .carte-main:active { cursor: grabbing; transform: scale(0.96); }
     .carte-main.indisponible { opacity: .4; cursor: not-allowed; }
     .carte-main .carte-emoji { font-size: 1.5rem; }
+    img.carte-emoji { width: 28px; height: 28px; object-fit: contain; display: block; }
     .carte-main .carte-nom { font-size: .62rem; font-weight: 700; color: var(--couleur-texte); }
     .carte-main .carte-cout {
       font-size: .68rem;
@@ -253,6 +254,7 @@
       opacity: .45;
       filter: drop-shadow(0 2px 6px rgba(0,0,0,.4));
     }
+    .carte-ghost img { width: 36px; height: 36px; object-fit: contain; display: block; }
     .battlogy-message {
       position: fixed;
       left: 50%;
@@ -287,6 +289,7 @@
       font-size: 1.9rem;
       filter: drop-shadow(0 2px 6px rgba(0,0,0,.5));
     }
+    img.carte-pioche-emoji { width: 32px; height: 32px; object-fit: contain; display: block; }
     .carte-pioche-anim .carte-pioche-label {
       font-size: .66rem;
       font-weight: 700;
@@ -446,6 +449,7 @@
     .deck-slot-remplie:hover { filter: brightness(.95); }
     .deck-slot-survolee { border-color: #22c55e; background: #22c55e18; transform: scale(1.03); }
     .deck-slot .deck-slot-emoji { font-size: 1.7rem; }
+    img.deck-slot-emoji { width: 30px; height: 30px; object-fit: contain; display: block; }
     .deck-slot .deck-slot-nom { font-size: .6rem; font-weight: 700; text-align: center; padding: 0 .2rem; line-height: 1.15; }
     .deck-slot-retirer {
       position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%;
@@ -489,6 +493,7 @@
     .deck-carte-verrouillee:hover { transform: none; }
     .deck-carte-equipee { border-color: var(--couleur-bouton); }
     .deck-collection-carte .deck-emoji { font-size: 1.5rem; }
+    img.deck-emoji { width: 26px; height: 26px; object-fit: contain; display: block; }
     .deck-collection-carte .deck-nom { font-size: .68rem; font-weight: 700; }
     .deck-collection-carte .deck-cout {
       font-size: .62rem; font-weight: 700; color: #92400e; background: #fef3c7;
@@ -565,7 +570,7 @@
 
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
-    import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck } from '../script/battlogy.js'
+    import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck, chargerCartesJeu } from '../script/battlogy.js'
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -575,6 +580,13 @@
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')
+
+      // Définitions des cartes : chargées depuis la BDD (voir onglet admin
+      // « Cartes Battlogy »). Si la table est vide ou inaccessible,
+      // window.appliquerCartesJeu n'est pas appelée et le jeu garde ses
+      // cartes de secours en dur (CARTES_SECOURS, voir plus bas).
+      const cartesJeu = await chargerCartesJeu()
+      if (cartesJeu) window.appliquerCartesJeu(cartesJeu)
 
       const { data: session } = await db.auth.getUser()
       const userId = session?.user?.id ?? null
@@ -649,7 +661,12 @@
   // police, barre de vie) ET la hit box utilisée pour le combat (la
   // portée d'attaque d'un adversaire est comparée à ce rayon). 1 = taille
   // normale ; les squelettes sont 2x plus petits (0.5).
-  const CARTES = {
+  // CARTES_SECOURS : copie de secours utilisée uniquement si la table BDD
+  // `battlogy_cartes` est vide ou inaccessible au chargement (voir l'appel
+  // à chargerCartesJeu / window.appliquerCartesJeu dans le script module
+  // plus haut). En fonctionnement normal, CARTES est entièrement piloté
+  // par la BDD et gérable depuis l'onglet admin « Cartes Battlogy ».
+  const CARTES_SECOURS = {
     guerrier: {
       id: 'guerrier', nom: 'Guerrier', emoji: '⚔️', cout: 1,
       pv: 100, degats: 10, porte: 34, vitesseAttaque: 1,
@@ -723,6 +740,26 @@
       // centre d'impact → unité (les repousse loin du point d'impact).
       repousse: 90
     }
+  }
+
+  // CARTES : source réellement utilisée par le moteur de jeu. Vaut
+  // CARTES_SECOURS tant que la BDD n'a pas répondu, puis est remplacée par
+  // window.appliquerCartesJeu (voir script module plus haut) si la table
+  // `battlogy_cartes` contient des cartes actives.
+  let CARTES = CARTES_SECOURS
+
+  // Affiche l'icône d'une carte (image BDD si définie, sinon l'emoji de
+  // secours) sous forme de balise prête à insérer dans un innerHTML.
+  const STORAGE_BUCKET_URL_CARTES = 'https://uqjciekcfrxscfwztttt.supabase.co/storage/v1/object/public/pictures/'
+  function urlImageCarte(nom) {
+    if (!nom) return ''
+    return nom.startsWith('http') ? nom : STORAGE_BUCKET_URL_CARTES + nom
+  }
+  function iconeCarteHTML(carte, classe) {
+    if (carte.image) {
+      return `<img class="${classe}" src="${urlImageCarte(carte.image)}" alt="${carte.nom}">`
+    }
+    return `<span class="${classe}">${carte.emoji || '❔'}</span>`
   }
 
   // Rayon (en px) d'une unité de taille 1. Tous les rayons d'unité se
@@ -814,6 +851,17 @@
   window.appliquerDonneesBattlogy = function(cartes, deck) {
     if (cartes) cartesDebloquees = cartes
     deckSauvegarde = (Array.isArray(deck) && deck.length > 0) ? deck : null
+  }
+
+  // Remplace les définitions de cartes en dur par celles de la BDD (voir
+  // chargerCartesJeu dans le script module plus haut). Appelé avant
+  // appliquerDonneesBattlogy : le débloquage réel par joueur (ci-dessus)
+  // prendra ensuite le dessus sur ce débloquage « tout est disponible »
+  // par défaut.
+  window.appliquerCartesJeu = function(cartes) {
+    if (!cartes || Object.keys(cartes).length === 0) return
+    CARTES = cartes
+    cartesDebloquees = new Set(Object.keys(CARTES))
   }
 
   function chargerCompositionDeck() {
@@ -980,7 +1028,7 @@
       return `
         <div class="carte-main${(!partieCommencee || partieTerminee) ? ' indisponible' : ''}${tropCher ? ' cout-eleve' : ''}" data-uid="${item.uid}">
           <span class="carte-touche">${touche}</span>
-          <span class="carte-emoji">${carte.emoji}</span>
+          ${iconeCarteHTML(carte, 'carte-emoji')}
           <span class="carte-nom">${carte.nom}</span>
           <span class="carte-cout">${carte.cout}</span>
         </div>`
@@ -2043,7 +2091,7 @@
     el.style.left = (r.left + r.width / 2) + 'px'
     el.style.top = (r.top + r.height / 2) + 'px'
     el.innerHTML = `
-      <span class="carte-pioche-emoji">${carte.emoji}</span>
+      ${iconeCarteHTML(carte, 'carte-pioche-emoji')}
       <span class="carte-pioche-label">${perdue ? '❌ ' + carte.nom + ' perdue' : '+ ' + carte.nom}</span>`
     document.body.appendChild(el)
     el.addEventListener('animationend', () => el.remove())
@@ -2212,7 +2260,7 @@
         carteEnCours = uid
         ghostEl = document.createElement('div')
         ghostEl.className = 'carte-ghost'
-        ghostEl.textContent = CARTES[item.carteId]?.emoji || ''
+        ghostEl.innerHTML = CARTES[item.carteId] ? iconeCarteHTML(CARTES[item.carteId], '') : ''
         document.body.appendChild(ghostEl)
         deplacerGhost(e.clientX, e.clientY)
         document.addEventListener('pointermove', pendantGlisser)
@@ -2317,7 +2365,7 @@
     carteEnCours = item.uid
     ghostEl = document.createElement('div')
     ghostEl.className = 'carte-ghost'
-    ghostEl.textContent = CARTES[item.carteId]?.emoji || ''
+    ghostEl.innerHTML = CARTES[item.carteId] ? iconeCarteHTML(CARTES[item.carteId], '') : ''
     document.body.appendChild(ghostEl)
     pendantGlisser({ clientX: dernierPointeur.x, clientY: dernierPointeur.y })
   })
@@ -2429,7 +2477,7 @@
       return `
         <div class="deck-slot deck-slot-remplie" draggable="true" data-slot="${i}" data-carte="${carteId}">
           <button type="button" class="deck-slot-retirer" data-slot="${i}" title="Retirer">✕</button>
-          <span class="deck-slot-emoji">${carte.emoji}</span>
+          ${iconeCarteHTML(carte, 'deck-slot-emoji')}
           <span class="deck-slot-nom">${carte.nom}</span>
         </div>`
     }).join('') + `
@@ -2452,7 +2500,7 @@
       return `
         <div class="deck-collection-carte${verrouillee ? ' deck-carte-verrouillee' : ''}${qte > 0 ? ' deck-carte-equipee' : ''}"
              draggable="${peutAjouter ? 'true' : 'false'}" data-carte="${carte.id}">
-          <span class="deck-emoji">${carte.emoji}</span>
+          ${iconeCarteHTML(carte, 'deck-emoji')}
           <span class="deck-nom">${carte.nom}${verrouillee ? ' 🔒' : ''}</span>
           <span class="deck-cout">${verrouillee ? 'Verrouillée' : 'Coût ' + carte.cout}</span>
           ${stepperHtml}
