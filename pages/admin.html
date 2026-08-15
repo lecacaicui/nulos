@@ -343,6 +343,9 @@
         <button class="onglet" id="onglet-mda" data-onglet="mda" onclick="ouvrirOnglet('mda')" style="display:none">
           <span class="onglet-icone">😇</span> Ennemis MDA
         </button>
+        <button class="onglet" id="onglet-battlogy" data-onglet="battlogy" onclick="ouvrirOnglet('battlogy')" style="display:none">
+          <span class="onglet-icone">🃏</span> Cartes Battlogy
+        </button>
         <button class="onglet" data-onglet="annonces" onclick="ouvrirOnglet('annonces')">
           <span class="onglet-icone">📢</span> Annonces
         </button>
@@ -586,6 +589,58 @@
           </div>
         </div>
 
+        <!-- ===== Onglet Cartes Battlogy ===== -->
+        <div class="onglet-panneau" data-panneau="battlogy" id="battlogy-card">
+          <h2>🃏 Cartes — Battlogy</h2>
+          <p class="note-verrouille">Gérez les cartes jouables dans Battlogy : stats, image, coût. Ajouter une carte ne la débloque pas automatiquement pour les joueurs existants. Désactiver une carte la retire du jeu sans la supprimer (les decks contenant cette carte l'ignoreront simplement).</p>
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormCarteBattlogy(null)">+ Nouvelle carte</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="bt-filtre-nom" placeholder="Nom de la carte…" oninput="appliquerFiltresCartesBattlogy()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Catégorie</label>
+              <select class="filtre-select" id="bt-filtre-categorie" onchange="appliquerFiltresCartesBattlogy()">
+                <option value="">Toutes</option>
+                <option value="troupe">Troupe</option>
+                <option value="sort">Sort</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="bt-filtre-statut" onchange="appliquerFiltresCartesBattlogy()">
+                <option value="">Tous</option>
+                <option value="actif">Active</option>
+                <option value="inactif">Désactivée</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="bt-tri" onchange="appliquerFiltresCartesBattlogy()">
+                <option value="ordre-asc">Ordre ↑</option>
+                <option value="ordre-desc">Ordre ↓</option>
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="cout-asc">Coût ↑</option>
+                <option value="cout-desc">Coût ↓</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresCartesBattlogy()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="bt-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>Coût</th><th>PV</th><th>Dégâts</th><th>Catégorie</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-battlogy"></tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- ===== Onglet Annonces ===== -->
         <div class="onglet-panneau" data-panneau="annonces">
           <h2>📢 Annonces</h2>
@@ -744,6 +799,93 @@
     </div>
   </div>
 
+  <!-- ===== Modale Carte Battlogy ===== -->
+  <div class="modale-fond" id="modale-battlogy-fond" onclick="if(event.target===this) fermerModaleCarteBattlogy()">
+    <div class="modale-admin">
+      <button class="modale-fermer" onclick="fermerModaleCarteBattlogy()">✕</button>
+      <h2 id="titre-modale-battlogy">Nouvelle carte</h2>
+      <label for="bt-id">Identifiant unique (texte, ex: archer)</label>
+      <input type="text" id="bt-id" placeholder="ex: archer">
+      <label for="bt-nom">Nom affiché</label>
+      <input type="text" id="bt-nom" placeholder="ex: Archer">
+      <label>Image</label>
+      <div class="img-picker-wrap" id="bt-picker-wrap">
+        <div class="img-picker-preview-wrap">
+          <img class="img-picker-preview" id="bt-image-preview" src="" alt="">
+          <span class="img-picker-nom-actuel" id="bt-image-nom">Aucune image</span>
+        </div>
+        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('bt')">🖼 Choisir / importer une image</button>
+      </div>
+      <input type="hidden" id="bt-image">
+      <div class="msg-inline" id="bt-image-msg" style="margin-left:0"></div>
+
+      <label for="bt-categorie">Catégorie</label>
+      <select id="bt-categorie">
+        <option value="troupe">Troupe (recrute une unité)</option>
+        <option value="sort">Sort (statue, effet instantané…)</option>
+      </select>
+      <label for="bt-type-attaque">Type d'attaque</label>
+      <select id="bt-type-attaque">
+        <option value="melee">Mêlée</option>
+        <option value="distance">Distance</option>
+      </select>
+
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px">
+          <label for="bt-cout">Coût (or)</label>
+          <input type="number" id="bt-cout" min="0" step="1" placeholder="1">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label for="bt-pv">PV</label>
+          <input type="number" id="bt-pv" min="0" step="1" placeholder="100">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label for="bt-degats">Dégâts</label>
+          <input type="number" id="bt-degats" min="0" step="1" placeholder="10">
+        </div>
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px">
+          <label for="bt-porte">Portée (px)</label>
+          <input type="number" id="bt-porte" min="0" step="1" placeholder="34">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label for="bt-vitesse-attaque">Vitesse d'attaque (att/s)</label>
+          <input type="number" id="bt-vitesse-attaque" min="0" step="0.1" placeholder="1">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label for="bt-vitesse-marche">Vitesse de marche (px/s)</label>
+          <input type="number" id="bt-vitesse-marche" min="0" step="1" placeholder="40">
+        </div>
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px">
+          <label for="bt-activation">Temps d'activation (ms)</label>
+          <input type="number" id="bt-activation" min="0" step="1" placeholder="800">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label for="bt-nombre">Nombre d'unités</label>
+          <input type="number" id="bt-nombre" min="1" step="1" placeholder="1">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label for="bt-taille">Taille (multiplicateur)</label>
+          <input type="number" id="bt-taille" min="0.1" step="0.1" placeholder="1">
+        </div>
+      </div>
+
+      <label for="bt-ordre">Ordre d'affichage</label>
+      <input type="number" id="bt-ordre" step="1" placeholder="1">
+
+      <label for="bt-options">Options avancées (JSON, optionnel — réservé aux sorts)</label>
+      <textarea id="bt-options" rows="3" placeholder='ex: {"placementLibre":true,"effetInstantane":true,"zoneHex":2,"degatsChateauMult":0.4}'
+        style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.85rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:monospace;"></textarea>
+      <p class="note-verrouille" style="margin-top:.3rem;">Propriétés reconnues : placementLibre, immobile, effetInstantane, zoneHex, degatsChateauMult, repousse, zoneAttaque, zoneAttaqueHex.</p>
+
+      <button class="btn btn-primary btn-full" onclick="sauvegarderCarteBattlogy()">Enregistrer</button>
+      <div class="msg-inline" id="msg-modale-battlogy"></div>
+    </div>
+  </div>
+
   <!-- ===== Modale Annonce ===== -->
   <div class="modale-fond" id="modale-annonce-fond" onclick="if(event.target===this) fermerModaleAnnonce()">
     <div class="modale-admin">
@@ -835,6 +977,9 @@
     import {
       adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
     } from '../script/mda.js'
+    import {
+      adminListerCartes, adminSauvegarderCarte, adminToggleActifCarte, adminSupprimerCarte
+    } from '../script/battlogy.js'
 
     const STORAGE_BUCKET = 'pictures'
 
@@ -1036,10 +1181,12 @@
         document.getElementById('onglet-creatures').style.display = 'flex'
         document.getElementById('onglet-lootbox').style.display = 'flex'
         document.getElementById('onglet-mda').style.display = 'flex'
+        document.getElementById('onglet-battlogy').style.display = 'flex'
         chargerTheme()
         chargerCreatures()
         chargerLootBoxesAdmin()
         chargerEnnemisMDA()
+        chargerCartesBattlogy()
       }
       chargerUtilisateurs()
       chargerAnnoncesAdmin()
@@ -1583,6 +1730,155 @@
       if (!confirm(`Supprimer définitivement l'ennemi "${nom}" ? Cette action est irréversible.`)) return
       await adminSupprimerEnnemiMDA(id)
       await chargerEnnemisMDA()
+    }
+
+    // ===== Cartes Battlogy =====
+    let cartesBattlogyCache = []
+    let carteBattlogyEnEdition = null
+
+    async function chargerCartesBattlogy() {
+      cartesBattlogyCache = await adminListerCartes()
+      appliquerFiltresCartesBattlogy()
+    }
+
+    window.appliquerFiltresCartesBattlogy = function() {
+      const recherche  = document.getElementById('bt-filtre-nom').value.trim().toLowerCase()
+      const categorie  = document.getElementById('bt-filtre-categorie').value
+      const statut     = document.getElementById('bt-filtre-statut').value
+      const tri        = document.getElementById('bt-tri').value
+
+      let data = cartesBattlogyCache.filter(c => {
+        if (recherche && !c.nom.toLowerCase().includes(recherche)) return false
+        if (categorie && c.categorie !== categorie) return false
+        if (statut === 'actif' && !c.actif) return false
+        if (statut === 'inactif' && c.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'cout') { va = Number(a.cout); vb = Number(b.cout) }
+        else { va = a.ordre ?? 0; vb = b.ordre ?? 0 }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('bt-compteur').textContent = data.length + ' / ' + cartesBattlogyCache.length + ' carte(s)'
+      const tbody = document.getElementById('tbody-battlogy')
+      tbody.innerHTML = data.map(c => `<tr>
+        <td>${c.image ? `<img class="img-mini" src="${urlImage(esc(c.image))}" alt="${esc(c.nom)}" onerror="this.style.opacity=0.2">` : '<span class="note-verrouille">—</span>'}</td>
+        <td>${esc(c.nom)}</td>
+        <td>${c.cout}</td>
+        <td>${c.pv}</td>
+        <td>${c.degats}</td>
+        <td><span class="tag" style="background:var(--couleur-bordure)">${c.categorie === 'sort' ? 'Sort' : 'Troupe'}</span></td>
+        <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormCarteBattlogy('${c.id}')">Modifier</button>
+            <button class="btn-preset" onclick="toggleActifCarteBattlogy('${c.id}', ${c.actif})">${c.actif ? 'Désactiver' : 'Activer'}</button>
+            <button class="btn-delete" onclick="supprimerCarteBattlogy('${esc(c.id)}', '${esc(c.nom)}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="8" class="note-verrouille">Aucune carte trouvée.</td></tr>'
+    }
+
+    window.resetFiltresCartesBattlogy = function() {
+      document.getElementById('bt-filtre-nom').value = ''
+      document.getElementById('bt-filtre-categorie').value = ''
+      document.getElementById('bt-filtre-statut').value = ''
+      document.getElementById('bt-tri').value = 'ordre-asc'
+      appliquerFiltresCartesBattlogy()
+    }
+
+    window.ouvrirFormCarteBattlogy = function(id) {
+      carteBattlogyEnEdition = id
+      const c = id ? cartesBattlogyCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-battlogy').textContent = id ? 'Modifier la carte' : 'Nouvelle carte'
+      document.getElementById('bt-id').value = c?.id ?? ''
+      document.getElementById('bt-id').disabled = !!id
+      document.getElementById('bt-nom').value = c?.nom ?? ''
+      document.getElementById('bt-image').value = c?.image ?? ''
+      document.getElementById('bt-image-msg').textContent = ''
+      const btprev = document.getElementById('bt-image-preview')
+      const btnom  = document.getElementById('bt-image-nom')
+      if (c?.image) { btprev.src = urlImage(c.image); btprev.style.display = 'block'; btnom.textContent = c.image.split('/').pop() }
+      else { btprev.style.display = 'none'; btnom.textContent = 'Aucune image' }
+      document.getElementById('bt-categorie').value = c?.categorie ?? 'troupe'
+      document.getElementById('bt-type-attaque').value = c?.type_attaque ?? 'melee'
+      document.getElementById('bt-cout').value = c?.cout ?? '1'
+      document.getElementById('bt-pv').value = c?.pv ?? '0'
+      document.getElementById('bt-degats').value = c?.degats ?? '0'
+      document.getElementById('bt-porte').value = c?.porte ?? '0'
+      document.getElementById('bt-vitesse-attaque').value = c?.vitesse_attaque ?? '1'
+      document.getElementById('bt-vitesse-marche').value = c?.vitesse_marche ?? '0'
+      document.getElementById('bt-activation').value = c?.temps_activation ?? '0'
+      document.getElementById('bt-nombre').value = c?.nombre ?? '1'
+      document.getElementById('bt-taille').value = c?.taille ?? '1'
+      document.getElementById('bt-ordre').value = c?.ordre ?? (cartesBattlogyCache.length + 1)
+      document.getElementById('bt-options').value = c?.options ? JSON.stringify(c.options) : ''
+      document.getElementById('msg-modale-battlogy').textContent = ''
+      document.getElementById('modale-battlogy-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleCarteBattlogy = function() {
+      document.getElementById('modale-battlogy-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderCarteBattlogy = async function() {
+      const id = document.getElementById('bt-id').value.trim()
+      const nom = document.getElementById('bt-nom').value.trim()
+      const image = document.getElementById('bt-image').value.trim() || null
+      const categorie = document.getElementById('bt-categorie').value
+      const type_attaque = document.getElementById('bt-type-attaque').value
+      const cout = parseInt(document.getElementById('bt-cout').value)
+      const pv = parseInt(document.getElementById('bt-pv').value)
+      const degats = parseInt(document.getElementById('bt-degats').value)
+      const porte = parseInt(document.getElementById('bt-porte').value)
+      const vitesse_attaque = parseFloat(document.getElementById('bt-vitesse-attaque').value)
+      const vitesse_marche = parseInt(document.getElementById('bt-vitesse-marche').value)
+      const temps_activation = parseInt(document.getElementById('bt-activation').value)
+      const nombre = parseInt(document.getElementById('bt-nombre').value)
+      const taille = parseFloat(document.getElementById('bt-taille').value)
+      const ordre = parseInt(document.getElementById('bt-ordre').value) || 0
+      const optionsTexte = document.getElementById('bt-options').value.trim()
+      const msgEl = document.getElementById('msg-modale-battlogy')
+
+      if (!id || !nom || isNaN(cout) || isNaN(pv) || isNaN(degats) || isNaN(porte)
+          || isNaN(vitesse_attaque) || isNaN(vitesse_marche) || isNaN(temps_activation)
+          || isNaN(nombre) || isNaN(taille)) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+
+      let options = {}
+      if (optionsTexte) {
+        try { options = JSON.parse(optionsTexte) }
+        catch (e) { msgEl.textContent = '✗ JSON invalide dans les options avancées.'; msgEl.className = 'msg-inline err'; return }
+      }
+
+      const { ok, error } = await adminSauvegarderCarte({
+        id, nom, image, categorie, type_attaque, cout, pv, degats, porte,
+        vitesse_attaque, vitesse_marche, temps_activation, nombre, taille,
+        options, ordre, actif: true
+      })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerCartesBattlogy()
+      setTimeout(() => fermerModaleCarteBattlogy(), 500)
+    }
+
+    window.toggleActifCarteBattlogy = async function(id, actifActuel) {
+      await adminToggleActifCarte(id, !actifActuel)
+      await chargerCartesBattlogy()
+    }
+
+    window.supprimerCarteBattlogy = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement la carte "${nom}" ? Cette action est irréversible.`)) return
+      await adminSupprimerCarte(id)
+      await chargerCartesBattlogy()
     }
 
     // ===== Annonces =====
