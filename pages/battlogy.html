@@ -495,12 +495,13 @@
       border-radius: 999px; padding: 0 .45rem;
     }
     .btn-mini {
-      font-size: .66rem; font-weight: 700; padding: .3rem .4rem; border-radius: 6px;
-      border: none; cursor: pointer; width: 100%; margin-top: .1rem;
+      width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--couleur-bordure);
+      background: var(--couleur-conteneur); color: var(--couleur-texte); font-size: .95rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0;
     }
-    .btn-mini-equiper { background: var(--couleur-bouton); color: #fff; }
-    .btn-mini-equiper:disabled { background: var(--couleur-bordure); color: var(--couleur-texte-faible); cursor: not-allowed; }
-    .btn-mini-retirer { background: #dc2626; color: #fff; }
+    .btn-mini:disabled { opacity: .35; cursor: not-allowed; }
+    .deck-collection-stepper { display: flex; align-items: center; gap: .4rem; margin-top: .15rem; }
+    .deck-collection-stepper span { min-width: 1.6em; text-align: center; font-weight: 700; font-size: .68rem; color: var(--couleur-texte-faible); }
 
     .modale-deck-actions { display: flex; gap: .6rem; margin-top: 1.5rem; }
     .modale-deck-actions .btn { flex: 1; }
@@ -551,7 +552,7 @@
     <div class="modale-deck">
       <button class="modale-fermer" onclick="fermerModaleDeck()">✕</button>
       <h2>🃏 Éditer mon deck</h2>
-      <div class="modale-deck-compteur"><span id="deck-compteur">0</span>/8 cartes — glisse-dépose une carte dans un emplacement, ou clique dessus</div>
+      <div class="modale-deck-compteur"><span id="deck-compteur">0</span>/8 cartes — jusqu'à 2 exemplaires de chaque carte. Glisse-dépose ou clique sur +/−.</div>
       <div class="deck-slots-grille" id="deck-slots-grille"></div>
       <div class="deck-section-titre">Cartes disponibles</div>
       <div class="deck-collection-grille" id="deck-collection-grille"></div>
@@ -729,7 +730,8 @@
   const RAYON_UNITE_BASE = 14
 
   // ─── Deck / Main / Or : constantes de jeu ──────────────────────
-  const DECK_TAILLE           = 8   // 8 emplacements, une seule copie de chaque carte (+1 emplacement spécial verrouillé, voir modale d'édition)
+  const DECK_TAILLE           = 8   // 8 emplacements (+1 emplacement spécial verrouillé, voir modale d'édition)
+  const MAX_COPIES_PAR_CARTE  = 2   // une carte peut occuper jusqu'à 2 des 8 emplacements
   const MAIN_TAILLE_MAX       = 5
   const POIDS_DEPART          = 1
   const POIDS_MIN             = 0
@@ -815,8 +817,16 @@
   }
 
   function chargerCompositionDeck() {
-    const source = [...new Set(deckSauvegarde ?? DECK_PAR_DEFAUT)]   // dédoublonne (compat anciens decks avec copies multiples)
-    const filtree = source.filter(id => !!CARTES[id] && cartesDebloquees.has(id)).slice(0, DECK_TAILLE)
+    const source = deckSauvegarde ?? DECK_PAR_DEFAUT
+    const compteurs = {}
+    const filtree = []
+    for (const id of source) {
+      if (!CARTES[id] || !cartesDebloquees.has(id)) continue
+      compteurs[id] = (compteurs[id] || 0) + 1
+      if (compteurs[id] > MAX_COPIES_PAR_CARTE) continue   // plafond : 2 exemplaires max par carte
+      filtree.push(id)
+      if (filtree.length >= DECK_TAILLE) break
+    }
     return filtree.length > 0 ? filtree : DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)).slice(0, DECK_TAILLE)
   }
 
@@ -2391,11 +2401,20 @@
   const elCollection = document.getElementById('deck-collection-grille')
 
   // Construit un tableau de DECK_TAILLE emplacements à partir d'une liste
-  // d'id (dédoublonnée, tronquée, complétée par des emplacements vides).
+  // d'id (plafonnée à MAX_COPIES_PAR_CARTE exemplaires par carte, tronquée,
+  // complétée par des emplacements vides).
   function construireSlotsDepuis(liste) {
-    const uniques = [...new Set(liste)].slice(0, DECK_TAILLE)
-    while (uniques.length < DECK_TAILLE) uniques.push(null)
-    return uniques
+    const compteurs = {}
+    const resultat = []
+    for (const id of liste) {
+      if (id == null) continue
+      compteurs[id] = (compteurs[id] || 0) + 1
+      if (compteurs[id] > MAX_COPIES_PAR_CARTE) continue
+      resultat.push(id)
+      if (resultat.length >= DECK_TAILLE) break
+    }
+    while (resultat.length < DECK_TAILLE) resultat.push(null)
+    return resultat
   }
 
   function renderModaleDeck() {
@@ -2421,24 +2440,32 @@
 
     elCollection.innerHTML = Object.values(CARTES).map(carte => {
       const verrouillee = !cartesDebloquees.has(carte.id)
-      const equipee = editionSlots.includes(carte.id)
+      const qte = verrouillee ? 0 : editionSlots.filter(id => id === carte.id).length
       const deckPlein = nb >= DECK_TAILLE
-      const boutonHtml = verrouillee ? '' : equipee
-        ? `<button type="button" class="btn-mini btn-mini-retirer" data-carte="${carte.id}">Retirer</button>`
-        : `<button type="button" class="btn-mini btn-mini-equiper" data-carte="${carte.id}" ${deckPlein ? 'disabled' : ''}>Équiper</button>`
+      const peutAjouter = !verrouillee && qte < MAX_COPIES_PAR_CARTE && !deckPlein
+      const stepperHtml = verrouillee ? '' : `
+          <div class="deck-collection-stepper">
+            <button type="button" class="btn-mini" data-action="moins" data-carte="${carte.id}" ${qte <= 0 ? 'disabled' : ''}>−</button>
+            <span>${qte}/${MAX_COPIES_PAR_CARTE}</span>
+            <button type="button" class="btn-mini" data-action="plus" data-carte="${carte.id}" ${!peutAjouter ? 'disabled' : ''}>+</button>
+          </div>`
       return `
-        <div class="deck-collection-carte${verrouillee ? ' deck-carte-verrouillee' : ''}${equipee ? ' deck-carte-equipee' : ''}"
-             draggable="${verrouillee ? 'false' : 'true'}" data-carte="${carte.id}">
+        <div class="deck-collection-carte${verrouillee ? ' deck-carte-verrouillee' : ''}${qte > 0 ? ' deck-carte-equipee' : ''}"
+             draggable="${peutAjouter ? 'true' : 'false'}" data-carte="${carte.id}">
           <span class="deck-emoji">${carte.emoji}</span>
           <span class="deck-nom">${carte.nom}${verrouillee ? ' 🔒' : ''}</span>
           <span class="deck-cout">${verrouillee ? 'Verrouillée' : 'Coût ' + carte.cout}</span>
-          ${boutonHtml}
+          ${stepperHtml}
         </div>`
     }).join('')
   }
 
   function equiperCarteDansDeck(carteId) {
-    if (!cartesDebloquees.has(carteId) || editionSlots.includes(carteId)) return
+    if (!cartesDebloquees.has(carteId)) return
+    if (editionSlots.filter(id => id === carteId).length >= MAX_COPIES_PAR_CARTE) {
+      afficherMessage(`Maximum ${MAX_COPIES_PAR_CARTE} exemplaires de cette carte.`)
+      return
+    }
     const indexVide = editionSlots.indexOf(null)
     if (indexVide === -1) { afficherMessage('Deck plein (8/8).'); return }
     editionSlots[indexVide] = carteId
@@ -2446,7 +2473,7 @@
   }
 
   function retirerCarteDuDeck(carteId) {
-    const index = editionSlots.indexOf(carteId)
+    const index = editionSlots.lastIndexOf(carteId)
     if (index === -1) return
     editionSlots[index] = null
     renderModaleDeck()
@@ -2454,7 +2481,8 @@
 
   // Dépose une carte (venant de la collection ou d'un autre emplacement)
   // dans l'emplacement `indexCible`. Si elle vient d'un autre emplacement,
-  // les deux emplacements échangent leur contenu.
+  // les deux emplacements échangent leur contenu. Si elle vient de la
+  // collection, on vérifie le plafond de MAX_COPIES_PAR_CARTE exemplaires.
   function deposerCarteDansSlot(carteId, indexCible, from, slotOrigine) {
     if (!cartesDebloquees.has(carteId)) return
     if (from === 'slot') {
@@ -2462,13 +2490,15 @@
       editionSlots[slotOrigine] = contenuCible
       editionSlots[indexCible] = carteId
     } else {
-      const indexActuel = editionSlots.indexOf(carteId)
-      if (indexActuel !== -1) editionSlots[indexActuel] = null
       const contenuCible = editionSlots[indexCible]
+      const dejaPresentes = editionSlots.filter(id => id === carteId).length - (contenuCible === carteId ? 1 : 0)
+      if (dejaPresentes >= MAX_COPIES_PAR_CARTE) {
+        afficherMessage(`Maximum ${MAX_COPIES_PAR_CARTE} exemplaires de cette carte.`)
+        return
+      }
       // Si l'emplacement visé contenait déjà une autre carte, elle repart
       // simplement dans la collection (retirée du deck).
       editionSlots[indexCible] = carteId
-      void contenuCible
     }
     renderModaleDeck()
   }
@@ -2487,12 +2517,11 @@
 
   // ── Clic : équiper / retirer (mobile-friendly, sans drag) ──
   elCollection.addEventListener('click', (e) => {
-    const tuile = e.target.closest('.deck-collection-carte')
-    if (!tuile) return
-    const carteId = tuile.dataset.carte
-    if (!cartesDebloquees.has(carteId)) return
-    if (editionSlots.includes(carteId)) retirerCarteDuDeck(carteId)
-    else equiperCarteDansDeck(carteId)
+    const btn = e.target.closest('button[data-action]')
+    if (!btn) return
+    const carteId = btn.dataset.carte
+    if (btn.dataset.action === 'plus') equiperCarteDansDeck(carteId)
+    else retirerCarteDuDeck(carteId)
   })
 
   elSlots.addEventListener('click', (e) => {
