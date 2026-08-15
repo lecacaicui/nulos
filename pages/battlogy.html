@@ -412,25 +412,96 @@
       color: var(--couleur-texte-faible); cursor: pointer; line-height: 1;
     }
     .modale-fermer:hover { color: var(--couleur-texte); }
-    .deck-liste { display: flex; flex-direction: column; gap: .6rem; }
-    .deck-ligne {
-      display: flex; align-items: center; gap: .75rem;
-      background: var(--couleur-fond); border: 1px solid var(--couleur-bordure);
-      border-radius: 10px; padding: .6rem .8rem;
+    /* ── Grille d'emplacements du deck (8 + 1 spécial verrouillé) ── */
+    .deck-slots-grille {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .6rem;
+      margin-bottom: 1.5rem;
     }
-    .deck-ligne-verrouillee { opacity: .45; filter: grayscale(.6); }
-    .deck-ligne .deck-emoji { font-size: 1.4rem; }
-    .deck-ligne .deck-infos { flex: 1; }
-    .deck-ligne .deck-nom { font-size: .88rem; font-weight: 700; }
-    .deck-ligne .deck-cout { font-size: .72rem; color: var(--couleur-texte-faible); }
-    .deck-stepper { display: flex; align-items: center; gap: .5rem; }
-    .deck-stepper button {
-      width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--couleur-bordure);
-      background: var(--couleur-conteneur); color: var(--couleur-texte); font-size: 1rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; line-height: 1;
+    .deck-slot {
+      aspect-ratio: 1;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .25rem;
+      position: relative;
+      transition: filter .15s, transform .1s, border-color .15s, background .15s;
     }
-    .deck-stepper button:disabled { opacity: .35; cursor: not-allowed; }
-    .deck-stepper span { min-width: 1.2em; text-align: center; font-weight: 700; font-size: .9rem; }
+    .deck-slot-vide {
+      border: 2px dashed var(--couleur-bordure);
+      background: var(--couleur-fond);
+      color: var(--couleur-texte-faible);
+      cursor: default;
+    }
+    .deck-slot-vide .deck-slot-plus { font-size: 1.6rem; line-height: 1; }
+    .deck-slot-remplie {
+      border: 2px solid var(--couleur-bouton);
+      background: var(--couleur-conteneur);
+      cursor: grab;
+    }
+    .deck-slot-remplie:active { cursor: grabbing; }
+    .deck-slot-remplie:hover { filter: brightness(.95); }
+    .deck-slot-survolee { border-color: #22c55e; background: #22c55e18; transform: scale(1.03); }
+    .deck-slot .deck-slot-emoji { font-size: 1.7rem; }
+    .deck-slot .deck-slot-nom { font-size: .6rem; font-weight: 700; text-align: center; padding: 0 .2rem; line-height: 1.15; }
+    .deck-slot-retirer {
+      position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%;
+      background: #dc2626; color: #fff; font-size: .62rem; font-weight: 700; border: 2px solid var(--couleur-conteneur);
+      display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1;
+    }
+    .deck-slot-retirer:hover { filter: brightness(.9); }
+    .deck-slot-special {
+      border: 2px dashed var(--couleur-bordure);
+      background: repeating-linear-gradient(45deg, transparent, transparent 6px, var(--couleur-bordure)55 6px, var(--couleur-bordure)55 12px);
+      opacity: .55;
+      cursor: not-allowed;
+      color: var(--couleur-texte-faible);
+    }
+    .deck-slot-special .deck-slot-emoji { font-size: 1.3rem; }
+
+    /* ── Collection de cartes disponibles ── */
+    .deck-section-titre { font-size: .85rem; color: var(--couleur-texte-faible); font-weight: 600; margin: 0 0 .75rem; }
+    .deck-collection-grille {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+      gap: .6rem;
+    }
+    .deck-collection-carte {
+      border: 2px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: .6rem .4rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .3rem;
+      background: var(--couleur-fond);
+      cursor: grab;
+      user-select: none;
+      text-align: center;
+      transition: filter .15s, transform .1s, border-color .15s, opacity .15s;
+    }
+    .deck-collection-carte:active { cursor: grabbing; }
+    .deck-collection-carte:hover { transform: translateY(-2px); }
+    .deck-carte-verrouillee { opacity: .4; filter: grayscale(1); cursor: not-allowed; }
+    .deck-carte-verrouillee:hover { transform: none; }
+    .deck-carte-equipee { border-color: var(--couleur-bouton); }
+    .deck-collection-carte .deck-emoji { font-size: 1.5rem; }
+    .deck-collection-carte .deck-nom { font-size: .68rem; font-weight: 700; }
+    .deck-collection-carte .deck-cout {
+      font-size: .62rem; font-weight: 700; color: #92400e; background: #fef3c7;
+      border-radius: 999px; padding: 0 .45rem;
+    }
+    .btn-mini {
+      font-size: .66rem; font-weight: 700; padding: .3rem .4rem; border-radius: 6px;
+      border: none; cursor: pointer; width: 100%; margin-top: .1rem;
+    }
+    .btn-mini-equiper { background: var(--couleur-bouton); color: #fff; }
+    .btn-mini-equiper:disabled { background: var(--couleur-bordure); color: var(--couleur-texte-faible); cursor: not-allowed; }
+    .btn-mini-retirer { background: #dc2626; color: #fff; }
+
     .modale-deck-actions { display: flex; gap: .6rem; margin-top: 1.5rem; }
     .modale-deck-actions .btn { flex: 1; }
   </style>
@@ -480,8 +551,10 @@
     <div class="modale-deck">
       <button class="modale-fermer" onclick="fermerModaleDeck()">✕</button>
       <h2>🃏 Éditer mon deck</h2>
-      <div class="modale-deck-compteur"><span id="deck-compteur">0</span>/10 cartes</div>
-      <div class="deck-liste" id="deck-liste"></div>
+      <div class="modale-deck-compteur"><span id="deck-compteur">0</span>/8 cartes — glisse-dépose une carte dans un emplacement, ou clique dessus</div>
+      <div class="deck-slots-grille" id="deck-slots-grille"></div>
+      <div class="deck-section-titre">Cartes disponibles</div>
+      <div class="deck-collection-grille" id="deck-collection-grille"></div>
       <div class="modale-deck-actions">
         <button class="btn btn-secondary" id="btn-deck-reset">Réinitialiser</button>
         <button class="btn btn-primary" id="btn-deck-sauver">Enregistrer</button>
@@ -656,7 +729,7 @@
   const RAYON_UNITE_BASE = 14
 
   // ─── Deck / Main / Or : constantes de jeu ──────────────────────
-  const DECK_TAILLE           = 10
+  const DECK_TAILLE           = 8   // 8 emplacements, une seule copie de chaque carte (+1 emplacement spécial verrouillé, voir modale d'édition)
   const MAIN_TAILLE_MAX       = 5
   const POIDS_DEPART          = 1
   const POIDS_MIN             = 0
@@ -685,12 +758,8 @@
   // enregistré son propre deck en BDD (voir modale d'édition, et le
   // module script/battlogy.js pour le chargement/la sauvegarde).
   const DECK_PAR_DEFAUT = [
-    'guerrier', 'guerrier',
-    'archer', 'archer',
-    'squelette',
-    'magicien', 'golem',
-    'statue',
-    'boule_de_feu', 'bombe_a_eau'
+    'guerrier', 'archer', 'squelette', 'magicien',
+    'golem', 'statue', 'boule_de_feu', 'bombe_a_eau'
   ]
 
   // ─── État de la partie ──────────────────────────────────────────
@@ -746,7 +815,7 @@
   }
 
   function chargerCompositionDeck() {
-    const source = deckSauvegarde ?? DECK_PAR_DEFAUT
+    const source = [...new Set(deckSauvegarde ?? DECK_PAR_DEFAUT)]   // dédoublonne (compat anciens decks avec copies multiples)
     const filtree = source.filter(id => !!CARTES[id] && cartesDebloquees.has(id)).slice(0, DECK_TAILLE)
     return filtree.length > 0 ? filtree : DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)).slice(0, DECK_TAILLE)
   }
@@ -2311,45 +2380,101 @@
   renderMain()
 
   // ─── Modale d'édition du deck ───────────────────────────────────
-  // État temporaire d'édition : { carteId: quantité }, initialisé depuis
-  // la composition sauvegardée (ou celle par défaut) à chaque ouverture.
-  let editionDeck = {}
+  // État temporaire d'édition : tableau de DECK_TAILLE emplacements,
+  // chacun contenant soit un id de carte, soit null (vide). Une carte
+  // ne peut occuper qu'un seul emplacement (pas de doublons). Initialisé
+  // depuis la composition sauvegardée (ou celle par défaut) à chaque
+  // ouverture de la modale.
+  let editionSlots = []
 
-  function compositionVersCompte(liste) {
-    const compte = {}
-    for (const id of liste) compte[id] = (compte[id] || 0) + 1
-    return compte
-  }
+  const elSlots      = document.getElementById('deck-slots-grille')
+  const elCollection = document.getElementById('deck-collection-grille')
 
-  function totalEditionDeck() {
-    return Object.values(editionDeck).reduce((a, b) => a + b, 0)
+  // Construit un tableau de DECK_TAILLE emplacements à partir d'une liste
+  // d'id (dédoublonnée, tronquée, complétée par des emplacements vides).
+  function construireSlotsDepuis(liste) {
+    const uniques = [...new Set(liste)].slice(0, DECK_TAILLE)
+    while (uniques.length < DECK_TAILLE) uniques.push(null)
+    return uniques
   }
 
   function renderModaleDeck() {
-    const total = totalEditionDeck()
-    document.getElementById('deck-compteur').textContent = total
-    document.getElementById('deck-liste').innerHTML = Object.values(CARTES).map(carte => {
-      const verrouillee = !cartesDebloquees.has(carte.id)
-      const qte = verrouillee ? 0 : (editionDeck[carte.id] || 0)
-      const peutAjouter = !verrouillee && total < DECK_TAILLE
+    const nb = editionSlots.filter(Boolean).length
+    document.getElementById('deck-compteur').textContent = nb
+
+    elSlots.innerHTML = editionSlots.map((carteId, i) => {
+      if (!carteId) {
+        return `<div class="deck-slot deck-slot-vide" data-slot="${i}"><span class="deck-slot-plus">+</span></div>`
+      }
+      const carte = CARTES[carteId]
       return `
-        <div class="deck-ligne${verrouillee ? ' deck-ligne-verrouillee' : ''}">
+        <div class="deck-slot deck-slot-remplie" draggable="true" data-slot="${i}" data-carte="${carteId}">
+          <button type="button" class="deck-slot-retirer" data-slot="${i}" title="Retirer">✕</button>
+          <span class="deck-slot-emoji">${carte.emoji}</span>
+          <span class="deck-slot-nom">${carte.nom}</span>
+        </div>`
+    }).join('') + `
+      <div class="deck-slot deck-slot-special" title="Emplacement spécial — bientôt disponible">
+        <span class="deck-slot-emoji">🔒</span>
+        <span class="deck-slot-nom">Bientôt disponible</span>
+      </div>`
+
+    elCollection.innerHTML = Object.values(CARTES).map(carte => {
+      const verrouillee = !cartesDebloquees.has(carte.id)
+      const equipee = editionSlots.includes(carte.id)
+      const deckPlein = nb >= DECK_TAILLE
+      const boutonHtml = verrouillee ? '' : equipee
+        ? `<button type="button" class="btn-mini btn-mini-retirer" data-carte="${carte.id}">Retirer</button>`
+        : `<button type="button" class="btn-mini btn-mini-equiper" data-carte="${carte.id}" ${deckPlein ? 'disabled' : ''}>Équiper</button>`
+      return `
+        <div class="deck-collection-carte${verrouillee ? ' deck-carte-verrouillee' : ''}${equipee ? ' deck-carte-equipee' : ''}"
+             draggable="${verrouillee ? 'false' : 'true'}" data-carte="${carte.id}">
           <span class="deck-emoji">${carte.emoji}</span>
-          <div class="deck-infos">
-            <div class="deck-nom">${carte.nom}${verrouillee ? ' 🔒' : ''}</div>
-            <div class="deck-cout">${verrouillee ? 'Non débloquée' : 'Coût ' + carte.cout + ' or'}</div>
-          </div>
-          <div class="deck-stepper">
-            <button type="button" data-action="moins" data-carte="${carte.id}" ${qte <= 0 ? 'disabled' : ''}>−</button>
-            <span>${qte}</span>
-            <button type="button" data-action="plus" data-carte="${carte.id}" ${!peutAjouter ? 'disabled' : ''}>+</button>
-          </div>
+          <span class="deck-nom">${carte.nom}${verrouillee ? ' 🔒' : ''}</span>
+          <span class="deck-cout">${verrouillee ? 'Verrouillée' : 'Coût ' + carte.cout}</span>
+          ${boutonHtml}
         </div>`
     }).join('')
   }
 
+  function equiperCarteDansDeck(carteId) {
+    if (!cartesDebloquees.has(carteId) || editionSlots.includes(carteId)) return
+    const indexVide = editionSlots.indexOf(null)
+    if (indexVide === -1) { afficherMessage('Deck plein (8/8).'); return }
+    editionSlots[indexVide] = carteId
+    renderModaleDeck()
+  }
+
+  function retirerCarteDuDeck(carteId) {
+    const index = editionSlots.indexOf(carteId)
+    if (index === -1) return
+    editionSlots[index] = null
+    renderModaleDeck()
+  }
+
+  // Dépose une carte (venant de la collection ou d'un autre emplacement)
+  // dans l'emplacement `indexCible`. Si elle vient d'un autre emplacement,
+  // les deux emplacements échangent leur contenu.
+  function deposerCarteDansSlot(carteId, indexCible, from, slotOrigine) {
+    if (!cartesDebloquees.has(carteId)) return
+    if (from === 'slot') {
+      const contenuCible = editionSlots[indexCible]
+      editionSlots[slotOrigine] = contenuCible
+      editionSlots[indexCible] = carteId
+    } else {
+      const indexActuel = editionSlots.indexOf(carteId)
+      if (indexActuel !== -1) editionSlots[indexActuel] = null
+      const contenuCible = editionSlots[indexCible]
+      // Si l'emplacement visé contenait déjà une autre carte, elle repart
+      // simplement dans la collection (retirée du deck).
+      editionSlots[indexCible] = carteId
+      void contenuCible
+    }
+    renderModaleDeck()
+  }
+
   function ouvrirModaleDeck() {
-    editionDeck = compositionVersCompte(chargerCompositionDeck())
+    editionSlots = construireSlotsDepuis(chargerCompositionDeck())
     renderModaleDeck()
     document.getElementById('modale-deck-fond').classList.add('ouverte')
   }
@@ -2360,29 +2485,73 @@
 
   document.getElementById('btn-editer-deck').addEventListener('click', ouvrirModaleDeck)
 
-  document.getElementById('deck-liste').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]')
-    if (!btn) return
-    const carteId = btn.dataset.carte
-    const total = totalEditionDeck()
-    if (btn.dataset.action === 'plus' && total < DECK_TAILLE) {
-      editionDeck[carteId] = (editionDeck[carteId] || 0) + 1
-    } else if (btn.dataset.action === 'moins' && (editionDeck[carteId] || 0) > 0) {
-      editionDeck[carteId] = editionDeck[carteId] - 1
-    }
+  // ── Clic : équiper / retirer (mobile-friendly, sans drag) ──
+  elCollection.addEventListener('click', (e) => {
+    const tuile = e.target.closest('.deck-collection-carte')
+    if (!tuile) return
+    const carteId = tuile.dataset.carte
+    if (!cartesDebloquees.has(carteId)) return
+    if (editionSlots.includes(carteId)) retirerCarteDuDeck(carteId)
+    else equiperCarteDansDeck(carteId)
+  })
+
+  elSlots.addEventListener('click', (e) => {
+    const tuile = e.target.closest('.deck-slot-remplie')
+    if (!tuile) return
+    editionSlots[Number(tuile.dataset.slot)] = null
     renderModaleDeck()
   })
 
+  // ── Glisser-déposer (desktop) ──
+  document.querySelector('.modale-deck').addEventListener('dragstart', (e) => {
+    const tuileCollection = e.target.closest('.deck-collection-carte')
+    const tuileSlot = e.target.closest('.deck-slot-remplie')
+    if (tuileCollection && cartesDebloquees.has(tuileCollection.dataset.carte)) {
+      e.dataTransfer.setData('text/plain', JSON.stringify({ carteId: tuileCollection.dataset.carte, from: 'collection' }))
+    } else if (tuileSlot) {
+      e.dataTransfer.setData('text/plain', JSON.stringify({ carteId: tuileSlot.dataset.carte, from: 'slot', slot: Number(tuileSlot.dataset.slot) }))
+    }
+  })
+
+  elSlots.addEventListener('dragover', (e) => {
+    const slot = e.target.closest('.deck-slot')
+    if (!slot || slot.classList.contains('deck-slot-special')) return
+    e.preventDefault()
+    slot.classList.add('deck-slot-survolee')
+  })
+  elSlots.addEventListener('dragleave', (e) => {
+    const slot = e.target.closest('.deck-slot')
+    if (slot) slot.classList.remove('deck-slot-survolee')
+  })
+  elSlots.addEventListener('drop', (e) => {
+    const slot = e.target.closest('.deck-slot')
+    if (!slot || slot.classList.contains('deck-slot-special')) return
+    e.preventDefault()
+    slot.classList.remove('deck-slot-survolee')
+    const donnees = e.dataTransfer.getData('text/plain')
+    if (!donnees) return
+    const { carteId, from, slot: slotOrigine } = JSON.parse(donnees)
+    deposerCarteDansSlot(carteId, Number(slot.dataset.slot), from, slotOrigine)
+  })
+
+  // Glisser une carte équipée jusque dans la collection = la retirer du deck.
+  elCollection.addEventListener('dragover', (e) => e.preventDefault())
+  elCollection.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const donnees = e.dataTransfer.getData('text/plain')
+    if (!donnees) return
+    const { from, slot: slotOrigine } = JSON.parse(donnees)
+    if (from === 'slot') { editionSlots[slotOrigine] = null; renderModaleDeck() }
+  })
+
   document.getElementById('btn-deck-reset').addEventListener('click', () => {
-    editionDeck = compositionVersCompte(DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)))
+    editionSlots = construireSlotsDepuis(DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)))
     renderModaleDeck()
   })
 
   document.getElementById('btn-deck-sauver').addEventListener('click', () => {
-    const liste = []
-    for (const [carteId, qte] of Object.entries(editionDeck)) {
-      for (let i = 0; i < qte; i++) liste.push(carteId)
-    }
+    const liste = editionSlots.filter(Boolean)
+    if (liste.length === 0) { afficherMessage('Le deck doit contenir au moins une carte.'); return }
     sauvegarderCompositionDeck(liste)
     afficherMessage('Deck enregistré.')
     fermerModaleDeck()
