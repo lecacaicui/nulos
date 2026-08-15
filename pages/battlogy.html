@@ -730,7 +730,10 @@
     boule_de_feu: {
       id: 'boule_de_feu', nom: 'Boule de feu', emoji: '🔥', cout: 4,
       categorie: 'sort', placementLibre: true, effetInstantane: true,
-      degats: 60, zoneHex: 2, degatsChateauMult: 0.4
+      degats: 60, zoneHex: 2, degatsChateauMult: 0.4,
+      // Applique une brûlure (dégâts sur la durée) aux unités touchées —
+      // voir appliquerStatut / mettreAJourStatuts.
+      statut: { type: 'brulure', duree: 3000, params: { degatsParSeconde: 6 } }
     },
     bombe_a_eau: {
       id: 'bombe_a_eau', nom: 'Bombe à eau', emoji: '💧', cout: 2,
@@ -738,7 +741,9 @@
       degats: 15, zoneHex: 2, degatsChateauMult: 0.4,
       // Force (px) de la poussée appliquée aux unités touchées, dans l'axe
       // centre d'impact → unité (les repousse loin du point d'impact).
-      repousse: 90
+      repousse: 90,
+      // Ralentit (gèle) les unités touchées — voir multiplicateurVitesseStatuts.
+      statut: { type: 'gel', duree: 2500, params: { ralentissement: 0.45 } }
     }
   }
 
@@ -825,6 +830,12 @@
   // Éclat visuel des sorts à effet de zone (Boule de feu, Bombe à eau…) —
   // voir lancerSortZone / dessinerEffetsSort.
   let effetsSort = []
+  // ─── Nouveaux systèmes d'animation (mort, arrivée, sorts en vol) ──
+  let particules = []       // éclats génériques (mort, impacts, arrivées)
+  let textesFlottants = []  // texte qui monte et s'estompe (arrivée spéciale)
+  let effetsSol = []        // anneau au sol (arrivée spéciale)
+  let sortsEnVol = []       // sorts qui volent depuis le château avant impact
+  let secousse = { intensite: 0, duree: 0, dureeTotale: 0 } // secousse d'écran
   const VITESSE_PROJECTILE = 340 // px/s
 
   // Apparition automatique d'un guerrier ennemi, pour les tests.
@@ -1125,6 +1136,14 @@
       }
       for (const e of effetsMelee) reechelonner(e)
       for (const e of effetsSort) { reechelonner(e); e.rayon *= echelle }
+      for (const p of particules) reechelonner(p)
+      for (const t of textesFlottants) reechelonner(t)
+      for (const e of effetsSol) { reechelonner(e); e.rayonMax *= echelle }
+      for (const s of sortsEnVol) {
+        reechelonner(s)
+        s.xCible = MARGE + (s.xCible - MARGE) * echelle
+        s.yCible = gridOffsetY + (s.yCible - gridOffsetY) * echelle
+      }
     }
 
     if (!dernierTimestamp) requestAnimationFrame(boucleDeJeu)
@@ -1451,13 +1470,62 @@
     const rayonPx = carte.zoneHex * VS
     appliquerDegatsZone(x, y, rayonPx, team, carte.degats, {
       multChateau: carte.degatsChateauMult ?? 1,
-      repousse: carte.repousse || 0
+      repousse: carte.repousse || 0,
+      statut: carte.statut || null
     })
     effetsSort.push({
       x, y, rayon: rayonPx,
       couleur: carte.repousse ? '#38bdf8' : '#f97316',
       dureeRestante: 260, dureeTotale: 260
     })
+    creerParticules(x, y, carte.repousse ? '#38bdf8' : '#f97316', 14, { vitesseMax: 160, dureeMax: 500 })
+  }
+
+  // ─── Sorts avec trajectoire (Boule de feu, Bombe à eau…) ────────
+  // Au lieu d'appliquer l'effet instantanément sous le curseur, le sort
+  // "part" visuellement du château du camp qui l'a lancé et vole jusqu'à
+  // la case visée : lancerSortZone (dégâts + éclat + particules) n'est
+  // déclenché qu'à l'arrivée, pas au moment de la pose.
+  const VITESSE_SORT = 520 // px/s
+
+  function lancerSortDepuisChateau(carte, xCible, yCible, team) {
+    // pointCastle(team) renvoie le château VISÉ par `team` (l'adverse) ;
+    // on veut ici le château D'ORIGINE, donc celui visé par le camp
+    // opposé.
+    const origine = pointCastle(team === 'joueur' ? 'ennemi' : 'joueur')
+    sortsEnVol.push({ x: origine.x, y: origine.y, xCible, yCible, team, carte })
+  }
+
+  function mettreAJourSortsEnVol(dt) {
+    const pas = VITESSE_SORT * dt / 1000
+    for (const s of sortsEnVol) {
+      const dx = s.xCible - s.x, dy = s.yCible - s.y
+      const dist = Math.hypot(dx, dy)
+      if (dist <= Math.max(pas, 6)) {
+        lancerSortZone(s.carte, s.xCible, s.yCible, s.team)
+        s.termine = true
+      } else {
+        s.x += dx / dist * pas
+        s.y += dy / dist * pas
+      }
+    }
+    sortsEnVol = sortsEnVol.filter(s => !s.termine)
+  }
+
+  // Boule incandescente (Boule de feu) ou goutte bleue (Bombe à eau),
+  // distinguées comme pour l'éclat d'impact via carte.repousse.
+  function dessinerSortsEnVol() {
+    for (const s of sortsEnVol) {
+      const couleur = s.carte.repousse ? '#38bdf8' : '#f97316'
+      ctx.save()
+      ctx.fillStyle = couleur
+      ctx.shadowColor = couleur
+      ctx.shadowBlur = 10
+      ctx.beginPath()
+      ctx.arc(s.x, s.y, 7, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
   }
 
   // Pool des troupes que le bot ennemi peut faire apparaître (les sorts à
@@ -1478,6 +1546,110 @@
     const pos = positions[Math.floor(Math.random() * positions.length)]
     const carteId = POOL_SPAWN_ENNEMI[Math.floor(Math.random() * POOL_SPAWN_ENNEMI.length)]
     poserCarte(CARTES[carteId], pos.x, pos.y, 'ennemi')
+  }
+
+  // ─── Animations de mort ─────────────────────────────────────────
+  // Une entrée par carte.id pour un effet sur-mesure ; `defaut` s'applique
+  // à toute unité sans entrée dédiée. Appelées juste avant que l'unité
+  // morte soit retirée des tableaux (voir mettreAJourUnites).
+  const EFFETS_MORT = {
+    golem: (u) => {
+      creerParticules(u.x, u.y, '#78716c', 18, { vitesseMax: 100, dureeMax: 700, rayon: 3.5 })
+      declencherSecousse(4, 180)
+    },
+    statue: (u) => {
+      creerParticules(u.x, u.y, '#9ca3af', 14, { vitesseMax: 90, dureeMax: 650, rayon: 3 })
+    },
+    defaut: (u) => {
+      creerParticules(u.x, u.y, u.team === 'joueur' ? '#93c5fd' : '#fca5a5', 10, { dureeMax: 500 })
+    }
+  }
+
+  function declencherMortUnite(unite) {
+    ;(EFFETS_MORT[unite.carteId] || EFFETS_MORT.defaut)(unite)
+  }
+
+  // ─── Effets d'arrivée (unités spéciales) ────────────────────────
+  // Même principe que EFFETS_MORT, mais sans entrée "defaut" : la
+  // plupart des troupes n'ont pas besoin d'un effet à l'arrivée. Pour
+  // ajouter un effet d'arrivée à une nouvelle carte, il suffit d'ajouter
+  // une entrée ici avec son id.
+  const EFFETS_ARRIVEE = {
+    golem: (u, carte) => {
+      creerEffetSol(u.x, u.y, '#78716c', 50)
+      creerTexteFlottant(u.x, u.y - 20, carte.nom, '#d6d3d1')
+      declencherSecousse(3, 150)
+    },
+    statue: (u, carte) => {
+      creerEffetSol(u.x, u.y, '#a855f7', 44)
+      creerTexteFlottant(u.x, u.y - 20, carte.nom, '#d8b4fe')
+    }
+  }
+
+  function declencherEffetArrivee(unite, carte) {
+    const effet = EFFETS_ARRIVEE[carte.id]
+    if (effet) effet(unite, carte)
+  }
+
+  // ─── Statuts (poison, gel, brûlure…) ────────────────────────────
+  // Chaque statut actif sur une unité est un objet { type, dureeRestante,
+  // dureeTotale, ...params } stocké dans unite.statuts. Un nouveau statut
+  // du même type remplace l'ancien plutôt que de s'empiler (pas de stack
+  // infini si on subit deux fois la même bombe à eau).
+  // Types actuellement gérés :
+  //  - 'poison' / 'brulure' : dégâts périodiques (params.degatsParSeconde)
+  //  - 'gel' : ralentit la marche ET la cadence d'attaque
+  //    (params.ralentissement, ex: 0.5 = deux fois plus lent)
+  function appliquerStatut(unite, type, duree, params = {}) {
+    if (!unite || unite.pv <= 0) return
+    unite.statuts = (unite.statuts || []).filter(s => s.type !== type)
+    unite.statuts.push({ type, dureeRestante: duree, dureeTotale: duree, _accumulateur: 0, ...params })
+  }
+
+  // À appeler une fois par frame pour CHAQUE unité vivante (y compris les
+  // immobiles, ex: une statue peut brûler) : applique les dégâts sur la
+  // durée et fait expirer les statuts terminés.
+  function mettreAJourStatuts(unite, dt) {
+    if (!unite.statuts || unite.statuts.length === 0) return
+    for (const s of unite.statuts) {
+      s.dureeRestante -= dt
+      if ((s.type === 'poison' || s.type === 'brulure') && s.degatsParSeconde) {
+        s._accumulateur += dt
+        while (s._accumulateur >= 1000 && unite.pv > 0) {
+          s._accumulateur -= 1000
+          unite.pv = Math.max(0, unite.pv - s.degatsParSeconde)
+        }
+      }
+    }
+    unite.statuts = unite.statuts.filter(s => s.dureeRestante > 0)
+  }
+
+  // Multiplicateur de vitesse (marche + cadence d'attaque) actuellement
+  // appliqué par les statuts de l'unité — 1 = normal, < 1 = ralenti.
+  function multiplicateurVitesseStatuts(unite) {
+    let m = 1
+    for (const s of (unite.statuts || [])) {
+      if (s.type === 'gel') m *= (s.ralentissement ?? 0.5)
+    }
+    return m
+  }
+
+  // Anneaux superposés autour d'une unité pour chaque statut actif —
+  // vert (poison), bleu (gel), orange (brûlure).
+  function dessinerStatuts(u) {
+    if (!u.statuts || u.statuts.length === 0) return
+    const COULEURS_STATUT = { poison: '#22c55e', gel: '#38bdf8', brulure: '#f97316' }
+    let decalage = 0
+    for (const s of u.statuts) {
+      const couleur = COULEURS_STATUT[s.type]
+      if (!couleur) continue
+      ctx.beginPath()
+      ctx.arc(u.x, u.y, rayonUnite(u) + 3 + decalage, 0, Math.PI * 2)
+      ctx.strokeStyle = couleur
+      ctx.lineWidth = 2
+      ctx.stroke()
+      decalage += 4
+    }
   }
 
   function creerUnite(carte, x, y, team) {
@@ -1512,9 +1684,11 @@
       // d'activation/marche/attaque : elle reste plantée, encaisse les
       // dégâts, un point c'est tout (voir mettreAJourUnite).
       immobile: !!carte.immobile,
-      etat: carte.immobile ? 'immobile' : 'activation'
+      etat: carte.immobile ? 'immobile' : 'activation',
+      statuts: []
     }
     ;(team === 'joueur' ? unitesJoueur : unitesEnnemi).push(unite)
+    declencherEffetArrivee(unite, carte)
   }
 
   // Rayon effectif (hit box) d'une unité, selon sa taille.
@@ -1690,7 +1864,9 @@
 
   function mettreAJourUnite(unite, dt) {
     if (unite.pv <= 0) return
-    if (unite.immobile) return // encaisse les dégâts, rien d'autre
+    mettreAJourStatuts(unite, dt) // dégâts sur la durée, même immobile (statue qui brûle)
+    if (unite.pv <= 0) return // le statut a pu achever l'unité ce tick
+    if (unite.immobile) return // encaisse les dégâts/statuts, rien d'autre
     if (unite.etat === 'activation') {
       unite.activation -= dt
       if (unite.activation <= 0) unite.etat = 'marche'
@@ -1721,7 +1897,7 @@
 
     if (cibleDetectee && distCible - rayonCible <= unite.porte) {
       unite.etat = 'attaque'
-      unite.cooldownAttaque -= dt
+      unite.cooldownAttaque -= dt * multiplicateurVitesseStatuts(unite)
       if (unite.cooldownAttaque <= 0) {
         unite.cooldownAttaque = unite.cooldownAttaqueBase
         declencherAttaque(unite, ennemiProche, cibleX, cibleY)
@@ -1730,7 +1906,7 @@
     }
 
     unite.etat = 'marche'
-    const vitesse = unite.vitesseMarche * dt / 1000
+    const vitesse = unite.vitesseMarche * multiplicateurVitesseStatuts(unite) * dt / 1000
 
     if (cibleDetectee) {
       // Une cible a été détectée (ennemi ou château) mais reste hors de
@@ -1754,6 +1930,8 @@
   function mettreAJourUnites(dt) {
     for (const u of unitesJoueur) mettreAJourUnite(u, dt)
     for (const u of unitesEnnemi) mettreAJourUnite(u, dt)
+    for (const u of unitesJoueur) if (u.pv <= 0) declencherMortUnite(u)
+    for (const u of unitesEnnemi) if (u.pv <= 0) declencherMortUnite(u)
     unitesJoueur = unitesJoueur.filter(u => u.pv > 0)
     unitesEnnemi = unitesEnnemi.filter(u => u.pv > 0)
     resoudreCollisions()
@@ -1813,7 +1991,7 @@
   // `repousse` (optionnel, px) : en plus des dégâts, pousse les unités
   // touchées loin du point d'impact (voir la Bombe à eau) — le château,
   // lui, ne bouge évidemment jamais.
-  function appliquerDegatsZone(x, y, rayon, team, degats, { multChateau = 1, repousse = 0 } = {}) {
+  function appliquerDegatsZone(x, y, rayon, team, degats, { multChateau = 1, repousse = 0, statut = null } = {}) {
     const adversaires = team === 'joueur' ? unitesEnnemi : unitesJoueur
     for (const u of adversaires) {
       if (u.pv <= 0) continue
@@ -1821,6 +1999,7 @@
       const d = Math.hypot(dx, dy)
       if (d > rayon + rayonUnite(u)) continue
       u.pv = Math.max(0, u.pv - degats)
+      if (statut && u.pv > 0) appliquerStatut(u, statut.type, statut.duree, statut.params || {})
       if (repousse > 0 && u.pv > 0 && !u.immobile) {
         const n = d > 0.001 ? d : 1
         u.x += (dx / n) * repousse
@@ -1880,6 +2059,112 @@
   function mettreAJourEffetsSort(dt) {
     for (const e of effetsSort) e.dureeRestante -= dt
     effetsSort = effetsSort.filter(e => e.dureeRestante > 0)
+  }
+
+  // ─── Système de particules générique ───────────────────────────
+  // Réutilisé par les animations de mort, les impacts de sort et les
+  // arrivées spéciales — un seul système plutôt qu'un par usage.
+  function creerParticules(x, y, couleur, n = 10, { vitesseMin = 40, vitesseMax = 140, dureeMin = 300, dureeMax = 600, rayon = 2.5 } = {}) {
+    for (let i = 0; i < n; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const vitesse = vitesseMin + Math.random() * (vitesseMax - vitesseMin)
+      const duree = dureeMin + Math.random() * (dureeMax - dureeMin)
+      particules.push({
+        x, y,
+        vx: Math.cos(angle) * vitesse,
+        vy: Math.sin(angle) * vitesse,
+        couleur, rayon: rayon * (0.6 + Math.random() * 0.8),
+        dureeRestante: duree, dureeTotale: duree
+      })
+    }
+  }
+
+  function mettreAJourParticules(dt) {
+    const s = dt / 1000
+    for (const p of particules) {
+      p.x += p.vx * s
+      p.y += p.vy * s
+      p.vx *= 0.94
+      p.vy *= 0.94
+      p.dureeRestante -= dt
+    }
+    particules = particules.filter(p => p.dureeRestante > 0)
+  }
+
+  function dessinerParticules() {
+    for (const p of particules) {
+      const frac = Math.max(0, p.dureeRestante / p.dureeTotale)
+      ctx.save()
+      ctx.globalAlpha = frac
+      ctx.fillStyle = p.couleur
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.rayon * frac, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
+  }
+
+  // ─── Texte flottant (arrivée d'unité spéciale, réutilisable ailleurs) ──
+  function creerTexteFlottant(x, y, texte, couleur = '#ffffff') {
+    textesFlottants.push({ x, y, texte, couleur, dureeRestante: 900, dureeTotale: 900 })
+  }
+
+  function mettreAJourTextesFlottants(dt) {
+    for (const t of textesFlottants) t.dureeRestante -= dt
+    textesFlottants = textesFlottants.filter(t => t.dureeRestante > 0)
+  }
+
+  function dessinerTextesFlottants() {
+    for (const t of textesFlottants) {
+      const frac = Math.max(0, t.dureeRestante / t.dureeTotale)
+      ctx.save()
+      ctx.globalAlpha = frac
+      ctx.fillStyle = t.couleur
+      ctx.font = 'bold 13px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(t.texte, t.x, t.y - (1 - frac) * 26)
+      ctx.restore()
+    }
+  }
+
+  // ─── Anneau au sol (arrivée spéciale) ──────────────────────────
+  function creerEffetSol(x, y, couleur, rayonMax = 46) {
+    effetsSol.push({ x, y, couleur, rayonMax, dureeRestante: 420, dureeTotale: 420 })
+  }
+  function mettreAJourEffetsSol(dt) {
+    for (const e of effetsSol) e.dureeRestante -= dt
+    effetsSol = effetsSol.filter(e => e.dureeRestante > 0)
+  }
+  function dessinerEffetsSol() {
+    for (const e of effetsSol) {
+      const frac = Math.max(0, e.dureeRestante / e.dureeTotale)
+      ctx.save()
+      ctx.globalAlpha = frac * 0.6
+      ctx.strokeStyle = e.couleur
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(e.x, e.y, e.rayonMax * (1 - frac * 0.3), 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
+    }
+  }
+
+  // ─── Secousse d'écran (impact fort, arrivée spéciale) ──────────
+  // `intensite` en pixels, `duree` en ms. decalageSecousse() est appliqué
+  // via ctx.translate() dans render(), uniquement sur le premier plan (le
+  // fond est redessiné hors du translate pour ne jamais laisser de bord
+  // transparent visible pendant la secousse).
+  function declencherSecousse(intensite, duree) {
+    secousse = { intensite, duree, dureeTotale: duree }
+  }
+  function mettreAJourSecousse(dt) {
+    if (secousse.duree > 0) secousse.duree -= dt
+  }
+  function decalageSecousse() {
+    if (secousse.duree <= 0) return { x: 0, y: 0 }
+    const frac = secousse.duree / secousse.dureeTotale
+    const i = secousse.intensite * frac
+    return { x: (Math.random() * 2 - 1) * i, y: (Math.random() * 2 - 1) * i }
   }
 
   // Petite flèche orientée vers sa direction de vol.
@@ -1984,6 +2269,8 @@
       ctx.fillStyle = '#ffffffcc'
       ctx.fillText('⏳', u.x, yBarre - 6)
     }
+
+    dessinerStatuts(u)
   }
 
   function dessinerUnites() {
@@ -2053,15 +2340,26 @@
 
   // ─── Rendu principal ─────────────────────────────────────────
   function render() {
+    // Le fond est dessiné hors de la secousse d'écran : il couvre toujours
+    // tout le canvas, même quand le premier plan est décalé (sinon on
+    // verrait un bord transparent clignoter pendant l'impact).
     drawBg()
+    const dec = decalageSecousse()
+    ctx.save()
+    ctx.translate(dec.x, dec.y)
     drawGrid()
     dessinerZoneDepot()
+    dessinerEffetsSol()
     drawCastle(false) // ennemi (haut)
     drawCastle(true)  // joueur (bas)
     dessinerUnites()
+    dessinerSortsEnVol()
     dessinerProjectiles()
     dessinerEffetsMelee()
     dessinerEffetsSort()
+    dessinerParticules()
+    dessinerTextesFlottants()
+    ctx.restore()
   }
 
   // ─── Jauge de pioche (camembert) ────────────────────────────────
@@ -2106,8 +2404,13 @@
     if (partieCommencee && !partieTerminee) {
       mettreAJourUnites(dt)
       mettreAJourProjectiles(dt)
+      mettreAJourSortsEnVol(dt)
       mettreAJourEffetsMelee(dt)
       mettreAJourEffetsSort(dt)
+      mettreAJourParticules(dt)
+      mettreAJourTextesFlottants(dt)
+      mettreAJourEffetsSol(dt)
+      mettreAJourSecousse(dt)
 
       tempsDepuisSpawnEnnemi += dt
       if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
@@ -2230,7 +2533,7 @@
     // La carte est posée exactement au centre de la case (pas à l'endroit
     // précis du curseur/doigt).
     if (carte.effetInstantane) {
-      lancerSortZone(carte, hex.cx, hex.cy, 'joueur')
+      lancerSortDepuisChateau(carte, hex.cx, hex.cy, 'joueur')
     } else {
       poserCarte(carte, hex.cx, hex.cy, 'joueur')
     }
@@ -2406,6 +2709,11 @@
     projectiles = []
     effetsMelee = []
     effetsSort = []
+    particules = []
+    textesFlottants = []
+    effetsSol = []
+    sortsEnVol = []
+    secousse = { intensite: 0, duree: 0, dureeTotale: 0 }
     partieTerminee = false
     partieCommencee = true
 
