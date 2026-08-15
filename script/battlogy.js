@@ -100,3 +100,110 @@ export async function sauvegarderDeck(userId, liste) {
   if (error) { console.error('sauvegarderDeck a échoué :', error); return { ok: false, error } }
   return { ok: true }
 }
+
+// ===========================================================================
+// ===== Cartes (définitions de jeu) — gestion complète en BDD =============
+// ===========================================================================
+/**
+ * Schéma attendu côté Supabase (table `battlogy_cartes`) :
+ *
+ * create table battlogy_cartes (
+ *   id text primary key,
+ *   nom text not null,
+ *   image text,                                    -- nom de fichier dans le
+ *                                                    -- bucket Storage "pictures"
+ *                                                    -- (voir urlImage dans lootbox.js)
+ *   cout integer not null default 1,
+ *   pv integer not null default 0,
+ *   degats integer not null default 0,
+ *   porte integer not null default 0,
+ *   vitesse_attaque numeric not null default 1,
+ *   vitesse_marche integer not null default 0,
+ *   temps_activation integer not null default 0,
+ *   nombre integer not null default 1,              -- unités invoquées par carte
+ *   taille numeric not null default 1,
+ *   type_attaque text not null default 'melee',      -- 'melee' | 'distance'
+ *   categorie text not null default 'troupe',        -- 'troupe' | 'sort'
+ *   options jsonb not null default '{}'::jsonb,      -- propriétés avancées,
+ *                                                     -- réservées aux sorts :
+ *                                                     -- placementLibre, immobile,
+ *                                                     -- effetInstantane, zoneHex,
+ *                                                     -- degatsChateauMult, repousse,
+ *                                                     -- zoneAttaque, zoneAttaqueHex
+ *   ordre integer not null default 0,
+ *   actif boolean not null default true               -- si false, la carte
+ *                                                       -- disparaît du jeu
+ *                                                       -- (mais reste en BDD)
+ * );
+ *
+ * Penser à activer la RLS et à n'autoriser l'écriture (insert/update/delete)
+ * qu'aux comptes admin/super_admin, la lecture étant ouverte à tous.
+ *
+ * NOTE : `battlogy_cartes_utilisateurs` (plus haut dans ce fichier) reste
+ * inchangée — elle continue de dire quelles cartes CHAQUE joueur a
+ * débloquées. Ajouter une carte ici ne la débloque pour personne
+ * automatiquement (voir le commentaire sur CARTES_DEPART).
+ */
+
+/** Convertit une ligne BDD vers le format attendu par le moteur de jeu (objet CARTES, voir battlogy.html). */
+function convertirCarteBDD(ligne) {
+  return {
+    id: ligne.id,
+    nom: ligne.nom,
+    image: ligne.image || null,
+    cout: ligne.cout,
+    pv: ligne.pv,
+    degats: ligne.degats,
+    porte: ligne.porte,
+    vitesseAttaque: Number(ligne.vitesse_attaque),
+    vitesseMarche: ligne.vitesse_marche,
+    tempsActivation: ligne.temps_activation,
+    nombre: ligne.nombre,
+    taille: Number(ligne.taille),
+    typeAttaque: ligne.type_attaque,
+    categorie: ligne.categorie,
+    ...(ligne.options || {})
+  }
+}
+
+/**
+ * Charge les cartes actives depuis la BDD, au format attendu par le jeu.
+ * Retourne null si la table est vide ou inaccessible, pour laisser
+ * battlogy.html se replier sur ses cartes en dur (CARTES_SECOURS).
+ */
+export async function chargerCartesJeu() {
+  const { data, error } = await db.from('battlogy_cartes')
+    .select('*')
+    .eq('actif', true)
+    .order('ordre', { ascending: true })
+  if (error || !data || data.length === 0) return null
+  const cartes = {}
+  data.forEach(ligne => { cartes[ligne.id] = convertirCarteBDD(ligne) })
+  return cartes
+}
+
+/** Liste TOUTES les cartes (actives ou non), pour l'administration. */
+export async function adminListerCartes() {
+  const { data, error } = await db.from('battlogy_cartes').select('*').order('ordre')
+  if (error) { console.error('adminListerCartes :', error); return [] }
+  return data
+}
+
+/** Crée ou met à jour une carte (upsert sur id). */
+export async function adminSauvegarderCarte(carte) {
+  const { error } = await db.from('battlogy_cartes').upsert(carte, { onConflict: 'id' })
+  if (error) { console.error('adminSauvegarderCarte :', error); return { ok: false, error } }
+  return { ok: true }
+}
+
+/** Active/désactive une carte (n'apparaît plus dans le jeu si inactive, sans la supprimer). */
+export async function adminToggleActifCarte(id, actif) {
+  const { error } = await db.from('battlogy_cartes').update({ actif }).eq('id', id)
+  return { ok: !error, error }
+}
+
+/** Supprime définitivement une carte. */
+export async function adminSupprimerCarte(id) {
+  const { error } = await db.from('battlogy_cartes').delete().eq('id', id)
+  return { ok: !error, error }
+}
