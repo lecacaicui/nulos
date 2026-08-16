@@ -149,20 +149,27 @@
     }
 
     /* ═══ Jauge d'or : barre de progression current/max, lisible d'un coup
-       d'œil. Largeur non fixe : elle s'élargit avec orCapaciteMax (voir
+       d'œil. La PILULE (.or-jauge) s'élargit avec orCapaciteMax (voir
        mettreAJourLargeurJaugeOr()) pour visualiser la capacité, pas
-       seulement le remplissage. La valeur ci-dessous n'est que la largeur
-       de départ (orCapaciteMax initial = 3), écrasée en JS ensuite. ═══ */
+       seulement le remplissage — mais son EMPLACEMENT (.or-jauge-slot)
+       réserve toujours la largeur maximale possible (OR_JAUGE_LARGEUR_MAX)
+       dans la barre du bas : ainsi, quand la pilule grandit, elle grandit
+       "dans" cet espace déjà réservé et ne pousse jamais les cartes
+       (#main-cartes) à côté. ═══ */
+    .or-jauge-slot {
+      flex: 0 0 240px;
+      display: flex;
+      align-items: center;
+      margin-right: .4rem;
+    }
     .or-jauge {
       position: relative;
-      flex: 0 0 auto;
-      width: 108px;
+      width: 108px; /* largeur de départ (orCapaciteMax initial = 3), écrasée en JS */
       height: 42px;
       border-radius: 999px;
       background: var(--couleur-fond);
       border: 1px solid var(--couleur-bordure);
       overflow: hidden;
-      margin-right: .4rem;
       transition: width .25s ease;
     }
     .or-jauge-remplissage {
@@ -171,6 +178,22 @@
       width: 0%;
       background: linear-gradient(90deg, #f59e0b, #fbbf24);
       transition: width .25s ease;
+    }
+    /* Graduations : une ligne tous les "1 or" de capacité — l'écart entre
+       deux traits (--or-segment, en %) est recalculé en JS à chaque
+       changement de orCapaciteMax, pour toujours diviser la jauge en
+       exactement orCapaciteMax portions égales. */
+    .or-jauge-graduation {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: repeating-linear-gradient(
+        to right,
+        rgba(0,0,0,.32) 0,
+        rgba(0,0,0,.32) 1.5px,
+        transparent 1.5px,
+        transparent var(--or-segment, 33.333%)
+      );
     }
     .or-jauge-texte {
       position: relative;
@@ -571,9 +594,12 @@
           <div class="pioche-camembert" id="pioche-camembert"></div>
           <span class="pioche-icone">🃏</span>
         </div>
-        <div class="or-jauge" id="or-jauge" title="Or / capacité max">
-          <div class="or-jauge-remplissage" id="or-jauge-remplissage"></div>
-          <span class="or-jauge-texte">🪙 <span id="or-affiche">0</span>/<span id="or-cap-affiche">3</span></span>
+        <div class="or-jauge-slot">
+          <div class="or-jauge" id="or-jauge" title="Or / capacité max">
+            <div class="or-jauge-remplissage" id="or-jauge-remplissage"></div>
+            <div class="or-jauge-graduation" id="or-jauge-graduation"></div>
+            <span class="or-jauge-texte">🪙 <span id="or-affiche">0</span>/<span id="or-cap-affiche">3</span></span>
+          </div>
         </div>
         <div id="main-cartes"></div>
         <button class="btn-pioche-urgence" id="btn-pioche-urgence" style="display:none">⚡ Piocher (5)</button>
@@ -1078,10 +1104,13 @@
   // orCapaciteMax == OR_CAPACITE_DEPART) et OR_JAUGE_LARGEUR_MAX (à
   // orCapaciteMax == OR_CAPACITE_MAX) : la jauge s'élargit visuellement à
   // mesure que la capacité max grandit, pas seulement son remplissage.
+  // La graduation (--or-segment) est recalculée en même temps, pour que
+  // chaque trait continue de représenter exactement 1 or de capacité.
   function mettreAJourLargeurJaugeOr() {
     const proportion = (orCapaciteMax - OR_CAPACITE_DEPART) / (OR_CAPACITE_MAX - OR_CAPACITE_DEPART)
     const largeur = OR_JAUGE_LARGEUR_MIN + proportion * (OR_JAUGE_LARGEUR_MAX - OR_JAUGE_LARGEUR_MIN)
     document.getElementById('or-jauge').style.width = Math.round(largeur) + 'px'
+    document.getElementById('or-jauge').style.setProperty('--or-segment', (100 / orCapaciteMax) + '%')
   }
 
   function renderMain() {
