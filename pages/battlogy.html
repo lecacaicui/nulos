@@ -37,8 +37,14 @@
        exactement ce qui reste après le titre et la barre de cartes. */
     main { flex: 1 1 auto; min-height: 0; display: flex; }
     .battlogy-wrap {
-      max-width: 560px;
-      width: 100%;
+      /* La zone visible (plateau + barre or/cartes) occupe 90% de la
+         largeur de la page. Le plateau lui-même (le canvas dans
+         .arena-outer) garde sa taille inchangée : ses dimensions sont
+         calculées dans initArena() d'après la hauteur disponible (voir Rh
+         dans initArena()), qui ne change pas ici — seul l'espace
+         horizontal autour de lui (et la barre du bas) s'élargit. */
+      max-width: 90vw;
+      width: 90%;
       margin: 0 auto;
       height: 100%;
       box-sizing: border-box;
