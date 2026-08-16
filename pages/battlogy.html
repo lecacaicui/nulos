@@ -668,7 +668,15 @@
 
   <script>
   // ─── Constantes de jeu ───────────────────────────────────────
-  const COLS        = 7
+  // COLS = 21 : 3 lanes côte à côte (7 colonnes chacune, comme l'unique
+  // lane d'origine) — une lane centrale (l'ancien terrain) flanquée d'une
+  // lane à gauche et d'une lane à droite. Comme tout le moteur (placement,
+  // détection, ciblage, rendu du château/de la grille) est déjà calculé en
+  // fonction de COLS/canvas.width et non de valeurs fixes, élargir la
+  // grille suffit à ouvrir ces deux couloirs supplémentaires : rien
+  // d'autre à changer pour que les troupes puissent y être posées et s'y
+  // déplacer normalement jusqu'au château adverse.
+  const COLS        = 21
   const ROWS        = 20
   const CASTLE_PX   = 78    // hauteur en px de chaque zone château (barre de vie + image)
   const MARGE       = 8     // marge horizontale
