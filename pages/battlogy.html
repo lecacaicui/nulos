@@ -668,15 +668,22 @@
 
   <script>
   // ─── Constantes de jeu ───────────────────────────────────────
-  // COLS = 21 : 3 lanes côte à côte (7 colonnes chacune, comme l'unique
-  // lane d'origine) — une lane centrale (l'ancien terrain) flanquée d'une
-  // lane à gauche et d'une lane à droite. Comme tout le moteur (placement,
-  // détection, ciblage, rendu du château/de la grille) est déjà calculé en
-  // fonction de COLS/canvas.width et non de valeurs fixes, élargir la
-  // grille suffit à ouvrir ces deux couloirs supplémentaires : rien
-  // d'autre à changer pour que les troupes puissent y être posées et s'y
-  // déplacer normalement jusqu'au château adverse.
-  const COLS        = 21
+  // 3 lanes distinctes (gauche / centre / droite), chacune identique à
+  // l'ancien terrain unique (7 colonnes), séparées par un fossé infranchissable
+  // (GAP_R_MULT, en unités de R) que ni les troupes du joueur ni celles du
+  // bot ne peuvent traverser (voir le mur ajouté dans resoudreCollisions()).
+  // Les 3 lanes restent toutes connectées au MÊME château en haut et en bas
+  // (barre de vie + image, voir drawCastle) : le fossé s'arrête à la grille,
+  // il ne coupe pas le château. `COLS` (utilisé partout ailleurs dans le
+  // fichier) reste le nombre total de colonnes ; `colLocal`/`laneIndex`
+  // permettent de retrouver, pour une colonne globale donnée, sa position
+  // DANS sa lane et le numéro de sa lane.
+  const LANE_COLS    = 7                    // colonnes par lane (= l'ancien terrain)
+  const NB_LANES     = 3                    // gauche, centre, droite
+  const COLS         = LANE_COLS * NB_LANES
+  const GAP_R_MULT    = 3.4                 // largeur du fossé entre 2 lanes, en unités de R
+  function colLocal(col)  { return col % LANE_COLS }
+  function laneIndex(col) { return Math.floor(col / LANE_COLS) }
   const ROWS        = 20
   const CASTLE_PX   = 78    // hauteur en px de chaque zone château (barre de vie + image)
   const MARGE       = 8     // marge horizontale
@@ -714,6 +721,8 @@
   let gridOffsetY  // y où commence la grille
   let gridH        // hauteur réelle de la grille
   let zoneJoueurYMax  // limite basse (haut du château) de la grille jouable
+  let GAP_PX       // largeur (px) du fossé infranchissable entre 2 lanes
+  let LANE_PITCH   // largeur (px) d'une lane (hexagones seuls, sans fossé)
   // Rayon (en px) d'une unité de taille 1, recalculé à chaque initArena()
   // en proportion de R (voir RATIO_RAYON_UNITE plus bas) : avant, ce rayon
   // était une constante fixe (14px), indépendante de R — comme R dépend de
@@ -1179,8 +1188,16 @@
     // de canvas.width/height.
     const ancienR = R
 
+    // Largeur (en unités de R) d'UNE lane (identique à l'ancienne grille
+    // pleine largeur), et largeur totale (3 lanes + 2 fossés) en unités de
+    // R — le fossé (GAP_R_MULT) scale avec R comme le reste de la grille,
+    // pour garder les proportions identiques quel que soit le zoom/la
+    // taille de fenêtre.
+    const K_LANE  = 1.5 * LANE_COLS + 0.5
+    const K_TOTAL = NB_LANES * K_LANE + (NB_LANES - 1) * GAP_R_MULT
+
     // R limité par la largeur disponible
-    const Rw = (availW - 2 * MARGE) / (1.5 * COLS + 0.5)
+    const Rw = (availW - 2 * MARGE) / K_TOTAL
     // R limité par la hauteur disponible (2 châteaux + grille, colonnes
     // pleines = ROWS+1 rangées)
     const Rh = (availH - 2 * CASTLE_PX - 12) / ((ROWS + 1) * Math.sqrt(3))
@@ -1189,11 +1206,13 @@
     HS = R * 1.5           // espacement horizontal entre centres de colonnes
     VS = R * Math.sqrt(3)  // espacement vertical entre centres de rangées
     RAYON_UNITE_BASE = R * RATIO_RAYON_UNITE
+    GAP_PX     = GAP_R_MULT * R   // largeur du fossé entre 2 lanes, en px
+    LANE_PITCH = K_LANE * R       // largeur d'une lane (hexagones), en px
 
     gridOffsetY = CASTLE_PX + 6
 
-    gridH        = (ROWS + 1) * VS                       // hauteur réelle de la grille
-    const gridW  = (1.5 * COLS + 0.5) * R + 2 * MARGE     // largeur réelle de la grille
+    gridH        = (ROWS + 1) * VS               // hauteur réelle de la grille
+    const gridW  = K_TOTAL * R + 2 * MARGE        // largeur réelle (3 lanes + 2 fossés)
 
     canvas.width  = Math.round(gridW)
     canvas.height = Math.round(gridOffsetY + gridH + 6 + CASTLE_PX)
@@ -1248,10 +1267,43 @@
   }
 
   // ─── Conversion coordonnées hexa → pixels ────────────────────
+  // `col` est un index GLOBAL (0..COLS-1) : on en déduit la lane
+  // (laneIndex) et la position locale dans cette lane (colLocal), puis on
+  // décale x du nombre de lanes déjà passées, fossés compris (LANE_PITCH +
+  // GAP_PX chacune). Le motif hexagonal (décalage vertical, parité) est
+  // calculé sur colLocal et non sur col, pour que chaque lane reproduise
+  // exactement l'ancien terrain (7 colonnes), quelle que soit sa position.
   function hexCenter(row, col) {
-    const x = MARGE + R + col * HS
-    const y = gridOffsetY + VS / 2 + row * VS + (col % 2 === 1 ? VS / 2 : 0)
+    const lane   = laneIndex(col)
+    const cLocal = colLocal(col)
+    const x = MARGE + lane * (LANE_PITCH + GAP_PX) + R + cLocal * HS
+    const y = gridOffsetY + VS / 2 + row * VS + (cLocal % 2 === 1 ? VS / 2 : 0)
     return { x, y }
+  }
+
+  // ─── Fossés entre lanes ────────────────────────────────────────
+  // Renvoie les bornes [gauche, droite] (px) de chaque fossé entre 2 lanes
+  // consécutives (NB_LANES - 1 fossés). Utilisé à la fois pour le dessin
+  // (dessinerFosses) et pour le mur infranchissable (voir resoudreCollisions).
+  function zonesFosse() {
+    const zones = []
+    for (let lane = 0; lane < NB_LANES - 1; lane++) {
+      const droiteLane = MARGE + lane * (LANE_PITCH + GAP_PX) + LANE_PITCH
+      zones.push({ left: droiteLane, right: droiteLane + GAP_PX })
+    }
+    return zones
+  }
+
+  // Dessine les fossés (bande non-jouable) sur toute la hauteur de la
+  // grille, pour que la séparation entre les 3 lanes soit visible même là
+  // où aucun hexagone n'est dessiné.
+  function dessinerFosses() {
+    for (const z of zonesFosse()) {
+      ctx.fillStyle = '#050d1a'
+      ctx.fillRect(z.left, gridOffsetY, z.right - z.left, gridH)
+      ctx.strokeStyle = '#ffffff10'
+      ctx.strokeRect(z.left, gridOffsetY, z.right - z.left, gridH)
+    }
   }
 
   // ─── Trouve l'hexagone le plus proche d'un point (x,y) en pixels ──
@@ -1262,14 +1314,19 @@
   // tomber quasiment pile sur la case), mais trouverHexPourPose() passe un
   // seuil plus généreux pour "rattraper" une pose imprécise proche du bord
   // de la grille (voir plus bas).
+  // NOTE : avec 3 lanes désormais séparées par un fossé, la position d'une
+  // colonne n'est plus une simple fonction linéaire de x (chaque lane a son
+  // propre décalage, voir hexCenter) — on ne peut donc plus estimer
+  // directement colEstime comme avant. La grille restant petite (COLS ×
+  // ROWS ≈ 400 hexagones), on parcourt simplement toutes les colonnes/
+  // rangées existantes et on garde le centre le plus proche : cette
+  // fonction n'est appelée que sur interaction (survol/pose), pas à chaque
+  // frame, le coût est négligeable.
   function trouverHexProche(x, y, seuilDistance = R * 1.15) {
-    const colEstime = Math.round((x - MARGE - R) / HS)
     let meilleur = null, meilleureDist = Infinity
-    for (let c = Math.max(0, colEstime - 2); c <= Math.min(COLS - 1, colEstime + 2); c++) {
-      const maxRow = (c % 2 === 0) ? ROWS : ROWS - 1
-      const decalage = (c % 2 === 1) ? VS / 2 : 0
-      const rowEstime = Math.round((y - gridOffsetY - VS / 2 - decalage) / VS)
-      for (let r = Math.max(0, rowEstime - 2); r <= Math.min(maxRow, rowEstime + 2); r++) {
+    for (let c = 0; c < COLS; c++) {
+      const maxRow = (colLocal(c) % 2 === 0) ? ROWS : ROWS - 1
+      for (let r = 0; r <= maxRow; r++) {
         const { x: cx, y: cy } = hexCenter(r, c)
         const d = Math.hypot(cx - x, cy - y)
         if (d < meilleureDist) { meilleureDist = d; meilleur = { row: r, col: c, cx, cy } }
@@ -1405,7 +1462,7 @@
     const { yMin, yMax } = calculerZonePose(team)
     const positions = []
     for (let c = 0; c < COLS; c++) {
-      const rowsCol = (c % 2 === 0) ? ROWS + 1 : ROWS
+      const rowsCol = (colLocal(c) % 2 === 0) ? ROWS + 1 : ROWS
       for (let r = 0; r < rowsCol; r++) {
         const { x, y } = hexCenter(r, c)
         if (fractionHexDansZone(y, R, yMin, yMax) >= SEUIL_HEX_DANS_ZONE) positions.push({ x, y })
@@ -1479,7 +1536,7 @@
   // colonnes paires qui ont une rangée de plus, ROWS-1 pour les impaires).
   function couleurHex(row, col) {
     const dark = (row + col) % 2 === 0
-    const maxRow = (col % 2 === 0) ? ROWS : ROWS - 1
+    const maxRow = (colLocal(col) % 2 === 0) ? ROWS : ROWS - 1
     if (row <= 7)            return dark ? C.hexEnemyDark  : C.hexEnemy
     if (row >= maxRow - 7)   return dark ? C.hexPlayerDark : C.hexPlayer
     return dark ? C.hexBaseDark : C.hexBase
@@ -1490,12 +1547,13 @@
   // Colonnes impaires : ROWS rangées (0..ROWS-1), décalées d'une demi-hauteur.
   function drawGrid() {
     for (let c = 0; c < COLS; c++) {
-      const rowsCol = (c % 2 === 0) ? ROWS + 1 : ROWS
+      const rowsCol = (colLocal(c) % 2 === 0) ? ROWS + 1 : ROWS
       for (let r = 0; r < rowsCol; r++) {
         const { x, y } = hexCenter(r, c)
         drawHex(x, y, R - 1.2, couleurHex(r, c), C.hexBord)
       }
     }
+    dessinerFosses()
 
     // Lignes de zone en pointillés (en y, pour rester alignées malgré le
     // décalage entre colonnes paires/impaires)
@@ -1544,11 +1602,19 @@
   }
 
   // ─── Point de cible du château (utilisé pour la marche et l'attaque) ──
-  function pointCastle(team) {
+  // Le château est UNIQUE et commun aux 3 lanes (barre de vie + image sur
+  // toute la largeur, voir drawCastle) : chaque lane doit donc pouvoir
+  // l'atteindre à SA propre position x, sans jamais avoir besoin de
+  // traverser le fossai qui la sépare des 2 autres lanes. `xRef` (en
+  // général unite.x) fixe le point visé sur cette même colonne x — sans
+  // xRef (ex: point de départ visuel d'un sort), on retombe sur le centre
+  // du plateau comme avant.
+  function pointCastle(team, xRef) {
+    const x = xRef !== undefined ? xRef : canvas.width / 2
     // team = camp qui VISE ce château (ex: 'joueur' vise le château ennemi)
     return team === 'joueur'
-      ? { x: canvas.width / 2, y: CASTLE_PX * 0.5 }
-      : { x: canvas.width / 2, y: canvas.height - CASTLE_PX * 0.5 }
+      ? { x, y: CASTLE_PX * 0.5 }
+      : { x, y: canvas.height - CASTLE_PX * 0.5 }
   }
 
   // ─── Unités ─────────────────────────────────────────────────
@@ -1905,6 +1971,19 @@
       if (m.x > limiteDroite) m.x = limiteDroite
       if (m.y < limiteHaute) m.y = limiteHaute
       if (m.y > limiteBasse) m.y = limiteBasse
+
+      // ─── Murs des fossés entre lanes ────────────────────────────
+      // Les 3 lanes ne se touchent pas : une unité ne peut jamais
+      // pénétrer dans la bande du fossé, sur toute la hauteur de la
+      // grille (le fossé s'arrête au château, qui reste commun aux 3
+      // lanes — voir drawCastle/pointCastle, inchangés). On la replace du
+      // côté d'où elle vient (le plus proche des deux bords du fossé).
+      for (const z of zonesFosse()) {
+        if (m.x + r > z.left && m.x - r < z.right) {
+          const centreFosse = (z.left + z.right) / 2
+          m.x = (m.x < centreFosse) ? (z.left - r) : (z.right + r)
+        }
+      }
     }
   }
 
@@ -1956,7 +2035,7 @@
   // Le château adverse n'est une cible que s'il est lui-même détecté
   // (même règle que pour un ennemi : rayon de détection + pas derrière).
   function chateauEstDetecte(unite) {
-    const c = pointCastle(unite.team)
+    const c = pointCastle(unite.team, unite.x)
     return estDetectable(unite, c.x, c.y)
   }
 
@@ -1981,7 +2060,7 @@
       cibleX = ennemiProche.x; cibleY = ennemiProche.y
       rayonCible = rayonUnite(ennemiProche)
     } else if (chateauEstDetecte(unite)) {
-      const c = pointCastle(unite.team)
+      const c = pointCastle(unite.team, unite.x)
       cibleX = c.x; cibleY = c.y
       // La hitbox du château est resserrée vers son centre (26px de base),
       // mais on ajoute ~1.5 hexagone de portée effective pour que les
@@ -2376,6 +2455,18 @@
     for (const u of unitesEnnemi) dessinerUnite(u)
   }
 
+  // Bornes [gauche, droite] (px) de chacune des 3 lanes (hexagones
+  // seulement, fossés exclus) — utilisé pour ne surligner que les zones
+  // réellement jouables (voir dessinerZoneDepot juste en dessous).
+  function zonesLanes() {
+    const zones = []
+    for (let lane = 0; lane < NB_LANES; lane++) {
+      const left = MARGE + lane * (LANE_PITCH + GAP_PX)
+      zones.push({ left, right: left + LANE_PITCH })
+    }
+    return zones
+  }
+
   // ─── Zone de pose (surlignée pendant un glisser) ───────────────
   let enTrainDeGlisser = false
   function dessinerZoneDepot() {
@@ -2389,10 +2480,12 @@
     const EPAISSEUR_AIDE_PLACEMENT = 4
 
     // Carte à placement libre (sort, ex: statue) : toute la grille est
-    // utilisable, on se contente de surligner la case survolée.
+    // utilisable, on se contente de surligner la case survolée. Surlignage
+    // fait lane par lane (et non sur toute la largeur) pour ne pas laisser
+    // croire que les fossés entre lanes sont posables.
     if (carte && carte.placementLibre) {
       ctx.fillStyle = '#a855f715'
-      ctx.fillRect(MARGE, gridOffsetY, canvas.width - 2 * MARGE, gridH)
+      for (const z of zonesLanes()) ctx.fillRect(z.left, gridOffsetY, z.right - z.left, gridH)
       if (hexSurvole) {
         drawHex(hexSurvole.cx, hexSurvole.cy, RAYON_AIDE_PLACEMENT, '#a855f788', '#d8b4fe', EPAISSEUR_AIDE_PLACEMENT)
       }
@@ -2401,10 +2494,12 @@
 
     const { yMin, yMax } = calculerZonePose()
     ctx.fillStyle = '#2563eb18'
-    ctx.fillRect(MARGE, yMin, canvas.width - 2 * MARGE, yMax - yMin)
     ctx.strokeStyle = '#2563eb55'
     ctx.setLineDash([5, 4])
-    ctx.strokeRect(MARGE, yMin, canvas.width - 2 * MARGE, yMax - yMin)
+    for (const z of zonesLanes()) {
+      ctx.fillRect(z.left, yMin, z.right - z.left, yMax - yMin)
+      ctx.strokeRect(z.left, yMin, z.right - z.left, yMax - yMin)
+    }
     ctx.setLineDash([])
 
     // Hexagone précisément survolé par le curseur/doigt : s'illumine en
