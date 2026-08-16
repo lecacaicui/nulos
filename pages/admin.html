@@ -41,27 +41,58 @@
     .modale-admin {
       background: var(--couleur-conteneur);
       border-radius: 14px;
-      padding: 2rem;
       max-width: 440px;
       width: 100%;
+      max-height: calc(100vh - 4rem);
       position: relative;
       box-shadow: 0 8px 30px rgba(0,0,0,.25);
       margin: 2rem auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* Modale large : réservée aux formulaires avec beaucoup de champs (ex: cartes Battlogy) */
+    .modale-admin.modale-admin-lg { max-width: 680px; }
+    .modale-admin-entete {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.5rem 2rem 0;
+      flex-shrink: 0;
+    }
+    .modale-admin-corps {
+      padding: .75rem 2rem 1.25rem;
+      overflow-y: auto;
+      flex: 1 1 auto;
+    }
+    .modale-admin-pied {
+      padding: 1rem 2rem 1.5rem;
+      flex-shrink: 0;
+      border-top: 1px solid var(--couleur-bordure);
+      background: var(--couleur-conteneur);
     }
     .modale-fermer {
-      position: absolute;
-      top: .75rem;
-      right: .9rem;
       background: none;
       border: none;
       font-size: 1.3rem;
       color: var(--couleur-texte-faible);
       cursor: pointer;
       line-height: 1;
+      flex-shrink: 0;
     }
     .modale-fermer:hover { color: var(--couleur-texte); }
     .modale-admin h2 { font-size: 1.2rem; margin-bottom: .25rem; }
     .modale-admin h3 { color: var(--couleur-texte); }
+    /* Grille de champs numériques (ex: coût/PV/dégâts) : plus lisible qu'un flex-wrap qui casse mal */
+    .champs-grille-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .6rem;
+    }
+    @media (max-width: 560px) {
+      .champs-grille-3 { grid-template-columns: 1fr 1fr; }
+    }
     .img-mini { width: 75px; height: 75px; object-fit: contain; vertical-align: middle; }
     .tag-rarete {
       display: inline-block;
@@ -209,7 +240,10 @@
       .row-actions { flex-wrap: wrap; }
       table { min-width: 480px; }
       .theme-grid { flex-direction: column; gap: 1rem; }
-      .modale-admin { padding: 1.5rem 1rem; margin: 1rem auto; }
+      .modale-admin { margin: 1rem auto; max-height: calc(100vh - 2rem); }
+      .modale-admin-entete { padding: 1.25rem 1.25rem 0; }
+      .modale-admin-corps { padding: .75rem 1.25rem 1rem; }
+      .modale-admin-pied { padding: .85rem 1.25rem 1.25rem; }
     }
     @media (max-width: 480px) {
       .onglet-icone { display: none; }
@@ -694,73 +728,85 @@
   <!-- ===== Modale Créature ===== -->
   <div class="modale-fond" id="modale-creature-fond" onclick="if(event.target===this) fermerModaleCreature()">
     <div class="modale-admin">
-      <button class="modale-fermer" onclick="fermerModaleCreature()">✕</button>
-      <h2 id="titre-modale-creature">Nouvelle créature</h2>
-      <label for="c-id">Identifiant unique (texte, ex: flamby)</label>
-      <input type="text" id="c-id" placeholder="ex: flamby">
-      <label for="c-nom">Nom affiché</label>
-      <input type="text" id="c-nom" placeholder="ex: Flamby">
-      <label for="c-rarete">Rareté</label>
-      <select id="c-rarete">
-        <option value="commun">Commun</option>
-        <option value="rare">Rare</option>
-        <option value="epique">Épique</option>
-        <option value="legendaire">Légendaire</option>
-        <option value="cosmique">Cosmique</option>
-        <option value="secret">Secret (caché du site)</option>
-      </select>
-      <label for="c-multiplicateur">Multiplicateur de production (ex: 1.15)</label>
-      <input type="number" id="c-multiplicateur" step="0.01" min="1" placeholder="1.10">
-      <label>Image</label>
-      <div class="img-picker-wrap" id="c-picker-wrap">
-        <div class="img-picker-preview-wrap">
-          <img class="img-picker-preview" id="c-image-preview" src="" alt="">
-          <span class="img-picker-nom-actuel" id="c-image-nom">Aucune image</span>
-        </div>
-        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('c')">🖼 Choisir / importer une image</button>
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-creature">Nouvelle créature</h2>
+        <button class="modale-fermer" onclick="fermerModaleCreature()">✕</button>
       </div>
-      <input type="hidden" id="c-image">
-      <div class="msg-inline" id="c-image-msg" style="margin-left:0"></div>
-      <label for="c-prix-vente">Prix de revente si doublon (pièces)</label>
-      <input type="number" id="c-prix-vente" min="0" step="1" placeholder="100">
-      <button class="btn btn-primary btn-full" onclick="sauvegarderCreature()">Enregistrer</button>
-      <div class="msg-inline" id="msg-modale-creature"></div>
+      <div class="modale-admin-corps">
+        <label for="c-id">Identifiant unique (texte, ex: flamby)</label>
+        <input type="text" id="c-id" placeholder="ex: flamby">
+        <label for="c-nom">Nom affiché</label>
+        <input type="text" id="c-nom" placeholder="ex: Flamby">
+        <label for="c-rarete">Rareté</label>
+        <select id="c-rarete">
+          <option value="commun">Commun</option>
+          <option value="rare">Rare</option>
+          <option value="epique">Épique</option>
+          <option value="legendaire">Légendaire</option>
+          <option value="cosmique">Cosmique</option>
+          <option value="secret">Secret (caché du site)</option>
+        </select>
+        <label for="c-multiplicateur">Multiplicateur de production (ex: 1.15)</label>
+        <input type="number" id="c-multiplicateur" step="0.01" min="1" placeholder="1.10">
+        <label>Image</label>
+        <div class="img-picker-wrap" id="c-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="c-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="c-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('c')">🖼 Choisir / importer une image</button>
+        </div>
+        <input type="hidden" id="c-image">
+        <div class="msg-inline" id="c-image-msg" style="margin-left:0"></div>
+        <label for="c-prix-vente">Prix de revente si doublon (pièces)</label>
+        <input type="number" id="c-prix-vente" min="0" step="1" placeholder="100">
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderCreature()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-creature"></div>
+      </div>
     </div>
   </div>
 
   <!-- ===== Modale Loot Box ===== -->
   <div class="modale-fond" id="modale-lootbox-fond" onclick="if(event.target===this) fermerModaleLootBox()">
     <div class="modale-admin">
-      <button class="modale-fermer" onclick="fermerModaleLootBox()">✕</button>
-      <h2 id="titre-modale-lootbox">Nouvelle loot box</h2>
-      <label for="lb-id">Identifiant unique (texte, ex: premium)</label>
-      <input type="text" id="lb-id" placeholder="ex: premium">
-      <label for="lb-nom">Nom affiché</label>
-      <input type="text" id="lb-nom" placeholder="ex: Loot Box Premium">
-      <label for="lb-prix">Prix (pièces)</label>
-      <input type="number" id="lb-prix" min="0" step="1" placeholder="400000">
-      <label>Image</label>
-      <div class="img-picker-wrap" id="lb-picker-wrap">
-        <div class="img-picker-preview-wrap">
-          <img class="img-picker-preview" id="lb-image-preview" src="" alt="">
-          <span class="img-picker-nom-actuel" id="lb-image-nom">Aucune image</span>
-        </div>
-        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('lb')">🖼 Choisir / importer une image</button>
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-lootbox">Nouvelle loot box</h2>
+        <button class="modale-fermer" onclick="fermerModaleLootBox()">✕</button>
       </div>
-      <input type="hidden" id="lb-image">
-      <div class="msg-inline" id="lb-image-msg" style="margin-left:0"></div>
-      <label for="lb-ordre">Ordre d'affichage</label>
-      <input type="number" id="lb-ordre" step="1" placeholder="1">
-      <button class="btn btn-primary btn-full" onclick="sauvegarderLootBox()">Enregistrer</button>
-      <div class="msg-inline" id="msg-modale-lootbox"></div>
-      <div id="composition-lootbox" style="display:none; margin-top:1.5rem; text-align:left;">
-        <h3 style="font-size:.95rem; margin-bottom:.5rem;">Composition (créatures de cette boîte)</h3>
-        <div id="liste-composition"></div>
-        <div class="row-actions" style="margin-top:.75rem; flex-wrap:wrap;">
-          <select id="ajout-creature-select" style="flex:1; min-width:140px;"></select>
-          <input type="number" id="ajout-creature-poids" value="10" min="0.01" step="0.01" style="width:80px;" placeholder="poids">
-          <button class="btn-save" onclick="ajouterCreatureALaBox()">Ajouter</button>
+      <div class="modale-admin-corps">
+        <label for="lb-id">Identifiant unique (texte, ex: premium)</label>
+        <input type="text" id="lb-id" placeholder="ex: premium">
+        <label for="lb-nom">Nom affiché</label>
+        <input type="text" id="lb-nom" placeholder="ex: Loot Box Premium">
+        <label for="lb-prix">Prix (pièces)</label>
+        <input type="number" id="lb-prix" min="0" step="1" placeholder="400000">
+        <label>Image</label>
+        <div class="img-picker-wrap" id="lb-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="lb-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="lb-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('lb')">🖼 Choisir / importer une image</button>
         </div>
+        <input type="hidden" id="lb-image">
+        <div class="msg-inline" id="lb-image-msg" style="margin-left:0"></div>
+        <label for="lb-ordre">Ordre d'affichage</label>
+        <input type="number" id="lb-ordre" step="1" placeholder="1">
+        <div id="composition-lootbox" style="display:none; margin-top:1.5rem; text-align:left;">
+          <h3 style="font-size:.95rem; margin-bottom:.5rem;">Composition (créatures de cette boîte)</h3>
+          <div id="liste-composition"></div>
+          <div class="row-actions" style="margin-top:.75rem; flex-wrap:wrap;">
+            <select id="ajout-creature-select" style="flex:1; min-width:140px;"></select>
+            <input type="number" id="ajout-creature-poids" value="10" min="0.01" step="0.01" style="width:80px;" placeholder="poids">
+            <button class="btn-save" onclick="ajouterCreatureALaBox()">Ajouter</button>
+          </div>
+        </div>
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderLootBox()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-lootbox"></div>
       </div>
     </div>
   </div>
@@ -768,184 +814,217 @@
   <!-- ===== Modale Ennemi MDA ===== -->
   <div class="modale-fond" id="modale-mda-fond" onclick="if(event.target===this) fermerModaleEnnemiMDA()">
     <div class="modale-admin">
-      <button class="modale-fermer" onclick="fermerModaleEnnemiMDA()">✕</button>
-      <h2 id="titre-modale-mda">Nouvel ennemi</h2>
-      <label for="m-id">Identifiant unique (texte, ex: charb)</label>
-      <input type="text" id="m-id" placeholder="ex: charb">
-      <label for="m-nom">Nom affiché</label>
-      <input type="text" id="m-nom" placeholder="ex: Charb">
-      <label>Image</label>
-      <div class="img-picker-wrap" id="m-picker-wrap">
-        <div class="img-picker-preview-wrap">
-          <img class="img-picker-preview" id="m-image-preview" src="" alt="">
-          <span class="img-picker-nom-actuel" id="m-image-nom">Aucune image</span>
-        </div>
-        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('m')">🖼 Choisir / importer une image</button>
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-mda">Nouvel ennemi</h2>
+        <button class="modale-fermer" onclick="fermerModaleEnnemiMDA()">✕</button>
       </div>
-      <input type="hidden" id="m-image">
-      <div class="msg-inline" id="m-image-msg" style="margin-left:0"></div>
-      <label for="m-pv">Points de vie (PV)</label>
-      <input type="number" id="m-pv" min="1" step="1" placeholder="10">
-      <label for="m-degats">Dégâts d'attaque</label>
-      <input type="number" id="m-degats" min="0" step="1" placeholder="1">
-      <label for="m-delai">Délai d'attaque (attaque tous les N tours)</label>
-      <input type="number" id="m-delai" min="1" step="1" placeholder="4">
-      <label for="m-effet">Effet spécial (optionnel — théorique, pas encore actif en jeu)</label>
-      <input type="text" id="m-effet" placeholder="Aucun pour l'instant">
-      <label for="m-ordre">Ordre d'affichage</label>
-      <input type="number" id="m-ordre" step="1" placeholder="1">
-      <button class="btn btn-primary btn-full" onclick="sauvegarderEnnemiMDA()">Enregistrer</button>
-      <div class="msg-inline" id="msg-modale-mda"></div>
+      <div class="modale-admin-corps">
+        <label for="m-id">Identifiant unique (texte, ex: charb)</label>
+        <input type="text" id="m-id" placeholder="ex: charb">
+        <label for="m-nom">Nom affiché</label>
+        <input type="text" id="m-nom" placeholder="ex: Charb">
+        <label>Image</label>
+        <div class="img-picker-wrap" id="m-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="m-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="m-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('m')">🖼 Choisir / importer une image</button>
+        </div>
+        <input type="hidden" id="m-image">
+        <div class="msg-inline" id="m-image-msg" style="margin-left:0"></div>
+        <label for="m-pv">Points de vie (PV)</label>
+        <input type="number" id="m-pv" min="1" step="1" placeholder="10">
+        <label for="m-degats">Dégâts d'attaque</label>
+        <input type="number" id="m-degats" min="0" step="1" placeholder="1">
+        <label for="m-delai">Délai d'attaque (attaque tous les N tours)</label>
+        <input type="number" id="m-delai" min="1" step="1" placeholder="4">
+        <label for="m-effet">Effet spécial (optionnel — théorique, pas encore actif en jeu)</label>
+        <input type="text" id="m-effet" placeholder="Aucun pour l'instant">
+        <label for="m-ordre">Ordre d'affichage</label>
+        <input type="number" id="m-ordre" step="1" placeholder="1">
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderEnnemiMDA()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-mda"></div>
+      </div>
     </div>
   </div>
 
   <!-- ===== Modale Carte Battlogy ===== -->
   <div class="modale-fond" id="modale-battlogy-fond" onclick="if(event.target===this) fermerModaleCarteBattlogy()">
-    <div class="modale-admin">
-      <button class="modale-fermer" onclick="fermerModaleCarteBattlogy()">✕</button>
-      <h2 id="titre-modale-battlogy">Nouvelle carte</h2>
-      <label for="bt-id">Identifiant unique (texte, ex: archer)</label>
-      <input type="text" id="bt-id" placeholder="ex: archer">
-      <label for="bt-nom">Nom affiché</label>
-      <input type="text" id="bt-nom" placeholder="ex: Archer">
-      <label>Image</label>
-      <div class="img-picker-wrap" id="bt-picker-wrap">
-        <div class="img-picker-preview-wrap">
-          <img class="img-picker-preview" id="bt-image-preview" src="" alt="">
-          <span class="img-picker-nom-actuel" id="bt-image-nom">Aucune image</span>
-        </div>
-        <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('bt')">🖼 Choisir / importer une image</button>
+    <div class="modale-admin modale-admin-lg">
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-battlogy">Nouvelle carte</h2>
+        <button class="modale-fermer" onclick="fermerModaleCarteBattlogy()">✕</button>
       </div>
-      <input type="hidden" id="bt-image">
-      <div class="msg-inline" id="bt-image-msg" style="margin-left:0"></div>
+      <div class="modale-admin-corps">
+        <div class="champs-grille-3" style="grid-template-columns: 2fr 1fr;">
+          <div>
+            <label for="bt-id">Identifiant unique (texte, ex: archer)</label>
+            <input type="text" id="bt-id" placeholder="ex: archer">
+          </div>
+          <div>
+            <label for="bt-nom">Nom affiché</label>
+            <input type="text" id="bt-nom" placeholder="ex: Archer">
+          </div>
+        </div>
+        <label>Image</label>
+        <div class="img-picker-wrap" id="bt-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="bt-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="bt-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('bt')">🖼 Choisir / importer une image</button>
+        </div>
+        <input type="hidden" id="bt-image">
+        <div class="msg-inline" id="bt-image-msg" style="margin-left:0"></div>
 
-      <label for="bt-categorie">Catégorie</label>
-      <select id="bt-categorie">
-        <option value="troupe">Troupe (recrute une unité)</option>
-        <option value="sort">Sort (statue, effet instantané…)</option>
-      </select>
-      <label for="bt-type-attaque">Type d'attaque</label>
-      <select id="bt-type-attaque">
-        <option value="melee">Mêlée</option>
-        <option value="distance">Distance</option>
-      </select>
+        <div class="champs-grille-3" style="grid-template-columns: 1fr 1fr;">
+          <div>
+            <label for="bt-categorie">Catégorie</label>
+            <select id="bt-categorie">
+              <option value="troupe">Troupe (recrute une unité)</option>
+              <option value="sort">Sort (statue, effet instantané…)</option>
+            </select>
+          </div>
+          <div>
+            <label for="bt-type-attaque">Type d'attaque</label>
+            <select id="bt-type-attaque">
+              <option value="melee">Mêlée</option>
+              <option value="distance">Distance</option>
+            </select>
+          </div>
+        </div>
 
-      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-        <div style="flex:1;min-width:120px">
-          <label for="bt-cout">Coût (or)</label>
-          <input type="number" id="bt-cout" min="0" step="1" placeholder="1">
+        <div class="champs-grille-3">
+          <div>
+            <label for="bt-cout">Coût (or)</label>
+            <input type="number" id="bt-cout" min="0" step="1" placeholder="1">
+          </div>
+          <div>
+            <label for="bt-pv">PV</label>
+            <input type="number" id="bt-pv" min="0" step="1" placeholder="100">
+          </div>
+          <div>
+            <label for="bt-degats">Dégâts</label>
+            <input type="number" id="bt-degats" min="0" step="1" placeholder="10">
+          </div>
         </div>
-        <div style="flex:1;min-width:120px">
-          <label for="bt-pv">PV</label>
-          <input type="number" id="bt-pv" min="0" step="1" placeholder="100">
+        <div class="champs-grille-3">
+          <div>
+            <label for="bt-porte">Portée (px)</label>
+            <input type="number" id="bt-porte" min="0" step="1" placeholder="34">
+          </div>
+          <div>
+            <label for="bt-vitesse-attaque">Vitesse d'attaque (att/s)</label>
+            <input type="number" id="bt-vitesse-attaque" min="0" step="0.1" placeholder="1">
+          </div>
+          <div>
+            <label for="bt-vitesse-marche">Vitesse de marche (px/s)</label>
+            <input type="number" id="bt-vitesse-marche" min="0" step="1" placeholder="40">
+          </div>
         </div>
-        <div style="flex:1;min-width:120px">
-          <label for="bt-degats">Dégâts</label>
-          <input type="number" id="bt-degats" min="0" step="1" placeholder="10">
+        <div class="champs-grille-3">
+          <div>
+            <label for="bt-activation">Temps d'activation (ms)</label>
+            <input type="number" id="bt-activation" min="0" step="1" placeholder="800">
+          </div>
+          <div>
+            <label for="bt-nombre">Nombre d'unités</label>
+            <input type="number" id="bt-nombre" min="1" step="1" placeholder="1">
+          </div>
+          <div>
+            <label for="bt-taille">Taille (multiplicateur)</label>
+            <input type="number" id="bt-taille" min="0.1" step="0.1" placeholder="1">
+          </div>
         </div>
+
+        <label for="bt-ordre">Ordre d'affichage</label>
+        <input type="number" id="bt-ordre" step="1" placeholder="1">
+
+        <label for="bt-options">Options avancées (JSON, optionnel — réservé aux sorts)</label>
+        <textarea id="bt-options" rows="3" placeholder='ex: {"placementLibre":true,"effetInstantane":true,"zoneHex":2,"degatsChateauMult":0.4}'
+          style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.85rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:monospace;"></textarea>
+        <p class="note-verrouille" style="margin-top:.3rem;">Propriétés reconnues : placementLibre, immobile, effetInstantane, zoneHex, degatsChateauMult, repousse, zoneAttaque, zoneAttaqueHex.</p>
       </div>
-      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-        <div style="flex:1;min-width:120px">
-          <label for="bt-porte">Portée (px)</label>
-          <input type="number" id="bt-porte" min="0" step="1" placeholder="34">
-        </div>
-        <div style="flex:1;min-width:120px">
-          <label for="bt-vitesse-attaque">Vitesse d'attaque (att/s)</label>
-          <input type="number" id="bt-vitesse-attaque" min="0" step="0.1" placeholder="1">
-        </div>
-        <div style="flex:1;min-width:120px">
-          <label for="bt-vitesse-marche">Vitesse de marche (px/s)</label>
-          <input type="number" id="bt-vitesse-marche" min="0" step="1" placeholder="40">
-        </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderCarteBattlogy()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-battlogy"></div>
       </div>
-      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-        <div style="flex:1;min-width:120px">
-          <label for="bt-activation">Temps d'activation (ms)</label>
-          <input type="number" id="bt-activation" min="0" step="1" placeholder="800">
-        </div>
-        <div style="flex:1;min-width:120px">
-          <label for="bt-nombre">Nombre d'unités</label>
-          <input type="number" id="bt-nombre" min="1" step="1" placeholder="1">
-        </div>
-        <div style="flex:1;min-width:120px">
-          <label for="bt-taille">Taille (multiplicateur)</label>
-          <input type="number" id="bt-taille" min="0.1" step="0.1" placeholder="1">
-        </div>
-      </div>
-
-      <label for="bt-ordre">Ordre d'affichage</label>
-      <input type="number" id="bt-ordre" step="1" placeholder="1">
-
-      <label for="bt-options">Options avancées (JSON, optionnel — réservé aux sorts)</label>
-      <textarea id="bt-options" rows="3" placeholder='ex: {"placementLibre":true,"effetInstantane":true,"zoneHex":2,"degatsChateauMult":0.4}'
-        style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.85rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:monospace;"></textarea>
-      <p class="note-verrouille" style="margin-top:.3rem;">Propriétés reconnues : placementLibre, immobile, effetInstantane, zoneHex, degatsChateauMult, repousse, zoneAttaque, zoneAttaqueHex.</p>
-
-      <button class="btn btn-primary btn-full" onclick="sauvegarderCarteBattlogy()">Enregistrer</button>
-      <div class="msg-inline" id="msg-modale-battlogy"></div>
     </div>
   </div>
 
   <!-- ===== Modale Annonce ===== -->
   <div class="modale-fond" id="modale-annonce-fond" onclick="if(event.target===this) fermerModaleAnnonce()">
     <div class="modale-admin">
-      <button class="modale-fermer" onclick="fermerModaleAnnonce()">✕</button>
-      <h2 id="titre-modale-annonce">Nouvelle annonce</h2>
-      <input type="hidden" id="a-id">
-      <label for="a-titre">Titre</label>
-      <input type="text" id="a-titre" placeholder="ex: Maintenance prévue ce week-end">
-      <label for="a-contenu">Contenu</label>
-      <textarea id="a-contenu" rows="5" placeholder="Détails de l'annonce…"
-        style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.9rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:inherit;"></textarea>
-      <p class="note-verrouille" id="a-meta" style="margin-top:.5rem;"></p>
-      <button class="btn btn-primary btn-full" onclick="sauvegarderAnnonce()">Enregistrer</button>
-      <div class="msg-inline" id="msg-modale-annonce"></div>
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-annonce">Nouvelle annonce</h2>
+        <button class="modale-fermer" onclick="fermerModaleAnnonce()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <input type="hidden" id="a-id">
+        <label for="a-titre">Titre</label>
+        <input type="text" id="a-titre" placeholder="ex: Maintenance prévue ce week-end">
+        <label for="a-contenu">Contenu</label>
+        <textarea id="a-contenu" rows="5" placeholder="Détails de l'annonce…"
+          style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.9rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:inherit;"></textarea>
+        <p class="note-verrouille" id="a-meta" style="margin-top:.5rem;"></p>
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderAnnonce()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-annonce"></div>
+      </div>
     </div>
   </div>
 
   <!-- ===== Modale picker image (partagée) ===== -->
   <div class="modale-fond" id="modale-picker-fond" onclick="if(event.target===this) fermerPickerImage()">
     <div class="modale-admin" style="max-width:520px">
-      <button class="modale-fermer" onclick="fermerPickerImage()">✕</button>
-      <h2>Choisir une image</h2>
-
-      <div class="img-picker-tabs">
-        <button class="img-picker-tab actif" id="picker-tab-upload" onclick="switchPickerTab('upload')">📤 Importer</button>
-        <button class="img-picker-tab" id="picker-tab-bib"    onclick="switchPickerTab('bib')">🗂 Bibliothèque</button>
+      <div class="modale-admin-entete">
+        <h2>Choisir une image</h2>
+        <button class="modale-fermer" onclick="fermerPickerImage()">✕</button>
       </div>
-      <div class="img-picker-body">
+      <div class="modale-admin-corps">
+        <div class="img-picker-tabs">
+          <button class="img-picker-tab actif" id="picker-tab-upload" onclick="switchPickerTab('upload')">📤 Importer</button>
+          <button class="img-picker-tab" id="picker-tab-bib"    onclick="switchPickerTab('bib')">🗂 Bibliothèque</button>
+        </div>
+        <div class="img-picker-body">
 
-        <!-- Onglet upload -->
-        <div class="img-picker-panneau actif" id="picker-panneau-upload">
-          <div class="img-upload-zone" id="picker-upload-zone" onclick="document.getElementById('picker-file-input').click()"
-               ondragover="event.preventDefault();this.classList.add('drag')"
-               ondragleave="this.classList.remove('drag')"
-               ondrop="pickerHandleDrop(event)">
-            <input type="file" id="picker-file-input" accept="image/*" onchange="pickerHandleFile(this.files[0])">
-            <div>Cliquez ou glissez-déposez une image ici</div>
-            <div style="font-size:.72rem;margin-top:.25rem">PNG, JPG, GIF, WEBP…</div>
+          <!-- Onglet upload -->
+          <div class="img-picker-panneau actif" id="picker-panneau-upload">
+            <div class="img-upload-zone" id="picker-upload-zone" onclick="document.getElementById('picker-file-input').click()"
+                 ondragover="event.preventDefault();this.classList.add('drag')"
+                 ondragleave="this.classList.remove('drag')"
+                 ondrop="pickerHandleDrop(event)">
+              <input type="file" id="picker-file-input" accept="image/*" onchange="pickerHandleFile(this.files[0])">
+              <div>Cliquez ou glissez-déposez une image ici</div>
+              <div style="font-size:.72rem;margin-top:.25rem">PNG, JPG, GIF, WEBP…</div>
+            </div>
+            <div class="img-upload-msg msg-inline" id="picker-upload-msg"></div>
           </div>
-          <div class="img-upload-msg msg-inline" id="picker-upload-msg"></div>
+
+          <!-- Onglet bibliothèque -->
+          <div class="img-picker-panneau" id="picker-panneau-bib">
+            <input class="img-bib-search" type="text" id="picker-bib-search" placeholder="Rechercher…" oninput="filtrerBiblio()">
+            <div class="img-bib-grille" id="picker-bib-grille">
+              <div class="img-bib-vide">Chargement…</div>
+            </div>
+          </div>
         </div>
 
-        <!-- Onglet bibliothèque -->
-        <div class="img-picker-panneau" id="picker-panneau-bib">
-          <input class="img-bib-search" type="text" id="picker-bib-search" placeholder="Rechercher…" oninput="filtrerBiblio()">
-          <div class="img-bib-grille" id="picker-bib-grille">
-            <div class="img-bib-vide">Chargement…</div>
-          </div>
+        <!-- Prévisualisation de la sélection en cours -->
+        <div class="img-picker-preview-wrap" style="margin-top:.75rem">
+          <img class="img-picker-preview" id="picker-preview" src="" alt="">
+          <span class="img-picker-nom-actuel" id="picker-nom-actuel">Aucune image sélectionnée</span>
         </div>
       </div>
-
-      <!-- Prévisualisation de la sélection en cours -->
-      <div class="img-picker-preview-wrap" style="margin-top:.75rem">
-        <img class="img-picker-preview" id="picker-preview" src="" alt="">
-        <span class="img-picker-nom-actuel" id="picker-nom-actuel">Aucune image sélectionnée</span>
-      </div>
-
-      <div style="display:flex;gap:.5rem;margin-top:.75rem">
-        <button class="btn btn-primary" style="flex:1" onclick="validerPickerImage()" id="picker-btn-valider" disabled>Utiliser cette image</button>
-        <button class="btn btn-secondary" onclick="fermerPickerImage()">Annuler</button>
+      <div class="modale-admin-pied">
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-primary" style="flex:1" onclick="validerPickerImage()" id="picker-btn-valider" disabled>Utiliser cette image</button>
+          <button class="btn btn-secondary" onclick="fermerPickerImage()">Annuler</button>
+        </div>
       </div>
     </div>
   </div>
