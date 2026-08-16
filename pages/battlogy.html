@@ -2004,13 +2004,32 @@
     return Math.max(unite.porte * FACTEUR_DETECTION_MIN_PORTE, canvas.width)
   }
 
-  // Une cible (unité ou point de château) est "détectée" si elle est à
-  // l'intérieur du rayon de détection ET pas franchement derrière l'unité
-  // (demi-cercle tourné vers l'avant, avec une petite tolérance pour
-  // considérer une cible "à son niveau" comme détectée même si elle est
-  // très légèrement en retrait). Impossible de détecter — ni d'être
-  // détecté par — quelqu'un strictement dans son dos.
+  // Lane (0, 1 ou 2) la plus proche d'une position x donnée — utilisé pour
+  // interdire la détection entre deux unités qui ne sont pas dans la même
+  // lane (voir estDetectable). Se base sur le centre de chaque lane plutôt
+  // que sur des bornes strictes : comme le mur (resoudreCollisions) empêche
+  // déjà toute unité de mettre un pied dans un fossé, x tombe toujours
+  // nettement plus près d'un centre de lane que d'un autre.
+  function laneDeX(x) {
+    let meilleure = 0, meilleureDist = Infinity
+    for (let lane = 0; lane < NB_LANES; lane++) {
+      const centre = MARGE + lane * (LANE_PITCH + GAP_PX) + LANE_PITCH / 2
+      const d = Math.abs(x - centre)
+      if (d < meilleureDist) { meilleureDist = d; meilleure = lane }
+    }
+    return meilleure
+  }
+
+  // Une cible (unité ou point de château) est "détectée" si elle est dans
+  // LA MÊME LANE (les 3 lanes ne se voient pas entre elles, en plus de ne
+  // pas se toucher physiquement), à l'intérieur du rayon de détection, ET
+  // pas franchement derrière l'unité (demi-cercle tourné vers l'avant,
+  // avec une petite tolérance pour considérer une cible "à son niveau"
+  // comme détectée même si elle est très légèrement en retrait).
+  // Impossible de détecter — ni d'être détecté par — quelqu'un strictement
+  // dans son dos, ou dans une autre lane.
   function estDetectable(unite, cibleX, cibleY) {
+    if (laneDeX(unite.x) !== laneDeX(cibleX)) return false
     const dx = cibleX - unite.x, dy = cibleY - unite.y
     const projection = dx * unite.dirX + dy * unite.dirY   // devant = positif
     const margeNiveau = VS * 0.5
