@@ -114,7 +114,12 @@
     .battlogy-bottombar {
       width: 100%;
       flex: 0 0 auto;
-      min-height: 84px;
+      /* Hauteur fixe (et non plus min-height) : la barre ne doit jamais
+         grandir, même quand la main est pleine (5 cartes) — sinon l'arène
+         (flex:1 juste au-dessus) rétrécit d'autant et toute la mise en
+         page se décale. Les cartes qui ne tiennent pas en largeur défilent
+         horizontalement dans #main-cartes plutôt que de passer à la ligne. */
+      height: 100px;
       border: 1px solid var(--couleur-bordure);
       border-radius: 12px;
       display: flex;
@@ -337,7 +342,21 @@
     .arena-overlay-carte .btn-group { margin-top: 0; }
 
     /* ═══ Barre du bas : or, main dynamique, pioche d'urgence ═══ */
-    #main-cartes { display: flex; align-items: center; gap: .5rem; flex: 1 1 auto; flex-wrap: wrap; }
+    #main-cartes {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      flex: 1 1 auto;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      min-width: 0;
+      /* Un peu de marge verticale pour que le halo/transform des cartes
+         (:active { transform: scale(0.96) }) ne soit jamais rogné par
+         l'overflow-x du conteneur. */
+      padding: 2px 0;
+      scrollbar-width: thin;
+    }
     .carte-main.cout-eleve { filter: grayscale(.5); }
     .btn-pioche-urgence {
       flex: 0 0 auto;
@@ -648,6 +667,15 @@
   let gridOffsetY  // y où commence la grille
   let gridH        // hauteur réelle de la grille
   let zoneJoueurYMax  // limite basse (haut du château) de la grille jouable
+  // Rayon (en px) d'une unité de taille 1, recalculé à chaque initArena()
+  // en proportion de R (voir RATIO_RAYON_UNITE plus bas) : avant, ce rayon
+  // était une constante fixe (14px), indépendante de R — comme R dépend de
+  // la largeur/hauteur disponible (donc du zoom du navigateur au moment du
+  // chargement), les unités paraissaient trop grandes ou trop petites par
+  // rapport à la grille selon le zoom en cours au démarrage. En l'exprimant
+  // en proportion de R, le rapport taille-unité/taille-case reste toujours
+  // le même, quel que soit le zoom ou la taille de fenêtre.
+  let RAYON_UNITE_BASE
 
   // ─── Cartes (données en dur, pour les tests) ──────────────────
   // porte en px, vitesseMarche en px/s, vitesseAttaque en attaques/seconde,
@@ -767,9 +795,12 @@
     return `<span class="${classe}">${carte.emoji || '❔'}</span>`
   }
 
-  // Rayon (en px) d'une unité de taille 1. Tous les rayons d'unité se
-  // calculent en multipliant cette base par `taille`.
-  const RAYON_UNITE_BASE = 14
+  // Ratio rayon-unité / R : 14 était la valeur fixe historique, et R vaut
+  // typiquement autour de 14 sur une fenêtre desktop courante — ce ratio
+  // reproduit donc la même apparence par défaut, tout en s'adaptant
+  // désormais correctement à R (voir RAYON_UNITE_BASE, déclaré plus haut,
+  // recalculé dans initArena()).
+  const RATIO_RAYON_UNITE = 1
 
   // ─── Deck / Main / Or : constantes de jeu ──────────────────────
   const DECK_TAILLE           = 8   // 8 emplacements (+1 emplacement spécial verrouillé, voir modale d'édition)
@@ -1091,6 +1122,7 @@
     R  = Math.max(6, Math.min(Rw, Rh))
     HS = R * 1.5           // espacement horizontal entre centres de colonnes
     VS = R * Math.sqrt(3)  // espacement vertical entre centres de rangées
+    RAYON_UNITE_BASE = R * RATIO_RAYON_UNITE
 
     gridOffsetY = CASTLE_PX + 6
 
