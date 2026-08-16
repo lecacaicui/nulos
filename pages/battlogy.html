@@ -148,17 +148,22 @@
       margin-right: .25rem;
     }
 
-    /* ═══ Jauge d'or : barre de progression current/max, lisible d'un coup d'œil ═══ */
+    /* ═══ Jauge d'or : barre de progression current/max, lisible d'un coup
+       d'œil. Largeur non fixe : elle s'élargit avec orCapaciteMax (voir
+       mettreAJourLargeurJaugeOr()) pour visualiser la capacité, pas
+       seulement le remplissage. La valeur ci-dessous n'est que la largeur
+       de départ (orCapaciteMax initial = 3), écrasée en JS ensuite. ═══ */
     .or-jauge {
       position: relative;
       flex: 0 0 auto;
       width: 108px;
-      height: 30px;
+      height: 42px;
       border-radius: 999px;
       background: var(--couleur-fond);
       border: 1px solid var(--couleur-bordure);
       overflow: hidden;
       margin-right: .4rem;
+      transition: width .25s ease;
     }
     .or-jauge-remplissage {
       position: absolute;
@@ -174,7 +179,7 @@
       align-items: center;
       justify-content: center;
       height: 100%;
-      font-size: .78rem;
+      font-size: .95rem;
       font-weight: 700;
       color: #1a1a1a;
       text-shadow: 0 1px 0 rgba(255,255,255,.35);
@@ -185,8 +190,8 @@
     .pioche-jauge {
       position: relative;
       flex: 0 0 auto;
-      width: 32px;
-      height: 32px;
+      width: 46px;
+      height: 46px;
       border-radius: 50%;
       background: var(--couleur-bordure);
       margin-right: .5rem;
@@ -204,7 +209,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: .8rem;
+      font-size: 1.15rem;
       filter: drop-shadow(0 1px 2px rgba(0,0,0,.6));
     }
     .carte-main {
@@ -351,6 +356,8 @@
     #main-cartes {
       display: flex;
       align-items: center;
+      justify-content: center;
+      justify-content: safe center;
       gap: .5rem;
       flex: 1 1 auto;
       flex-wrap: nowrap;
@@ -821,6 +828,11 @@
   const MULT_INITIAL_PAS_CHER = 2     // bonus de tirage (main de départ uniquement) si coût <= 3
   const OR_CAPACITE_DEPART    = 3
   const OR_CAPACITE_MAX       = 12
+  // Largeur (px) de la jauge d'or aux deux bornes de capacité — la jauge
+  // s'élargit progressivement entre les deux à mesure que orCapaciteMax
+  // augmente en cours de partie (voir mettreAJourLargeurJaugeOr()).
+  const OR_JAUGE_LARGEUR_MIN  = 108
+  const OR_JAUGE_LARGEUR_MAX  = 240
   const PIOCHE_URGENCE_COUT   = 5
   const PIOCHE_URGENCE_NB     = 2
 
@@ -1062,11 +1074,22 @@
   }
 
   // ─── Rendu de la barre du bas (or + main + pioche d'urgence) ────
+  // Largeur de la jauge d'or, interpolée entre OR_JAUGE_LARGEUR_MIN (à
+  // orCapaciteMax == OR_CAPACITE_DEPART) et OR_JAUGE_LARGEUR_MAX (à
+  // orCapaciteMax == OR_CAPACITE_MAX) : la jauge s'élargit visuellement à
+  // mesure que la capacité max grandit, pas seulement son remplissage.
+  function mettreAJourLargeurJaugeOr() {
+    const proportion = (orCapaciteMax - OR_CAPACITE_DEPART) / (OR_CAPACITE_MAX - OR_CAPACITE_DEPART)
+    const largeur = OR_JAUGE_LARGEUR_MIN + proportion * (OR_JAUGE_LARGEUR_MAX - OR_JAUGE_LARGEUR_MIN)
+    document.getElementById('or-jauge').style.width = Math.round(largeur) + 'px'
+  }
+
   function renderMain() {
     document.getElementById('or-affiche').textContent = or
     document.getElementById('or-cap-affiche').textContent = orCapaciteMax
     document.getElementById('or-jauge-remplissage').style.width =
       Math.min(100, (or / orCapaciteMax) * 100) + '%'
+    mettreAJourLargeurJaugeOr()
 
     const conteneur = document.getElementById('main-cartes')
     conteneur.innerHTML = main.map((item, i) => {
