@@ -41,8 +41,15 @@ function genererCodeLobby(longueur = 5) {
  * Crée un lobby pour l'utilisateur donné et retourne { ok, lobby } (ou
  * { ok: false, error }). En cas de collision de code (contrainte unique),
  * réessaie automatiquement avec un nouveau code.
+ *
+ * Supprime d'abord tout ancien lobby « en_attente » appartenant à ce même
+ * utilisateur : ça nettoie les lobbies orphelins laissés par un
+ * rechargement/fermeture de page qui n'a pas pu passer par annulerLobby.
  */
 export async function creerLobby(userId, username, tentativesRestantes = 5) {
+  await db.from('battlogy_lobbies').delete()
+    .eq('hote_user_id', userId).eq('statut', 'en_attente')
+
   const code = genererCodeLobby()
   const { data, error } = await db.from('battlogy_lobbies')
     .insert([{ code, hote_user_id: userId, hote_username: username }])
@@ -102,4 +109,40 @@ export function ecouterLobby(lobbyId, onChange) {
     .subscribe()
 
   return () => db.removeChannel(canal)
+}
+
+/** Jeton d'accès de la session en cours, nécessaire pour quitterLobbyBeacon
+ * (appelée hors du cycle de vie normal de la page, donc sans pouvoir
+ * attendre un appel asynchrone classique). */
+export async function recupererJetonAcces() {
+  const { data } = await db.auth.getSession()
+  return data?.session?.access_token ?? null
+}
+
+/**
+ * Version « best-effort » de annulerLobby/quitterLobby, pensée pour un
+ * handler `pagehide` (fermeture d'onglet ou rechargement) : une requête
+ * fetch classique risque de ne pas avoir le temps d'aboutir une fois la
+ * page en train de se décharger, donc on utilise `keepalive` pour que le
+ * navigateur termine la requête même après le déchargement.
+ * Ce n'est pas garanti à 100 % (selon navigateur/OS), mais couvre la
+ * grande majorité des cas de fermeture/rechargement normaux.
+ */
+export function quitterLobbyBeacon(lobbyId, accessToken, role) {
+  if (!lobbyId || !accessToken) return
+  const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: 'Bearer ' + accessToken,
+    'Content-Type': 'application/json'
+  }
+  if (role === 'hote') {
+    fetch(`${SUPABASE_URL}/rest/v1/battlogy_lobbies?id=eq.${lobbyId}`, {
+      method: 'DELETE', headers, keepalive: true
+    }).catch(() => {})
+  } else {
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/quitter_lobby`, {
+      method: 'POST', headers, keepalive: true,
+      body: JSON.stringify({ p_lobby_id: lobbyId })
+    }).catch(() => {})
+  }
 }
