@@ -565,6 +565,31 @@
 
     .modale-deck-actions { display: flex; gap: .6rem; margin-top: 1.5rem; }
     .modale-deck-actions .btn { flex: 1; }
+
+    /* ===== Modale lobby (attente d'un adversaire) ===== */
+    .modale-lobby {
+      background: var(--couleur-conteneur);
+      border-radius: 14px;
+      padding: 1.75rem;
+      max-width: 340px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.35);
+    }
+    .modale-lobby h2 { font-size: 1.15rem; margin-bottom: .5rem; }
+    .modale-lobby-texte { font-size: .85rem; color: var(--couleur-texte-faible); margin-bottom: 1.25rem; }
+    .modale-lobby-code {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: .25em;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: .75rem .5rem;
+      margin-bottom: 1.25rem;
+    }
+    .modale-lobby .btn { margin-top: .6rem; }
   </style>
 </head>
 <body>
@@ -628,9 +653,22 @@
     </div>
   </div>
 
+  <!-- ═══ Modale d'attente de lobby ═══ -->
+  <div class="modale-fond" id="modale-lobby-fond" onclick="if(event.target===this) fermerModaleLobby()">
+    <div class="modale-lobby">
+      <button class="modale-fermer" onclick="fermerModaleLobby()">✕</button>
+      <h2>🕓 En attente d'un adversaire</h2>
+      <p class="modale-lobby-texte">Partage ce code à ton adversaire pour qu'il puisse te rejoindre.</p>
+      <div class="modale-lobby-code" id="modale-lobby-code">-----</div>
+      <button class="btn btn-secondary btn-full" id="btn-copier-code">📋 Copier le code</button>
+      <button class="btn btn-danger btn-full" id="btn-annuler-lobby">Annuler le lobby</button>
+    </div>
+  </div>
+
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
     import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck, chargerCartesJeu } from '../script/battlogy.js'
+    import { creerLobby, annulerLobby } from '../script/lobby.js'
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -653,7 +691,7 @@
 
       // Rend la sauvegarde accessible au script de jeu (classique, pas
       // module) plus bas dans la page — voir sauvegarderCompositionDeck.
-      window.BattlogyDB = { userId, sauvegarderDeck }
+      window.BattlogyDB = { userId, sauvegarderDeck, creerLobby, annulerLobby }
 
       if (userId) {
         const [cartes, deck] = await Promise.all([
@@ -3085,12 +3123,49 @@
 
   document.getElementById('btn-editer-deck').addEventListener('click', ouvrirModaleDeck)
 
-  // ─── Lobby (à venir) ──────────────────────────────────────────
-  // Pas encore de logique de lobby/multijoueur : ces boutons sont pour
-  // l'instant de simples placeholders, prêts à être branchés plus tard.
-  document.getElementById('btn-creer-lobby').addEventListener('click', () => {
-    afficherMessage('Création de lobby — bientôt disponible !')
+  // ─── Lobby : création (rejoindre reste à brancher à l'étape suivante) ──
+  let lobbyActuel = null // ligne BDD du lobby en attente, ou null
+
+  document.getElementById('btn-creer-lobby').addEventListener('click', async () => {
+    const userId = window.BattlogyDB?.userId
+    if (!userId) { afficherMessage('Connecte-toi pour créer un lobby.'); return }
+
+    const btn = document.getElementById('btn-creer-lobby')
+    const texteInitial = btn.textContent
+    btn.disabled = true
+    btn.textContent = 'Création…'
+
+    const resultat = await window.BattlogyDB.creerLobby(userId, localStorage.getItem('username'))
+
+    btn.disabled = false
+    btn.textContent = texteInitial
+
+    if (!resultat.ok) { afficherMessage('Impossible de créer le lobby.'); return }
+
+    lobbyActuel = resultat.lobby
+    document.getElementById('modale-lobby-code').textContent = lobbyActuel.code
+    document.getElementById('modale-lobby-fond').classList.add('ouverte')
   })
+
+  document.getElementById('btn-copier-code').addEventListener('click', () => {
+    if (!lobbyActuel) return
+    navigator.clipboard.writeText(lobbyActuel.code).then(() => afficherMessage('Code copié !'))
+  })
+
+  document.getElementById('btn-annuler-lobby').addEventListener('click', fermerModaleLobby)
+
+  // Ferme la fenêtre d'attente ET annule le lobby en BDD (X, fond, ou
+  // bouton « Annuler ») : un lobby en attente ne doit jamais rester
+  // orphelin si l'hôte quitte l'écran.
+  window.fermerModaleLobby = async function() {
+    document.getElementById('modale-lobby-fond').classList.remove('ouverte')
+    if (lobbyActuel) {
+      const id = lobbyActuel.id
+      lobbyActuel = null
+      await window.BattlogyDB.annulerLobby(id)
+    }
+  }
+
   document.getElementById('btn-rejoindre-lobby').addEventListener('click', () => {
     afficherMessage('Rejoindre un lobby — bientôt disponible !')
   })
