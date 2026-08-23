@@ -702,7 +702,7 @@
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
     import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck, chargerCartesJeu } from '../script/battlogy.js'
-    import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby } from '../script/lobby.js'
+    import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, recupererJetonAcces, quitterLobbyBeacon } from '../script/lobby.js'
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -722,10 +722,11 @@
 
       const { data: session } = await db.auth.getUser()
       const userId = session?.user?.id ?? null
+      const accessToken = await recupererJetonAcces()
 
       // Rend la sauvegarde accessible au script de jeu (classique, pas
       // module) plus bas dans la page — voir sauvegarderCompositionDeck.
-      window.BattlogyDB = { userId, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby }
+      window.BattlogyDB = { userId, accessToken, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, quitterLobbyBeacon }
 
       if (userId) {
         const [cartes, deck] = await Promise.all([
@@ -3169,6 +3170,19 @@
   let salleActuelle = null   // ligne BDD du lobby affiché dans la salle d'attente
   let estHoteSalle = false   // true si l'utilisateur courant est l'hôte de salleActuelle
   let arreterEcouteLobby = null // fonction pour se désabonner du canal Realtime en cours
+
+  // Filet de sécurité : si l'onglet est fermé ou rechargé pendant qu'on
+  // est dans une salle d'attente, on tente de nettoyer côté Supabase
+  // (annuler si on est l'hôte, quitter si on est l'invité). Voir
+  // quitterLobbyBeacon dans lobby.js — best-effort, pas garanti à 100 %.
+  window.addEventListener('pagehide', () => {
+    if (!salleActuelle || !window.BattlogyDB?.accessToken) return
+    window.BattlogyDB.quitterLobbyBeacon(
+      salleActuelle.id,
+      window.BattlogyDB.accessToken,
+      estHoteSalle ? 'hote' : 'invite'
+    )
+  })
 
   function renderParticipantsSalle(lobby) {
     document.getElementById('salle-participants').innerHTML = `
