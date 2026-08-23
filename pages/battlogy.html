@@ -703,7 +703,7 @@
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
     import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck, chargerCartesJeu } from '../script/battlogy.js'
-    import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, recupererJetonAcces, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie } from '../script/lobby.js'
+    import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, recupererJetonAcces, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie, envoyerAbandonBeacon } from '../script/lobby.js'
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -727,7 +727,7 @@
 
       // Rend la sauvegarde accessible au script de jeu (classique, pas
       // module) plus bas dans la page — voir sauvegarderCompositionDeck.
-      window.BattlogyDB = { userId, accessToken, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie }
+      window.BattlogyDB = { userId, accessToken, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie, envoyerAbandonBeacon }
 
       if (userId) {
         const [cartes, deck] = await Promise.all([
@@ -3095,7 +3095,8 @@
     canalPartie = window.BattlogyDB.ouvrirCanalPartie(lobby.id, {
       surCoupJoue:  rolePvP === 'hote'   ? recevoirCoupInvite    : null,
       surEtat:      rolePvP === 'invite' ? recevoirEtatHote      : null,
-      surFinPartie: rolePvP === 'invite' ? recevoirFinPartieHote : null
+      surFinPartie: rolePvP === 'invite' ? recevoirFinPartieHote : null,
+      surAbandon:   recevoirAbandonAdversaire
     })
 
     demarrerPartie() // réutilise l'init existante (deck, main, or, PV châteaux…)
@@ -3228,6 +3229,26 @@
     partieTerminee = true
     afficherResultatPartie(!payload.victoireHote)
     quitterModePvP()
+  }
+
+  // ── L'un des deux joueurs a fermé/rechargé la page en pleine partie
+  // (voir envoyerAbandonBeacon, envoyé depuis le listener 'pagehide' plus
+  // bas) : forfait immédiat, victoire à l'adversaire resté en jeu.
+  function recevoirAbandonAdversaire() {
+    if (modePartie !== 'pvp' || partieTerminee) return
+    if (rolePvP === 'hote') {
+      // C'est l'invité qui a abandonné : l'hôte reste seul juge (source de
+      // vérité habituelle), donc on passe par le circuit normal — ça
+      // notifie aussi correctement l'invité si jamais il revenait.
+      terminerPartie(true)
+    } else {
+      // C'est l'hôte qui a abandonné : il ne peut plus notifier
+      // officiellement via 'fin_partie' (sa page est en train de se
+      // fermer), donc l'invité déclare directement sa propre victoire.
+      partieTerminee = true
+      afficherResultatPartie(true)
+      quitterModePvP()
+    }
   }
 
   renderMain()
@@ -3401,13 +3422,29 @@
   // est dans une salle d'attente, on tente de nettoyer côté Supabase
   // (annuler si on est l'hôte, quitter si on est l'invité). Voir
   // quitterLobbyBeacon dans lobby.js — best-effort, pas garanti à 100 %.
+  //
+  // Même principe si l'onglet est fermé/rechargé en pleine PARTIE JcJ
+  // (pas juste la salle d'attente) : on signale un abandon à l'adversaire
+  // via envoyerAbandonBeacon, qui déclare aussitôt sa victoire par forfait
+  // (voir recevoirAbandonAdversaire plus haut).
   window.addEventListener('pagehide', () => {
-    if (!salleActuelle || !window.BattlogyDB?.accessToken) return
-    window.BattlogyDB.quitterLobbyBeacon(
-      salleActuelle.id,
-      window.BattlogyDB.accessToken,
-      estHoteSalle ? 'hote' : 'invite'
-    )
+    if (!window.BattlogyDB?.accessToken) return
+
+    if (salleActuelle) {
+      window.BattlogyDB.quitterLobbyBeacon(
+        salleActuelle.id,
+        window.BattlogyDB.accessToken,
+        estHoteSalle ? 'hote' : 'invite'
+      )
+    }
+
+    if (modePartie === 'pvp' && lobbyPvPActuel && !partieTerminee) {
+      window.BattlogyDB.envoyerAbandonBeacon(
+        lobbyPvPActuel.id,
+        window.BattlogyDB.accessToken,
+        rolePvP
+      )
+    }
   })
 
   function renderParticipantsSalle(lobby) {
