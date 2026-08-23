@@ -1937,7 +1937,12 @@
       // dégâts, un point c'est tout (voir mettreAJourUnite).
       immobile: !!carte.immobile,
       etat: carte.immobile ? 'immobile' : 'activation',
-      statuts: []
+      statuts: [],
+      // Vitesse de projection en cours (px/s), suite à un effet de
+      // repousse (ex: Bombe à eau) — voir appliquerDegatsZone et
+      // mettreAJourKnockback. Nulle tant qu'aucune repousse n'est en cours.
+      knockbackVx: 0,
+      knockbackVy: 0
     }
     ;(team === 'joueur' ? unitesJoueur : unitesEnnemi).push(unite)
     declencherEffetArrivee(unite, carte)
@@ -2146,8 +2151,41 @@
     return estDetectable(unite, c.x, c.y)
   }
 
+  // ─── Repousse (knockback) : projection avec décélération ──────────────
+  // Au lieu de déplacer l'unité d'un coup (téléportation), un effet de
+  // repousse (voir appliquerDegatsZone) lui donne une vitesse de
+  // projection initiale, appliquée puis freinée frame après frame ici :
+  // départ rapide, décélération nette dans les frames qui suivent. La
+  // distance totale parcourue reste ≈ la valeur `repousse` d'origine
+  // (voir le calcul de REPOUSSE_VITESSE_FACTEUR ci-dessous).
+  //
+  // FACTEUR_FREINAGE_REPOUSSE : fraction de vitesse conservée à chaque
+  // frame (0.8 = perte de 20 %/frame, freinage très net en quelques
+  // frames). REPOUSSE_VITESSE_FACTEUR convertit une distance cible en
+  // vitesse initiale (px/s) telle que la somme géométrique des
+  // déplacements décroissants totalise environ cette distance, pour un
+  // jeu tournant à ~60 img/s.
+  const FACTEUR_FREINAGE_REPOUSSE = 0.8
+  const REPOUSSE_VITESSE_FACTEUR = 12
+
+  function mettreAJourKnockback(unite, dt) {
+    if (!unite.knockbackVx && !unite.knockbackVy) return
+    const s = dt / 1000
+    unite.x += unite.knockbackVx * s
+    unite.y += unite.knockbackVy * s
+    unite.knockbackVx *= FACTEUR_FREINAGE_REPOUSSE
+    unite.knockbackVy *= FACTEUR_FREINAGE_REPOUSSE
+    // Sous ce seuil la vitesse résiduelle est imperceptible : on coupe
+    // net plutôt que de la traîner indéfiniment.
+    if (Math.hypot(unite.knockbackVx, unite.knockbackVy) < 2) {
+      unite.knockbackVx = 0
+      unite.knockbackVy = 0
+    }
+  }
+
   function mettreAJourUnite(unite, dt) {
     if (unite.pv <= 0) return
+    mettreAJourKnockback(unite, dt) // projection en cours (repousse), indépendante de l'IA de marche
     mettreAJourStatuts(unite, dt) // dégâts sur la durée, même immobile (statue qui brûle)
     if (unite.pv <= 0) return // le statut a pu achever l'unité ce tick
     if (unite.immobile) return // encaisse les dégâts/statuts, rien d'autre
@@ -2282,8 +2320,11 @@
       if (statut && u.pv > 0) appliquerStatut(u, statut.type, statut.duree, statut.params || {})
       if (repousse > 0 && u.pv > 0 && !u.immobile) {
         const n = d > 0.001 ? d : 1
-        u.x += (dx / n) * repousse
-        u.y += (dy / n) * repousse
+        // Impulsion de vitesse à l'opposé du point d'impact, plutôt qu'un
+        // déplacement instantané : voir mettreAJourKnockback pour le
+        // freinage progressif appliqué frame après frame.
+        u.knockbackVx = (dx / n) * repousse * REPOUSSE_VITESSE_FACTEUR
+        u.knockbackVy = (dy / n) * repousse * REPOUSSE_VITESSE_FACTEUR
       }
     }
     if (multChateau > 0) {
