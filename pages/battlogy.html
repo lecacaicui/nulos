@@ -590,6 +590,28 @@
       margin-bottom: 1.25rem;
     }
     .modale-lobby .btn { margin-top: .6rem; }
+    .modale-lobby input[type="text"] { text-align: center; text-transform: uppercase; letter-spacing: .2em; font-weight: 700; }
+
+    .salle-participants { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1.25rem; }
+    .salle-joueur {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: .65rem .9rem;
+      font-size: .9rem;
+      font-weight: 600;
+    }
+    .salle-joueur .role {
+      font-size: .68rem;
+      font-weight: 700;
+      color: var(--couleur-texte-faible);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .salle-joueur.vide { color: var(--couleur-texte-faible); font-weight: 400; font-style: italic; }
   </style>
 </head>
 <body>
@@ -653,22 +675,34 @@
     </div>
   </div>
 
-  <!-- ═══ Modale d'attente de lobby ═══ -->
-  <div class="modale-fond" id="modale-lobby-fond" onclick="if(event.target===this) fermerModaleLobby()">
+  <!-- ═══ Modale : rejoindre un lobby (saisie du code) ═══ -->
+  <div class="modale-fond" id="modale-rejoindre-fond" onclick="if(event.target===this) fermerModaleRejoindre()">
     <div class="modale-lobby">
-      <button class="modale-fermer" onclick="fermerModaleLobby()">✕</button>
-      <h2>🕓 En attente d'un adversaire</h2>
-      <p class="modale-lobby-texte">Partage ce code à ton adversaire pour qu'il puisse te rejoindre.</p>
-      <div class="modale-lobby-code" id="modale-lobby-code">-----</div>
-      <button class="btn btn-secondary btn-full" id="btn-copier-code">📋 Copier le code</button>
-      <button class="btn btn-danger btn-full" id="btn-annuler-lobby">Annuler le lobby</button>
+      <button class="modale-fermer" onclick="fermerModaleRejoindre()">✕</button>
+      <h2>🔑 Rejoindre un lobby</h2>
+      <p class="modale-lobby-texte">Entre le code partagé par ton adversaire.</p>
+      <input type="text" id="input-code-lobby" placeholder="Ex : 7K2QM" maxlength="5" autocomplete="off">
+      <div class="msg" id="msg-rejoindre-lobby"></div>
+      <button class="btn btn-primary btn-full" id="btn-confirmer-rejoindre">Rejoindre</button>
+    </div>
+  </div>
+
+  <!-- ═══ Modale : salle d'attente (hôte ou invité) ═══ -->
+  <div class="modale-fond" id="modale-salle-fond">
+    <div class="modale-lobby">
+      <button class="modale-fermer" id="btn-fermer-salle">✕</button>
+      <h2>🕓 Salle d'attente</h2>
+      <div class="modale-lobby-code" id="modale-salle-code">-----</div>
+      <div class="salle-participants" id="salle-participants"></div>
+      <button class="btn btn-secondary btn-full" id="btn-copier-code" style="display:none">📋 Copier le code</button>
+      <button class="btn btn-danger btn-full" id="btn-quitter-salle">Quitter la salle</button>
     </div>
   </div>
 
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
     import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck, chargerCartesJeu } from '../script/battlogy.js'
-    import { creerLobby, annulerLobby } from '../script/lobby.js'
+    import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby } from '../script/lobby.js'
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -691,7 +725,7 @@
 
       // Rend la sauvegarde accessible au script de jeu (classique, pas
       // module) plus bas dans la page — voir sauvegarderCompositionDeck.
-      window.BattlogyDB = { userId, sauvegarderDeck, creerLobby, annulerLobby }
+      window.BattlogyDB = { userId, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby }
 
       if (userId) {
         const [cartes, deck] = await Promise.all([
@@ -3123,9 +3157,72 @@
 
   document.getElementById('btn-editer-deck').addEventListener('click', ouvrirModaleDeck)
 
-  // ─── Lobby : création (rejoindre reste à brancher à l'étape suivante) ──
-  let lobbyActuel = null // ligne BDD du lobby en attente, ou null
+  // ─── Lobby : création, participation et salle d'attente ────────
+  // Échappe les caractères HTML spéciaux avant d'insérer un pseudo (venant
+  // de la BDD) dans le DOM via innerHTML.
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  }
 
+  let salleActuelle = null   // ligne BDD du lobby affiché dans la salle d'attente
+  let estHoteSalle = false   // true si l'utilisateur courant est l'hôte de salleActuelle
+  let arreterEcouteLobby = null // fonction pour se désabonner du canal Realtime en cours
+
+  function renderParticipantsSalle(lobby) {
+    document.getElementById('salle-participants').innerHTML = `
+      <div class="salle-joueur">
+        <span>${esc(lobby.hote_username)}</span>
+        <span class="role">Hôte</span>
+      </div>
+      <div class="salle-joueur ${lobby.invite_username ? '' : 'vide'}">
+        <span>${lobby.invite_username ? esc(lobby.invite_username) : 'En attente d\u2019un adversaire…'}</span>
+        <span class="role">${lobby.invite_username ? 'Adversaire' : ''}</span>
+      </div>`
+  }
+
+  function afficherSalle(lobby, estHote) {
+    salleActuelle = lobby
+    estHoteSalle = estHote
+    document.getElementById('modale-salle-code').textContent = lobby.code
+    document.getElementById('btn-copier-code').style.display = estHote ? 'block' : 'none'
+    renderParticipantsSalle(lobby)
+    document.getElementById('modale-salle-fond').classList.add('ouverte')
+
+    if (arreterEcouteLobby) arreterEcouteLobby()
+    arreterEcouteLobby = window.BattlogyDB.ecouterLobby(lobby.id, (majOuNull) => {
+      if (!majOuNull) {
+        // Le lobby a été supprimé (hôte parti, ou nous-même) : on referme.
+        afficherMessage(estHoteSalle ? 'Lobby fermé.' : "L'hôte a annulé le lobby.")
+        fermerSalle(false)
+        return
+      }
+      salleActuelle = majOuNull
+      renderParticipantsSalle(salleActuelle)
+    })
+  }
+
+  async function fermerSalle(quitterServeur) {
+    document.getElementById('modale-salle-fond').classList.remove('ouverte')
+    if (arreterEcouteLobby) { arreterEcouteLobby(); arreterEcouteLobby = null }
+
+    if (quitterServeur && salleActuelle) {
+      if (estHoteSalle) await window.BattlogyDB.annulerLobby(salleActuelle.id)
+      else await window.BattlogyDB.quitterLobby(salleActuelle.id)
+    }
+    salleActuelle = null
+  }
+
+  document.getElementById('btn-fermer-salle').addEventListener('click', () => fermerSalle(true))
+  document.getElementById('btn-quitter-salle').addEventListener('click', () => fermerSalle(true))
+
+  document.getElementById('btn-copier-code').addEventListener('click', () => {
+    if (!salleActuelle) return
+    navigator.clipboard.writeText(salleActuelle.code).then(() => afficherMessage('Code copié !'))
+  })
+
+  // ── Créer un lobby ──
   document.getElementById('btn-creer-lobby').addEventListener('click', async () => {
     const userId = window.BattlogyDB?.userId
     if (!userId) { afficherMessage('Connecte-toi pour créer un lobby.'); return }
@@ -3141,33 +3238,54 @@
     btn.textContent = texteInitial
 
     if (!resultat.ok) { afficherMessage('Impossible de créer le lobby.'); return }
-
-    lobbyActuel = resultat.lobby
-    document.getElementById('modale-lobby-code').textContent = lobbyActuel.code
-    document.getElementById('modale-lobby-fond').classList.add('ouverte')
+    afficherSalle(resultat.lobby, true)
   })
 
-  document.getElementById('btn-copier-code').addEventListener('click', () => {
-    if (!lobbyActuel) return
-    navigator.clipboard.writeText(lobbyActuel.code).then(() => afficherMessage('Code copié !'))
+  // ── Rejoindre un lobby (saisie du code) ──
+  document.getElementById('btn-rejoindre-lobby').addEventListener('click', () => {
+    document.getElementById('input-code-lobby').value = ''
+    document.getElementById('msg-rejoindre-lobby').textContent = ''
+    document.getElementById('modale-rejoindre-fond').classList.add('ouverte')
+    document.getElementById('input-code-lobby').focus()
   })
 
-  document.getElementById('btn-annuler-lobby').addEventListener('click', fermerModaleLobby)
-
-  // Ferme la fenêtre d'attente ET annule le lobby en BDD (X, fond, ou
-  // bouton « Annuler ») : un lobby en attente ne doit jamais rester
-  // orphelin si l'hôte quitte l'écran.
-  window.fermerModaleLobby = async function() {
-    document.getElementById('modale-lobby-fond').classList.remove('ouverte')
-    if (lobbyActuel) {
-      const id = lobbyActuel.id
-      lobbyActuel = null
-      await window.BattlogyDB.annulerLobby(id)
-    }
+  window.fermerModaleRejoindre = function() {
+    document.getElementById('modale-rejoindre-fond').classList.remove('ouverte')
   }
 
-  document.getElementById('btn-rejoindre-lobby').addEventListener('click', () => {
-    afficherMessage('Rejoindre un lobby — bientôt disponible !')
+  async function confirmerRejoindre() {
+    const userId = window.BattlogyDB?.userId
+    if (!userId) { afficherMessage('Connecte-toi pour rejoindre un lobby.'); return }
+
+    const code = document.getElementById('input-code-lobby').value.trim()
+    const msgEl = document.getElementById('msg-rejoindre-lobby')
+    if (!code) { msgEl.textContent = 'Entre un code.'; msgEl.className = 'msg err'; return }
+
+    const btn = document.getElementById('btn-confirmer-rejoindre')
+    btn.disabled = true
+    btn.textContent = 'Connexion…'
+
+    const resultat = await window.BattlogyDB.rejoindreLobby(code, localStorage.getItem('username'))
+
+    btn.disabled = false
+    btn.textContent = 'Rejoindre'
+
+    if (!resultat.ok) {
+      const message = resultat.error?.message || ''
+      msgEl.textContent = message.includes('complet') ? 'Ce lobby est déjà complet.'
+        : message.includes('propre') ? 'Tu ne peux pas rejoindre ton propre lobby.'
+        : 'Lobby introuvable ou déjà commencé.'
+      msgEl.className = 'msg err'
+      return
+    }
+
+    window.fermerModaleRejoindre()
+    afficherSalle(resultat.lobby, false)
+  }
+
+  document.getElementById('btn-confirmer-rejoindre').addEventListener('click', confirmerRejoindre)
+  document.getElementById('input-code-lobby').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmerRejoindre()
   })
 
   // ── Clic : équiper / retirer (mobile-friendly, sans drag) ──
