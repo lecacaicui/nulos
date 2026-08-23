@@ -223,14 +223,28 @@
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
     ;(async () => {
-      if (!localStorage.getItem('username')) {
-        window.location.href = 'connexion.html'
-        return
-      }
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')
       await chargerFooter('../')
+
+      if (!localStorage.getItem('username')) {
+        // Mode non connecté : pas de redirect forcé, on affiche un état
+        // "invité" avec un lien vers la connexion.
+        document.getElementById('profil-avatar').textContent = '?'
+        document.getElementById('profil-username').textContent = 'Non connecté'
+        document.getElementById('info-username').textContent = '—'
+        document.getElementById('info-niveau').textContent = '—'
+        const tagNiveau = document.getElementById('profil-niveau')
+        tagNiveau.textContent = 'invité'
+        tagNiveau.className = 'header-tag tag-commun'
+        document.getElementById('badges-grille').innerHTML =
+          `<div style="grid-column:1/-1;font-size:.85rem;color:var(--couleur-texte-faible);">
+             Connectez-vous pour voir votre profil et vos badges —
+             <a href="connexion.html" style="color:var(--couleur-bouton);">se connecter</a>
+           </div>`
+        return
+      }
 
       const username = localStorage.getItem('username')
       const niveau   = localStorage.getItem('niveau') ?? 'commun'

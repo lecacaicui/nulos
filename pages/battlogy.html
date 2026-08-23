@@ -706,10 +706,11 @@
     import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, recupererJetonAcces, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie, envoyerAbandonBeacon } from '../script/lobby.js'
 
     ;(async () => {
-      if (!localStorage.getItem('username')) {
-        window.location.href = 'connexion.html'
-        return
-      }
+      // Mode non connecté : on ne bloque plus l'accès à la page. Un
+      // visiteur non connecté peut jouer en solo avec les cartes/deck par
+      // défaut ; les actions qui nécessitent un compte (sauvegarde du
+      // deck, multijoueur) affichent déjà leurs propres messages
+      // "Connecte-toi pour…" plus bas dans ce fichier.
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')

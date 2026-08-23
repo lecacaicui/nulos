@@ -864,10 +864,10 @@
     let toutesCreatures = []      // index complet : {creature, possedee, equipee}
 
     ;(async () => {
-      if (!localStorage.getItem('username')) {
-        window.location.href = 'connexion.html'
-        return
-      }
+      // Mode non connecté : la page reste accessible pour consulter les
+      // loot box et l'index des créatures. Seuls l'achat et l'équipement
+      // (qui nécessitent un compte) sont bloqués plus bas, avec un message
+      // au lieu d'un redirect forcé.
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')
@@ -875,7 +875,6 @@
 
       const { data: session } = await db.auth.getUser()
       userId = session?.user?.id ?? null
-      if (!userId) return
 
       await chargerSoldePieces()
       lootBoxes = await chargerLootBoxes()
@@ -895,6 +894,13 @@
     }
 
     async function chargerSoldePieces() {
+      if (!userId) {
+        pieces = 0
+        document.getElementById('solde-pieces').innerHTML =
+          '0 (<a href="connexion.html" style="color:var(--couleur-bouton);">connectez-vous</a>)'
+        afficherBoxes()
+        return
+      }
       const { data } = await db.from('clicker').select('pieces_actuelles').eq('user_id', userId).single()
       pieces = data?.pieces_actuelles ?? 0
       document.getElementById('solde-pieces').textContent = pieces.toLocaleString('fr')
@@ -902,6 +908,7 @@
     }
 
     async function sauvegarderSoldePieces() {
+      if (!userId) return
       await db.from('clicker').update({ pieces_actuelles: pieces }).eq('user_id', userId)
     }
 
@@ -983,6 +990,10 @@
     let _animOuverteCallback = null
 
     window.acheterBox = async function(lootBoxId) {
+      if (!userId) {
+        alert('Connectez-vous pour ouvrir une loot box.')
+        return
+      }
       const box = lootBoxes.find(b => b.id === lootBoxId)
       if (!box) return
       if (pieces < box.prix) {
@@ -1391,6 +1402,18 @@
     }
 
     async function rafraichirCollection() {
+      if (!userId) {
+        collectionDetaillee = []
+        document.getElementById('collection-grille').innerHTML =
+          '<p class="collection-vide">Connectez-vous pour constituer votre collection de créatures.</p>'
+        document.getElementById('equipee-info').textContent = 'Aucune créature équipée'
+        // L'index reste consultable même sans compte, mais rien n'est marqué comme possédé.
+        const { data: toutes } = await db.from('creatures').select('*').eq('actif', true)
+        toutesCreatures = (toutes ?? []).map(c => ({ creature: c, possedee: false, equipee: false }))
+        if (document.getElementById('modale-index-fond').classList.contains('ouverte')) filtrerIndex()
+        return
+      }
+
       const collection = await chargerCollection(userId)
       const ids = [...collection.keys()]
 
@@ -1445,6 +1468,10 @@
     }
 
     window.toggleEquipement = async function(creatureId, estDejaEquipee) {
+      if (!userId) {
+        alert('Connectez-vous pour équiper une créature.')
+        return
+      }
       if (estDejaEquipee) {
         await deseqiperCreature(userId)
       } else {

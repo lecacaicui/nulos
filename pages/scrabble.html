@@ -139,10 +139,7 @@
     import { chargerHeader, chargerFooter } from '../script/header.js'
 
     ;(async () => {
-      if (!localStorage.getItem('username')) {
-        window.location.href = 'connexion.html'
-        return
-      }
+      // Mode non connecté : page 100% locale (aucune donnée liée au compte).
       document.body.style.setProperty('visibility', 'visible', 'important')
       await chargerHeader('../')
       await chargerFooter('../')

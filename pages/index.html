@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accueil</title>
+  <link rel="stylesheet" href="style/style.css">
+  <script>
+  (function(){
+    var t = localStorage.getItem('theme_couleurs');
+    if (!t) return;
+    try {
+      var c = JSON.parse(t);
+      var r = document.documentElement.style;
+      r.setProperty('--couleur-fond', c.couleur_fond);
+      r.setProperty('--couleur-conteneur', c.couleur_conteneur);
+      r.setProperty('--couleur-bordure', c.couleur_bordure);
+      r.setProperty('--couleur-bouton', c.couleur_bouton);
+      var h = c.couleur_fond.replace('#','');
+      var lum = (0.299*parseInt(h.substring(0,2),16) + 0.587*parseInt(h.substring(2,4),16) + 0.114*parseInt(h.substring(4,6),16)) / 255;
+      r.setProperty('--couleur-texte', lum < 0.5 ? '#f1f1f1' : '#1a1a1a');
+      r.setProperty('--couleur-texte-faible', lum < 0.5 ? '#9ca3af' : '#6b7280');
+    } catch(e) {}
+  })();
+  </script>
+
+  <style>body { visibility: hidden; }</style>
+  <style>
+    .annonces-zone {
+      text-align: left;
+      margin-bottom: 1.75rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--couleur-bordure);
+    }
+    .annonces-zone h2 {
+      font-size: 1rem;
+      color: var(--couleur-texte-faible);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    .annonces-liste-scroll {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+    }
+    .annonce-carte {
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+    }
+    .annonce-titre {
+      font-weight: 700;
+      font-size: .95rem;
+      margin-bottom: .35rem;
+    }
+    .annonce-contenu {
+      font-size: .85rem;
+      color: var(--couleur-texte);
+      white-space: pre-wrap;
+      margin-bottom: .5rem;
+    }
+    .annonce-meta {
+      font-size: .72rem;
+      color: var(--couleur-texte-faible);
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .bandeau-invite {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: .9rem 1.1rem;
+      margin-bottom: 1.75rem;
+    }
+    .bandeau-invite p {
+      font-size: .85rem;
+      color: var(--couleur-texte-faible);
+      margin: 0;
+    }
+    .bandeau-invite .btn-group {
+      flex-direction: row;
+      gap: .6rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <main>
+    <!-- Page d'accueil : accessible à tous, connecté ou non (mode invité). -->
+    <div class="centered" id="vue-accueil" style="display:none">
+      <div class="card card-pages">
+        <h1>Accueil</h1>
+
+        <!-- Visible uniquement pour les visiteurs non connectés -->
+        <div class="bandeau-invite" id="bandeau-invite" style="display:none">
+          <p>Vous naviguez en mode invité — votre progression n'est pas sauvegardée.</p>
+          <div class="btn-group">
+            <a class="btn btn-primary" href="pages/connexion.html">Se connecter</a>
+            <a class="btn btn-secondary" href="pages/inscription.html">Créer un compte</a>
+          </div>
+        </div>
+
+        <div class="annonces-zone" id="annonces-zone" style="display:none">
+          <h2>📢 Annonces</h2>
+          <div id="annonces-liste"></div>
+        </div>
+
+        <h2>Fonctionnalités disponibles</h2>
+
+        <div class="pages-grid">
+          <a class="page-tile" href="pages/clicker.html">
+            <img class="page-tile-img" src="pictures/pas_content.png" alt="Clicker">
+            <span class="page-tile-label">Clicker</span>
+          </a>
+          <a class="page-tile" href="pages/scrabble.html">
+            <span class="page-tile-emoji">🔠</span>
+            <span class="page-tile-label">Scrabble — Joker</span>
+          </a>
+          <a class="page-tile" href="pages/demineur.html">
+            <img class="page-tile-img" src="pictures/demineur.png" alt="Démineur">
+            <span class="page-tile-label">Démineur</span>
+          </a>
+          <a class="page-tile" href="pages/loot_box.html">
+            <img class="page-tile-img" src="pictures/logo_lootbox.png" alt="Loot Box">
+            <span class="page-tile-label">Loot Box</span>
+          </a>
+          <a class="page-tile" href="pages/shikaku.html">
+            <img class="page-tile-img" src="pictures/shikaku.png" alt="Shikaku">
+            <span class="page-tile-label">Shikaku</span>
+          </a>
+          <a class="page-tile" href="pages/mda.html">
+            <img class="page-tile-img" src="pictures/mda.png" alt="Main de l'ange">
+            <span class="page-tile-label">Main de l'ange</span>
+          </a>
+          <a class="page-tile" href="pages/champ.html">
+            <span class="page-tile-emoji">x</span>
+            <span class="page-tile-label">Champ</span>
+          </a>
+          <a class="page-tile" href="pages/ueb.html">
+            <img class="page-tile-img" src="pictures/mda.png" alt="Main de l'ange">
+            <span class="page-tile-label">Ultra epic battle 7</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script type="module">
+  import { chargerHeader, chargerFooter, appliquerTheme } from './script/header.js'
+
+  // Protège contre les injections XSS : échappe les caractères HTML spéciaux
+  // avant d'insérer du contenu provenant de la BDD dans le DOM via innerHTML.
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+  import { chargerAnnonces } from './script/annonces.js'
+
+  ;(async () => {
+  document.body.style.setProperty('visibility', 'visible', 'important')
+  appliquerTheme()  // arrière-plan
+  await chargerHeader('')
+  await chargerFooter('')
+
+  // Mode non connecté : la grille de fonctionnalités reste accessible à
+  // tous. Seules les annonces (contenu propre aux membres) restent
+  // réservées aux comptes connectés ; un bandeau invite les visiteurs à
+  // se connecter ou créer un compte, sans bloquer l'accès à la page.
+  document.getElementById('vue-accueil').style.display = 'flex'
+
+  const connecte = !!localStorage.getItem('username')
+  if (connecte) {
+    await afficherAnnonces()
+  } else {
+    document.getElementById('bandeau-invite').style.display = 'flex'
+  }
+})()
+
+  async function afficherAnnonces() {
+    const annonces = await chargerAnnonces()
+    if (annonces.length === 0) return
+
+    const zone = document.getElementById('annonces-zone')
+    zone.style.display = 'block'
+    document.getElementById('annonces-liste').innerHTML = `
+      <div class="annonces-liste-scroll">
+        ${annonces.map(a => `
+          <div class="annonce-carte">
+            <div class="annonce-titre">${esc(a.titre)}</div>
+            <div class="annonce-contenu">${esc(a.contenu)}</div>
+            <div class="annonce-meta">
+              <span>Par ${esc(a.auteur_username)}</span>
+              <span>· Créée le ${formaterDateAnnonce(a.date_creation)}</span>
+              <span>· Publiée le ${formaterDateAnnonce(a.date_publication)}</span>
+            </div>
+          </div>`).join('')}
+      </div>`
+  }
+
+  function formaterDateAnnonce(iso) {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+</script>
+</body>
+</html>

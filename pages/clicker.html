@@ -212,10 +212,8 @@
     const db = createClient('https://uqjciekcfrxscfwztttt.supabase.co', 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz')
 
     ;(async () => {
-      if (!localStorage.getItem('username')) {
-        window.location.href = 'connexion.html'
-        return
-      }
+      // Mode non connecté : la page reste accessible. chargerSauvegarde()
+      // gère elle-même le cas où personne n'est connecté (userId = null).
       document.body.style.setProperty('visibility', 'visible', 'important')
       appliquerTheme()
       await chargerHeader('../')
@@ -245,8 +243,19 @@
 
     async function chargerSauvegarde() {
       const { data: session } = await db.auth.getUser()
-      if (!session?.user) return
-      userId = session.user.id
+      userId = session?.user?.id ?? null
+
+      if (!userId) {
+        // Mode non connecté : pas de sauvegarde à charger, on démarre à
+        // zéro. La progression n'est pas persistée tant qu'on n'est pas
+        // connecté (voir planifierSauvegarde/sauvegarder plus bas).
+        majAffichage()
+        document.getElementById('saving-status').innerHTML =
+          'Mode invité — progression non sauvegardée (<a href="connexion.html" style="color:var(--couleur-bouton);">se connecter</a>)'
+        await chargerClassement()
+        await chargerCreatureEquipee()
+        return
+      }
 
       const { data, error, count } = await db.from('clicker')
         .select('*', { count: 'exact' })
@@ -283,13 +292,17 @@
     }
 
     async function chargerCreatureEquipee() {
+      const el = document.getElementById('creature-equipee-contenu')
+      if (!userId) {
+        el.innerHTML = `<div class="creature-equipee-aucune">Connectez-vous pour équiper une créature</div>`
+        return
+      }
       const { data } = await db.from('creatures_utilisateurs')
         .select('creatures(nom, image, multiplicateur, rarete)')
         .eq('user_id', userId)
         .eq('equipee', true)
         .maybeSingle()
 
-      const el = document.getElementById('creature-equipee-contenu')
       if (!data?.creatures) {
         el.innerHTML = `<div class="creature-equipee-aucune">Aucune créature équipée — <a href="loot_box.html" style="color:var(--couleur-bouton);text-decoration:none;">ouvrir des loot box</a></div>`
         return
@@ -325,6 +338,7 @@
     // et débloque le badge correspondant le cas échéant. Sûr à appeler souvent :
     // on ne tente l'écriture que la première fois qu'un palier est franchi.
     function verifierBadgesClicker() {
+      if (!userId) return // pas de compte = pas de badge à débloquer
       const PALIERS = [
         [1_000_000,   'clicker_1m'],
         [10_000_000,  'clicker_10m'],
@@ -492,6 +506,7 @@
     }
 
     function planifierSauvegarde() {
+      if (!userId) return // le message "mode invité" déjà affiché reste inchangé
       clearTimeout(saveTimer)
       document.getElementById('saving-status').textContent = 'Modification en cours…'
       saveTimer = setTimeout(sauvegarder, 2000)
