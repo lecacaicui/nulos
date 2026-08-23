@@ -1006,6 +1006,21 @@
   let secousse = { intensite: 0, duree: 0, dureeTotale: 0 } // secousse d'écran
   const VITESSE_PROJECTILE = 340 // px/s
 
+  // Identifiants stables pour les projectiles et sorts en vol : sans ça,
+  // impossible pour l'invité en JcJ d'interpoler leur mouvement entre deux
+  // instantanés reçus (voir interpolerEtatDistant) — d'où le déplacement
+  // saccadé observé côté invité sur les flèches d'archer et les
+  // projectiles du magicien avant ce correctif.
+  let projectileIdCompteur = 0
+  let sortEnVolIdCompteur = 0
+
+  // Hôte en JcJ uniquement : effets ponctuels (étincelle de mêlée, impact
+  // de sort, particules, texte flottant, anneau au sol, secousse d'écran)
+  // créés depuis le dernier envoi d'état, à transmettre à l'invité — voir
+  // envoyerEtatPvP (qui vide cette file à chaque envoi) et
+  // rejouerEvenementsEffets (qui les rejoue côté invité).
+  let evenementsEffetsAEnvoyer = []
+
   // Apparition automatique d'un guerrier ennemi, pour les tests.
   const INTERVALLE_SPAWN_ENNEMI = 10000 // ms
   let tempsDepuisSpawnEnnemi = 0
@@ -1713,11 +1728,7 @@
       repousse: carte.repousse || 0,
       statut: carte.statut || null
     })
-    effetsSort.push({
-      x, y, rayon: rayonPx,
-      couleur: carte.repousse ? '#38bdf8' : '#f97316',
-      dureeRestante: 260, dureeTotale: 260
-    })
+    creerEffetSort(x, y, rayonPx, carte.repousse ? '#38bdf8' : '#f97316')
     creerParticules(x, y, carte.repousse ? '#38bdf8' : '#f97316', 14, { vitesseMax: 160, dureeMax: 500 })
   }
 
@@ -1733,7 +1744,7 @@
     // on veut ici le château D'ORIGINE, donc celui visé par le camp
     // opposé.
     const origine = pointCastle(team === 'joueur' ? 'ennemi' : 'joueur')
-    sortsEnVol.push({ x: origine.x, y: origine.y, xCible, yCible, team, carte })
+    sortsEnVol.push({ id: ++sortEnVolIdCompteur, x: origine.x, y: origine.y, xCible, yCible, team, carte })
   }
 
   function mettreAJourSortsEnVol(dt) {
@@ -2219,6 +2230,7 @@
       const dx = cibleX - unite.x, dy = cibleY - unite.y
       const dist = Math.hypot(dx, dy) || 1
       projectiles.push({
+        id: ++projectileIdCompteur,
         x: unite.x, y: unite.y,
         angle: Math.atan2(dy, dx),
         team: unite.team,
@@ -2234,12 +2246,7 @@
       })
     } else {
       appliquerDegatsSurCible(unite, ennemiProche)
-      effetsMelee.push({
-        x: (unite.x + cibleX) / 2, y: (unite.y + cibleY) / 2,
-        angle: Math.atan2(cibleY - unite.y, cibleX - unite.x),
-        team: unite.team,
-        dureeRestante: 160, dureeTotale: 160
-      })
+      creerEffetMelee((unite.x + cibleX) / 2, (unite.y + cibleY) / 2, Math.atan2(cibleY - unite.y, cibleX - unite.x), unite.team)
     }
   }
 
@@ -2323,9 +2330,32 @@
     projectiles = projectiles.filter(p => !p.termine)
   }
 
+  // Étincelle visuelle de contact en mêlée — voir declencherAttaque. Séparée
+  // de l'application des dégâts (qui ne doit jamais être rejouée côté
+  // invité) : c'est justement ce qui permet de la réutiliser telle quelle
+  // pour rejouer l'effet côté invité (voir rejouerEvenementsEffets), sans
+  // ré-appliquer de dégâts.
+  function creerEffetMelee(x, y, angle, team) {
+    effetsMelee.push({ x, y, angle, team, dureeRestante: 160, dureeTotale: 160 })
+    if (modePartie === 'pvp' && rolePvP === 'hote' && canvas) {
+      evenementsEffetsAEnvoyer.push({ t: 'melee', x: x / canvas.width, y: y / canvas.height, a: angle, team })
+    }
+  }
+
   function mettreAJourEffetsMelee(dt) {
     for (const e of effetsMelee) e.dureeRestante -= dt
     effetsMelee = effetsMelee.filter(e => e.dureeRestante > 0)
+  }
+
+  // Anneau d'impact d'un sort de zone — voir lancerSortZone. Même principe
+  // que creerEffetMelee : purement visuel (les dégâts sont déjà appliqués
+  // par appliquerDegatsZone au moment de l'appel), donc réutilisable sans
+  // risque pour la relecture côté invité.
+  function creerEffetSort(x, y, rayon, couleur) {
+    effetsSort.push({ x, y, rayon, couleur, dureeRestante: 260, dureeTotale: 260 })
+    if (modePartie === 'pvp' && rolePvP === 'hote' && canvas) {
+      evenementsEffetsAEnvoyer.push({ t: 'sort', x: x / canvas.width, y: y / canvas.height, rayon: rayon / canvas.width, couleur })
+    }
   }
 
   function mettreAJourEffetsSort(dt) {
@@ -2336,7 +2366,8 @@
   // ─── Système de particules générique ───────────────────────────
   // Réutilisé par les animations de mort, les impacts de sort et les
   // arrivées spéciales — un seul système plutôt qu'un par usage.
-  function creerParticules(x, y, couleur, n = 10, { vitesseMin = 40, vitesseMax = 140, dureeMin = 300, dureeMax = 600, rayon = 2.5 } = {}) {
+  function creerParticules(x, y, couleur, n = 10, opts = {}) {
+    const { vitesseMin = 40, vitesseMax = 140, dureeMin = 300, dureeMax = 600, rayon = 2.5 } = opts
     for (let i = 0; i < n; i++) {
       const angle = Math.random() * Math.PI * 2
       const vitesse = vitesseMin + Math.random() * (vitesseMax - vitesseMin)
@@ -2348,6 +2379,9 @@
         couleur, rayon: rayon * (0.6 + Math.random() * 0.8),
         dureeRestante: duree, dureeTotale: duree
       })
+    }
+    if (modePartie === 'pvp' && rolePvP === 'hote' && canvas) {
+      evenementsEffetsAEnvoyer.push({ t: 'particules', x: x / canvas.width, y: y / canvas.height, couleur, n, opts })
     }
   }
 
@@ -2379,6 +2413,9 @@
   // ─── Texte flottant (arrivée d'unité spéciale, réutilisable ailleurs) ──
   function creerTexteFlottant(x, y, texte, couleur = '#ffffff') {
     textesFlottants.push({ x, y, texte, couleur, dureeRestante: 900, dureeTotale: 900 })
+    if (modePartie === 'pvp' && rolePvP === 'hote' && canvas) {
+      evenementsEffetsAEnvoyer.push({ t: 'texte', x: x / canvas.width, y: y / canvas.height, texte, couleur })
+    }
   }
 
   function mettreAJourTextesFlottants(dt) {
@@ -2402,6 +2439,9 @@
   // ─── Anneau au sol (arrivée spéciale) ──────────────────────────
   function creerEffetSol(x, y, couleur, rayonMax = 46) {
     effetsSol.push({ x, y, couleur, rayonMax, dureeRestante: 420, dureeTotale: 420 })
+    if (modePartie === 'pvp' && rolePvP === 'hote' && canvas) {
+      evenementsEffetsAEnvoyer.push({ t: 'sol', x: x / canvas.width, y: y / canvas.height, couleur, rayonMax: rayonMax / canvas.width })
+    }
   }
   function mettreAJourEffetsSol(dt) {
     for (const e of effetsSol) e.dureeRestante -= dt
@@ -2428,6 +2468,9 @@
   // transparent visible pendant la secousse).
   function declencherSecousse(intensite, duree) {
     secousse = { intensite, duree, dureeTotale: duree }
+    if (modePartie === 'pvp' && rolePvP === 'hote' && canvas) {
+      evenementsEffetsAEnvoyer.push({ t: 'secousse', intensite, duree })
+    }
   }
   function mettreAJourSecousse(dt) {
     if (secousse.duree > 0) secousse.duree -= dt
@@ -2701,12 +2744,6 @@
         mettreAJourUnites(dt)
         mettreAJourProjectiles(dt)
         mettreAJourSortsEnVol(dt)
-        mettreAJourEffetsMelee(dt)
-        mettreAJourEffetsSort(dt)
-        mettreAJourParticules(dt)
-        mettreAJourTextesFlottants(dt)
-        mettreAJourEffetsSol(dt)
-        mettreAJourSecousse(dt)
 
         // Le pool de spawn aléatoire du bot ne concerne que le solo : en
         // JcJ, le camp adverse est peuplé par les vrais coups de l'invité
@@ -2721,6 +2758,22 @@
 
         tempsCombat += dt
       }
+
+      // Effets ponctuels (étincelle de mêlée, impact de sort, particules,
+      // texte flottant, anneau au sol, secousse d'écran) : ici, UNIQUEMENT
+      // une décroissance (durée restante, position des particules) —
+      // jamais de dégâts ni d'état de jeu — donc toujours exécutée, y
+      // compris côté invité en JcJ. Les effets eux-mêmes sont créés
+      // localement (hôte ou solo) ou rejoués depuis le réseau (invité,
+      // voir rejouerEvenementsEffets) ; sans cette sortie de la branche
+      // host-only ci-dessus, ils restaient figés à l'écran de l'invité
+      // (ou, pour la secousse, restaient déclenchés en continu).
+      mettreAJourEffetsMelee(dt)
+      mettreAJourEffetsSort(dt)
+      mettreAJourParticules(dt)
+      mettreAJourTextesFlottants(dt)
+      mettreAJourEffetsSol(dt)
+      mettreAJourSecousse(dt)
 
       // Génération d'or continue, plafonnée à orCapaciteMax, dont le rythme
       // accélère par palier (voir intervalleOrActuel). Gérée en local dans
@@ -3041,6 +3094,7 @@
     effetsSol = []
     sortsEnVol = []
     secousse = { intensite: 0, duree: 0, dureeTotale: 0 }
+    evenementsEffetsAEnvoyer = []
     partieTerminee = false
     partieCommencee = true
 
@@ -3161,18 +3215,68 @@
     window.BattlogyDB.envoyerEvenementPartie(canalPartie, 'etat', {
       uj: unitesJoueur.map(versUniteReseau),
       ue: unitesEnnemi.map(versUniteReseau),
-      pr: projectiles.map(p => ({ x: p.x / canvas.width, y: p.y / canvas.height, a: p.angle, team: p.team })),
+      // `id` sur les projectiles et sorts en vol : indispensable pour que
+      // l'invité puisse les interpoler entre deux instantanés (voir
+      // interpolerEtatDistant) au lieu de les faire "sauter" d'une
+      // position à l'autre toutes les INTERVALLE_ETAT_MS (120ms) — c'est
+      // ce qui rendait les flèches d'archer et les projectiles du
+      // magicien saccadés côté invité.
+      pr: projectiles.map(p => ({ id: p.id, x: p.x / canvas.width, y: p.y / canvas.height, a: p.angle, team: p.team })),
+      sv: sortsEnVol.map(s => ({ id: s.id, x: s.x / canvas.width, y: s.y / canvas.height, team: s.team, carteId: s.carte.id })),
       jc: Math.round(joueurChateauPV), jcm: joueurChateauPVMax,
       ec: Math.round(ennemiChateauPV), ecm: ennemiChateauPVMax,
-      tc: Math.round(tempsCombat)
+      tc: Math.round(tempsCombat),
+      // Effets ponctuels créés depuis le dernier envoi (voir
+      // creerEffetMelee/creerEffetSort/creerParticules/creerTexteFlottant/
+      // creerEffetSol/declencherSecousse) — rejoués tels quels côté invité
+      // (voir rejouerEvenementsEffets), qui sinon ne les voyait jamais.
+      ef: evenementsEffetsAEnvoyer
     })
+    evenementsEffetsAEnvoyer = []
   }
 
   // ── Invité : empile le nouvel instantané (garde le précédent pour
-  // interpoler le mouvement entre les deux, voir interpolerEtatDistant).
+  // interpoler le mouvement entre les deux, voir interpolerEtatDistant),
+  // puis rejoue immédiatement les effets ponctuels qu'il contient (une
+  // seule fois par instantané reçu — pas à chaque frame d'interpolation).
   function recevoirEtatHote(payload) {
     etatPrecedent = etatRecent
     etatRecent = { recu: performance.now(), payload }
+    rejouerEvenementsEffets(payload.ef)
+  }
+
+  // ── Invité : rejoue localement les effets ponctuels créés par l'hôte
+  // depuis le dernier envoi (étincelle de mêlée, impact de sort,
+  // particules, texte flottant, anneau au sol, secousse d'écran). Passe
+  // par les mêmes helpers que l'hôte (creerEffetMelee, creerEffetSort…),
+  // qui sont purement visuels — jamais de dégâts ni d'état de jeu — donc
+  // sûrs à rejouer ici. Le camp ('team') est inversé, comme pour toute
+  // donnée reçue de l'hôte (voir convertir plus bas).
+  function rejouerEvenementsEffets(evenements) {
+    if (!evenements || !canvas) return
+    for (const ev of evenements) {
+      const x = ev.x * canvas.width, y = (1 - ev.y) * canvas.height
+      switch (ev.t) {
+        case 'melee':
+          creerEffetMelee(x, y, -ev.a, ev.team === 'joueur' ? 'ennemi' : 'joueur')
+          break
+        case 'sort':
+          creerEffetSort(x, y, ev.rayon * canvas.width, ev.couleur)
+          break
+        case 'particules':
+          creerParticules(x, y, ev.couleur, ev.n, ev.opts)
+          break
+        case 'texte':
+          creerTexteFlottant(x, y, ev.texte, ev.couleur)
+          break
+        case 'sol':
+          creerEffetSol(x, y, ev.couleur, ev.rayonMax * canvas.width)
+          break
+        case 'secousse':
+          declencherSecousse(ev.intensite, ev.duree)
+          break
+      }
+    }
   }
 
   // ── Invité : reconstruit unitesJoueur/unitesEnnemi/projectiles/PV
@@ -3213,9 +3317,31 @@
     unitesJoueur = convertir(recent.ue, precedent ? precedent.ue : null, 'joueur')
     unitesEnnemi = convertir(recent.uj, precedent ? precedent.uj : null, 'ennemi')
 
-    projectiles = (recent.pr || []).map(p => ({
-      x: p.x * canvas.width, y: (1 - p.y) * canvas.height,
+    // Comme pour les unités ci-dessus (voir convertir), les projectiles et
+    // sorts en vol sont désormais interpolés PAR ID entre les deux derniers
+    // instantanés, au lieu de "sauter" directement à leur position la plus
+    // récente : sans ça, ils ne bougeaient qu'une fois toutes les
+    // INTERVALLE_ETAT_MS (120ms), d'où le mouvement saccadé observé côté
+    // invité sur les flèches d'archer et les projectiles du magicien.
+    function convertirListeAvecId(listeRecente, listePrecedente, construire) {
+      return listeRecente.map(r => {
+        const p = listePrecedente ? listePrecedente.find(x => x.id === r.id) : null
+        const t = p ? f : 1
+        const xn = p ? p.x + (r.x - p.x) * t : r.x
+        const yn = p ? p.y + (r.y - p.y) * t : r.y
+        return construire(r, xn, yn)
+      })
+    }
+
+    projectiles = convertirListeAvecId(recent.pr || [], precedent ? precedent.pr : null, (p, xn, yn) => ({
+      x: xn * canvas.width, y: (1 - yn) * canvas.height,
       angle: -p.a, team: p.team === 'joueur' ? 'ennemi' : 'joueur'
+    }))
+
+    sortsEnVol = convertirListeAvecId(recent.sv || [], precedent ? precedent.sv : null, (s, xn, yn) => ({
+      x: xn * canvas.width, y: (1 - yn) * canvas.height,
+      team: s.team === 'joueur' ? 'ennemi' : 'joueur',
+      carte: CARTES[s.carteId] || { repousse: 0 }
     }))
 
     joueurChateauPV = recent.ec; joueurChateauPVMax = recent.ecm
