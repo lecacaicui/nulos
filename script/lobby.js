@@ -147,6 +147,38 @@ export function quitterLobbyBeacon(lobbyId, accessToken, role) {
   }
 }
 
+/**
+ * Version « best-effort » pour signaler un ABANDON en cours de partie JcJ
+ * (fermeture d'onglet ou rechargement pendant le combat lui-même — pas la
+ * salle d'attente, voir quitterLobbyBeacon plus haut pour ce cas-là).
+ *
+ * Contrairement à envoyerEvenementPartie (qui passe par le canal WebSocket
+ * déjà ouvert, non garanti de finir d'émettre pendant un déchargement de
+ * page), celle-ci passe par l'API REST de diffusion Realtime de Supabase
+ * avec `keepalive`, pour les mêmes raisons que quitterLobbyBeacon : une
+ * requête fetch classique risque de ne pas avoir le temps d'aboutir une
+ * fois la page en train de se décharger.
+ *
+ * `role` indique qui abandonne ('hote' ou 'invite') — voir surAbandon dans
+ * ouvrirCanalPartie côté receveur (battlogy.html), qui décide qui gagne
+ * par forfait selon ce rôle.
+ */
+export function envoyerAbandonBeacon(lobbyId, accessToken, role) {
+  if (!lobbyId || !accessToken) return
+  fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: 'Bearer ' + accessToken,
+      'Content-Type': 'application/json'
+    },
+    keepalive: true,
+    body: JSON.stringify({
+      messages: [{ topic: 'partie-' + lobbyId, event: 'abandon', payload: { role }, private: false }]
+    })
+  }).catch(() => {})
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // ═══ Partie JcJ (Joueur contre Joueur) ═══════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════
@@ -196,6 +228,7 @@ export function ouvrirCanalPartie(lobbyId, gestionnaires = {}) {
   if (gestionnaires.surCoupJoue)  canal.on('broadcast', { event: 'coup_joue' },  ({ payload }) => gestionnaires.surCoupJoue(payload))
   if (gestionnaires.surEtat)      canal.on('broadcast', { event: 'etat' },       ({ payload }) => gestionnaires.surEtat(payload))
   if (gestionnaires.surFinPartie) canal.on('broadcast', { event: 'fin_partie' }, ({ payload }) => gestionnaires.surFinPartie(payload))
+  if (gestionnaires.surAbandon)   canal.on('broadcast', { event: 'abandon' },    ({ payload }) => gestionnaires.surAbandon(payload))
   canal.subscribe()
   return canal
 }
