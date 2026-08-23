@@ -585,6 +585,8 @@
             <div class="btn-group">
               <button class="btn btn-primary" id="btn-lancer">Lancer la partie</button>
               <button class="btn btn-secondary" id="btn-editer-deck">🃏 Éditer mon deck</button>
+              <button class="btn btn-secondary" id="btn-creer-lobby">➕ Créer un lobby</button>
+              <button class="btn btn-secondary" id="btn-rejoindre-lobby">🔑 Rejoindre un lobby</button>
             </div>
           </div>
         </div>
@@ -3082,6 +3084,16 @@
   }
 
   document.getElementById('btn-editer-deck').addEventListener('click', ouvrirModaleDeck)
+
+  // ─── Lobby (à venir) ──────────────────────────────────────────
+  // Pas encore de logique de lobby/multijoueur : ces boutons sont pour
+  // l'instant de simples placeholders, prêts à être branchés plus tard.
+  document.getElementById('btn-creer-lobby').addEventListener('click', () => {
+    afficherMessage('Création de lobby — bientôt disponible !')
+  })
+  document.getElementById('btn-rejoindre-lobby').addEventListener('click', () => {
+    afficherMessage('Rejoindre un lobby — bientôt disponible !')
+  })
 
   // ── Clic : équiper / retirer (mobile-friendly, sans drag) ──
   elCollection.addEventListener('click', (e) => {
