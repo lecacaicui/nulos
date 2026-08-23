@@ -694,6 +694,7 @@
       <h2>🕓 Salle d'attente</h2>
       <div class="modale-lobby-code" id="modale-salle-code">-----</div>
       <div class="salle-participants" id="salle-participants"></div>
+      <button class="btn btn-primary btn-full" id="btn-lancer-partie-pvp" style="display:none">▶️ Lancer la partie</button>
       <button class="btn btn-secondary btn-full" id="btn-copier-code" style="display:none">📋 Copier le code</button>
       <button class="btn btn-danger btn-full" id="btn-quitter-salle">Quitter la salle</button>
     </div>
@@ -702,7 +703,7 @@
   <script type="module">
     import { chargerHeader, appliquerTheme } from '../script/header.js'
     import { db, garantirCartesDeDepart, chargerDeck, sauvegarderDeck, chargerCartesJeu } from '../script/battlogy.js'
-    import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, recupererJetonAcces, quitterLobbyBeacon } from '../script/lobby.js'
+    import { creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, recupererJetonAcces, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie } from '../script/lobby.js'
 
     ;(async () => {
       if (!localStorage.getItem('username')) {
@@ -726,7 +727,7 @@
 
       // Rend la sauvegarde accessible au script de jeu (classique, pas
       // module) plus bas dans la page — voir sauvegarderCompositionDeck.
-      window.BattlogyDB = { userId, accessToken, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, quitterLobbyBeacon }
+      window.BattlogyDB = { userId, accessToken, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie }
 
       if (userId) {
         const [cartes, deck] = await Promise.all([
@@ -2688,27 +2689,42 @@
     const dt = Math.min(50, timestamp - dernierTimestamp) // dt plafonné (onglet en arrière-plan)
     dernierTimestamp = timestamp
 
-    if (partieCommencee && !partieTerminee) {
-      mettreAJourUnites(dt)
-      mettreAJourProjectiles(dt)
-      mettreAJourSortsEnVol(dt)
-      mettreAJourEffetsMelee(dt)
-      mettreAJourEffetsSort(dt)
-      mettreAJourParticules(dt)
-      mettreAJourTextesFlottants(dt)
-      mettreAJourEffetsSol(dt)
-      mettreAJourSecousse(dt)
+    // En JcJ côté invité, aucune physique locale : l'affichage est
+    // entièrement téléguidé par les instantanés reçus de l'hôte (voir
+    // interpolerEtatDistant) — seule la main/l'or restent gérés en local.
+    const estSpectateurPvP = modePartie === 'pvp' && rolePvP === 'invite'
 
-      tempsDepuisSpawnEnnemi += dt
-      if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
-        tempsDepuisSpawnEnnemi -= INTERVALLE_SPAWN_ENNEMI
-        spawnEnnemiAleatoire()
+    if (partieCommencee && !partieTerminee) {
+      if (estSpectateurPvP) {
+        interpolerEtatDistant(timestamp)
+      } else {
+        mettreAJourUnites(dt)
+        mettreAJourProjectiles(dt)
+        mettreAJourSortsEnVol(dt)
+        mettreAJourEffetsMelee(dt)
+        mettreAJourEffetsSort(dt)
+        mettreAJourParticules(dt)
+        mettreAJourTextesFlottants(dt)
+        mettreAJourEffetsSol(dt)
+        mettreAJourSecousse(dt)
+
+        // Le pool de spawn aléatoire du bot ne concerne que le solo : en
+        // JcJ, le camp adverse est peuplé par les vrais coups de l'invité
+        // (voir recevoirCoupInvite).
+        if (modePartie !== 'pvp') {
+          tempsDepuisSpawnEnnemi += dt
+          if (tempsDepuisSpawnEnnemi >= INTERVALLE_SPAWN_ENNEMI) {
+            tempsDepuisSpawnEnnemi -= INTERVALLE_SPAWN_ENNEMI
+            spawnEnnemiAleatoire()
+          }
+        }
+
+        tempsCombat += dt
       }
 
-      tempsCombat += dt
-
       // Génération d'or continue, plafonnée à orCapaciteMax, dont le rythme
-      // accélère par palier (voir intervalleOrActuel).
+      // accélère par palier (voir intervalleOrActuel). Gérée en local dans
+      // tous les cas (y compris l'invité en JcJ : chacun sa main/son or).
       tempsDepuisGeneration += dt
       const intervalleOr = intervalleOrActuel()
       let orAAffiche = false
@@ -2730,8 +2746,10 @@
       if (orAAffiche && !mainAAfficher) renderMain()
 
       // Mort subite (dès 4m30) : les deux châteaux perdent en continu un
-      // pourcentage de leurs PV max par seconde, jusqu'à destruction de l'un.
-      if (enMortSubite()) {
+      // pourcentage de leurs PV max par seconde, jusqu'à destruction de
+      // l'un. Côté invité en JcJ, les PV châteaux viennent déjà de l'hôte
+      // (qui applique lui-même cette perte) : pas de double application.
+      if (!estSpectateurPvP && enMortSubite()) {
         const perte = (dt / 1000) * MORT_SUBITE_TAUX
         joueurChateauPV = Math.max(0, joueurChateauPV - joueurChateauPVMax * perte)
         ennemiChateauPV = Math.max(0, ennemiChateauPV - ennemiChateauPVMax * perte)
@@ -2740,10 +2758,23 @@
       actualiserAffichageTimer()
       actualiserJaugePioche()
 
-      if (ennemiChateauPV <= 0) {
-        terminerPartie(true)
-      } else if (joueurChateauPV <= 0) {
-        terminerPartie(false)
+      // Là encore, côté invité en JcJ : c'est l'hôte qui décide seul de la
+      // fin de partie (voir recevoirFinPartieHote), jamais un calcul local.
+      if (!estSpectateurPvP) {
+        if (ennemiChateauPV <= 0) {
+          terminerPartie(true)
+        } else if (joueurChateauPV <= 0) {
+          terminerPartie(false)
+        }
+      }
+
+      // Hôte en JcJ : diffuse régulièrement l'état du combat à l'invité.
+      if (modePartie === 'pvp' && rolePvP === 'hote') {
+        tempsDepuisEnvoiEtat += dt
+        if (tempsDepuisEnvoiEtat >= INTERVALLE_ETAT_MS) {
+          tempsDepuisEnvoiEtat = 0
+          envoyerEtatPvP()
+        }
       }
     }
 
@@ -2817,6 +2848,15 @@
     or -= carte.cout
     main = main.filter(m => m.uid !== uid)
     renderMain()
+
+    if (modePartie === 'pvp' && rolePvP === 'invite') {
+      // En JcJ, l'invité ne simule rien localement : le coup est envoyé à
+      // l'hôte (seul à faire tourner la partie) — la troupe apparaîtra au
+      // prochain instantané reçu (voir envoyerCoupPvP / interpolerEtatDistant).
+      envoyerCoupPvP(carte, hex.cx, hex.cy)
+      return
+    }
+
     // La carte est posée exactement au centre de la case (pas à l'endroit
     // précis du curseur/doigt).
     if (carte.effetInstantane) {
@@ -3019,8 +3059,7 @@
     actualiserAffichageTimer()
   }
 
-  function terminerPartie(victoire) {
-    partieTerminee = true
+  function afficherResultatPartie(victoire) {
     afficherEcran(
       victoire ? '🏆 Victoire !' : '💀 Défaite…',
       victoire ? 'Le château ennemi est détruit.' : 'Ton château a été détruit.',
@@ -3028,7 +3067,168 @@
     )
   }
 
+  function terminerPartie(victoire) {
+    partieTerminee = true
+    if (modePartie === 'pvp' && rolePvP === 'hote') {
+      // L'hôte est seul juge : il notifie l'invité du résultat (inversé
+      // de son point de vue) plutôt que de laisser chaque écran décider
+      // tout seul — ça évite qu'une petite différence d'arrondi fasse
+      // afficher "Victoire" des deux côtés à la fois.
+      window.BattlogyDB.envoyerEvenementPartie(canalPartie, 'fin_partie', { victoireHote: victoire })
+    }
+    afficherResultatPartie(victoire)
+    if (modePartie === 'pvp') quitterModePvP()
+  }
+
   document.getElementById('btn-lancer').addEventListener('click', demarrerPartie)
+
+  // ─── JcJ : transition salle d'attente → partie ─────────────────
+  function demarrerPartiePvP(lobby, estHote) {
+    modePartie = 'pvp'
+    rolePvP = estHote ? 'hote' : 'invite'
+    lobbyPvPActuel = lobby
+    etatPrecedent = null
+    etatRecent = null
+    tempsDepuisEnvoiEtat = 0
+
+    if (canalPartie) window.BattlogyDB.fermerCanalPartie(canalPartie)
+    canalPartie = window.BattlogyDB.ouvrirCanalPartie(lobby.id, {
+      surCoupJoue:  rolePvP === 'hote'   ? recevoirCoupInvite    : null,
+      surEtat:      rolePvP === 'invite' ? recevoirEtatHote      : null,
+      surFinPartie: rolePvP === 'invite' ? recevoirFinPartieHote : null
+    })
+
+    demarrerPartie() // réutilise l'init existante (deck, main, or, PV châteaux…)
+    afficherMessage('La partie commence !')
+  }
+
+  // Referme le mode JcJ (fin de partie ou retour au menu) : ferme le canal
+  // réseau et, côté hôte, nettoie la ligne du lobby (elle ne sert plus une
+  // fois la partie lancée). Après ça, "Rejouer" relance une partie solo
+  // classique — un JcJ se relance en recréant/rejoignant un lobby.
+  function quitterModePvP() {
+    if (canalPartie) { window.BattlogyDB.fermerCanalPartie(canalPartie); canalPartie = null }
+    if (rolePvP === 'hote' && lobbyPvPActuel) window.BattlogyDB.annulerLobby(lobbyPvPActuel.id)
+    modePartie = 'solo'
+    rolePvP = null
+    lobbyPvPActuel = null
+    etatPrecedent = null
+    etatRecent = null
+  }
+
+  // ── Invité → Hôte : "je pose telle carte ici" ──
+  // Coordonnées envoyées normalisées (0..1, indépendantes de la résolution
+  // de chaque écran) et inversées en Y : l'invité se voit toujours en bas
+  // de SON écran, alors que côté hôte cette troupe est celle du camp
+  // 'ennemi' (en haut). X n'est jamais inversé (les 3 lanes restent dans
+  // le même ordre visuel pour les deux joueurs).
+  function envoyerCoupPvP(carte, x, y) {
+    if (!canalPartie || !canvas) return
+    window.BattlogyDB.envoyerEvenementPartie(canalPartie, 'coup_joue', {
+      carteId: carte.id,
+      x: x / canvas.width,
+      y: 1 - (y / canvas.height)
+    })
+  }
+
+  // ── Hôte : reçoit un coup de l'invité, l'applique dans SA simulation
+  // (seule source de vérité) comme une troupe/un sort du camp 'ennemi' —
+  // exactement le même chemin que spawnEnnemiAleatoire() utilisait pour le
+  // bot, remplacé ici par un vrai adversaire.
+  function recevoirCoupInvite(payload) {
+    if (rolePvP !== 'hote' || !partieCommencee || partieTerminee || !canvas) return
+    const carte = CARTES[payload.carteId]
+    if (!carte) return
+    const x = payload.x * canvas.width
+    const y = payload.y * canvas.height
+    if (carte.effetInstantane) lancerSortDepuisChateau(carte, x, y, 'ennemi')
+    else poserCarte(carte, x, y, 'ennemi')
+  }
+
+  // ── Hôte : diffuse un instantané de l'état du combat (positions/PV des
+  // unités, PV châteaux, projectiles, temps de combat) — appelé toutes les
+  // INTERVALLE_ETAT_MS depuis boucleDeJeu. Coordonnées normalisées (voir
+  // envoyerCoupPvP) pour rester valables quelle que soit la résolution de
+  // l'écran de l'invité.
+  function versUniteReseau(u) {
+    return { id: u.id, c: u.carteId, x: u.x / canvas.width, y: u.y / canvas.height,
+      pv: Math.round(u.pv), pvMax: u.pvMax, taille: u.taille, etat: u.etat }
+  }
+
+  function envoyerEtatPvP() {
+    if (!canalPartie || !canvas) return
+    window.BattlogyDB.envoyerEvenementPartie(canalPartie, 'etat', {
+      uj: unitesJoueur.map(versUniteReseau),
+      ue: unitesEnnemi.map(versUniteReseau),
+      pr: projectiles.map(p => ({ x: p.x / canvas.width, y: p.y / canvas.height, a: p.angle, team: p.team })),
+      jc: Math.round(joueurChateauPV), jcm: joueurChateauPVMax,
+      ec: Math.round(ennemiChateauPV), ecm: ennemiChateauPVMax,
+      tc: Math.round(tempsCombat)
+    })
+  }
+
+  // ── Invité : empile le nouvel instantané (garde le précédent pour
+  // interpoler le mouvement entre les deux, voir interpolerEtatDistant).
+  function recevoirEtatHote(payload) {
+    etatPrecedent = etatRecent
+    etatRecent = { recu: performance.now(), payload }
+  }
+
+  // ── Invité : reconstruit unitesJoueur/unitesEnnemi/projectiles/PV
+  // châteaux à partir des instantanés reçus, en inversant systématiquement
+  // le point de vue (ce qui est "ennemi" côté hôte est MOI, voir
+  // envoyerCoupPvP) — remplace entièrement mettreAJourUnites/Projectiles
+  // etc. : l'invité ne simule rien, il rejoue ce que l'hôte a calculé.
+  function interpolerEtatDistant(timestamp) {
+    if (!etatRecent || !canvas) return
+    const recent = etatRecent.payload
+    let f = 1, precedent = null
+    if (etatPrecedent) {
+      const intervalle = etatRecent.recu - etatPrecedent.recu
+      if (intervalle > 0) {
+        f = Math.max(0, Math.min(1, (timestamp - etatRecent.recu) / intervalle))
+        precedent = etatPrecedent.payload
+      }
+    }
+
+    function convertir(listeRecente, listePrecedente, teamAffichee) {
+      return listeRecente.map(ur => {
+        const up = listePrecedente ? listePrecedente.find(x => x.id === ur.id) : null
+        const t = up ? f : 1
+        const xn = up ? up.x + (ur.x - up.x) * t : ur.x
+        const yn = up ? up.y + (ur.y - up.y) * t : ur.y
+        const carte = CARTES[ur.c]
+        return {
+          id: ur.id, carteId: ur.c, emoji: carte ? carte.emoji : '',
+          team: teamAffichee,
+          x: xn * canvas.width, y: (1 - yn) * canvas.height,
+          pv: ur.pv, pvMax: ur.pvMax, taille: ur.taille, etat: ur.etat, statuts: []
+        }
+      })
+    }
+
+    // Ce que l'hôte appelle 'ennemi' (recent.ue), c'est MOI (l'invité) ;
+    // ce qu'il appelle 'joueur' (recent.uj), c'est mon adversaire.
+    unitesJoueur = convertir(recent.ue, precedent ? precedent.ue : null, 'joueur')
+    unitesEnnemi = convertir(recent.uj, precedent ? precedent.uj : null, 'ennemi')
+
+    projectiles = (recent.pr || []).map(p => ({
+      x: p.x * canvas.width, y: (1 - p.y) * canvas.height,
+      angle: -p.a, team: p.team === 'joueur' ? 'ennemi' : 'joueur'
+    }))
+
+    joueurChateauPV = recent.ec; joueurChateauPVMax = recent.ecm
+    ennemiChateauPV = recent.jc; ennemiChateauPVMax = recent.jcm
+    tempsCombat = recent.tc
+  }
+
+  // ── Invité : reçoit le résultat officiel décidé par l'hôte.
+  function recevoirFinPartieHote(payload) {
+    if (rolePvP !== 'invite' || partieTerminee) return
+    partieTerminee = true
+    afficherResultatPartie(!payload.victoireHote)
+    quitterModePvP()
+  }
 
   renderMain()
 
@@ -3171,6 +3371,32 @@
   let estHoteSalle = false   // true si l'utilisateur courant est l'hôte de salleActuelle
   let arreterEcouteLobby = null // fonction pour se désabonner du canal Realtime en cours
 
+  // ─── Mode JcJ (Joueur contre Joueur) ──────────────────────────────────
+  // 'solo' (par défaut, contre le bot) ou 'pvp'. rolePvP vaut 'hote' ou
+  // 'invite' uniquement en mode 'pvp'. L'HÔTE fait tourner la simulation
+  // pour LES DEUX camps (source de vérité unique — comme aujourd'hui
+  // contre le bot, seul le pool de spawn du camp adverse change, piloté
+  // par les coups reçus au lieu d'un tirage aléatoire). L'INVITÉ ne simule
+  // rien : unitesJoueur/unitesEnnemi/châteaux sont "téléguidés" depuis les
+  // instantanés reçus (voir interpolerEtatDistant), pas calculés
+  // localement — ça garantit qu'un seul écran ne peut jamais déclarer un
+  // résultat différent de l'autre. Chacun gère en revanche sa PROPRE main
+  // et son PROPRE or en local (voir tenterPoserCarte), pour rester
+  // réactif malgré la latence réseau.
+  let modePartie = 'solo'
+  let rolePvP = null
+  let canalPartie = null
+  let lobbyPvPActuel = null
+
+  // Hôte : rythme d'envoi des instantanés d'état à l'invité.
+  const INTERVALLE_ETAT_MS = 120
+  let tempsDepuisEnvoiEtat = 0
+
+  // Invité : deux derniers instantanés reçus, pour interpoler le
+  // mouvement entre deux envois de l'hôte au lieu d'un rendu saccadé.
+  let etatPrecedent = null
+  let etatRecent = null
+
   // Filet de sécurité : si l'onglet est fermé ou rechargé pendant qu'on
   // est dans une salle d'attente, on tente de nettoyer côté Supabase
   // (annuler si on est l'hôte, quitter si on est l'invité). Voir
@@ -3196,12 +3422,24 @@
       </div>`
   }
 
+  // Affiche/active le bouton "Lancer la partie" : réservé à l'hôte, et
+  // seulement une fois qu'un invité a rejoint la salle.
+  function actualiserBoutonLancerPvP(lobby, estHote) {
+    const btn = document.getElementById('btn-lancer-partie-pvp')
+    btn.style.display = estHote ? 'block' : 'none'
+    if (!estHote) return
+    const pret = !!lobby.invite_username
+    btn.disabled = !pret
+    btn.textContent = pret ? '▶️ Lancer la partie' : 'En attente d\u2019un adversaire…'
+  }
+
   function afficherSalle(lobby, estHote) {
     salleActuelle = lobby
     estHoteSalle = estHote
     document.getElementById('modale-salle-code').textContent = lobby.code
     document.getElementById('btn-copier-code').style.display = estHote ? 'block' : 'none'
     renderParticipantsSalle(lobby)
+    actualiserBoutonLancerPvP(lobby, estHote)
     document.getElementById('modale-salle-fond').classList.add('ouverte')
 
     if (arreterEcouteLobby) arreterEcouteLobby()
@@ -3214,8 +3452,29 @@
       }
       salleActuelle = majOuNull
       renderParticipantsSalle(salleActuelle)
+      actualiserBoutonLancerPvP(salleActuelle, estHoteSalle)
+      if (salleActuelle.statut === 'en_cours') {
+        // L'hôte a cliqué "Lancer la partie" : les deux côtés basculent
+        // en JcJ (voir demarrerPartiePvP plus bas).
+        if (arreterEcouteLobby) { arreterEcouteLobby(); arreterEcouteLobby = null }
+        document.getElementById('modale-salle-fond').classList.remove('ouverte')
+        const lobbyDepart = salleActuelle
+        const hoteDepart = estHoteSalle
+        salleActuelle = null
+        demarrerPartiePvP(lobbyDepart, hoteDepart)
+      }
     })
   }
+
+  document.getElementById('btn-lancer-partie-pvp').addEventListener('click', async () => {
+    if (!salleActuelle || !estHoteSalle) return
+    const btn = document.getElementById('btn-lancer-partie-pvp')
+    btn.disabled = true
+    const resultat = await window.BattlogyDB.demarrerPartieLobby(salleActuelle.id)
+    if (!resultat.ok) { btn.disabled = false; afficherMessage('Impossible de lancer la partie.') }
+    // Si ok, la transition se fait via la mise à jour Realtime reçue
+    // ci-dessus (statut === 'en_cours'), pas ici directement.
+  })
 
   async function fermerSalle(quitterServeur) {
     document.getElementById('modale-salle-fond').classList.remove('ouverte')
