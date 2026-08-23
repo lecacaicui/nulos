@@ -13,12 +13,16 @@ export const db = createClient(SUPABASE_URL, SUPABASE_KEY)
  *   code text not null unique,
  *   hote_user_id uuid not null references auth.users(id) on delete cascade,
  *   hote_username text not null,
+ *   invite_user_id uuid references auth.users(id) on delete set null,
+ *   invite_username text,
  *   statut text not null default 'en_attente' check (statut in ('en_attente', 'en_cours', 'termine')),
  *   cree_le timestamptz not null default now()
  * );
  *
- * RLS : lecture ouverte à tous les connectés, écriture (insert/update/delete)
- * réservée à l'hôte (auth.uid() = hote_user_id).
+ * RLS : lecture ouverte à tous les connectés, écriture directe (insert/
+ * update/delete) réservée à l'hôte. L'invité rejoint/quitte uniquement via
+ * les fonctions rejoindre_lobby / quitter_lobby (SECURITY DEFINER), voir
+ * migration_lobbies_2_rejoindre.sql.
  */
 
 // Caractères utilisés pour le code du lobby : lettres/chiffres sans les
@@ -60,4 +64,42 @@ export async function creerLobby(userId, username, tentativesRestantes = 5) {
 export async function annulerLobby(lobbyId) {
   const { error } = await db.from('battlogy_lobbies').delete().eq('id', lobbyId)
   return { ok: !error, error }
+}
+
+/**
+ * Rejoint un lobby existant à partir de son code (passe par une fonction
+ * BDD sécurisée, voir migration_lobbies_2_rejoindre.sql). Retourne
+ * { ok, lobby } ou { ok: false, error } (introuvable / déjà complet /
+ * propre lobby...).
+ */
+export async function rejoindreLobby(code, username) {
+  const { data, error } = await db.rpc('rejoindre_lobby', { p_code: code, p_username: username })
+  if (error) { console.error('rejoindreLobby a échoué :', error); return { ok: false, error } }
+  return { ok: true, lobby: data }
+}
+
+/** Quitte un lobby précédemment rejoint (libère la place d'invité). */
+export async function quitterLobby(lobbyId) {
+  const { error } = await db.rpc('quitter_lobby', { p_lobby_id: lobbyId })
+  return { ok: !error, error }
+}
+
+/**
+ * Écoute en temps réel les changements d'un lobby précis (arrivée/départ
+ * de l'invité, annulation par l'hôte...). `onChange` est appelé avec la
+ * ligne à jour, ou `null` si le lobby a été supprimé.
+ * Retourne une fonction à appeler pour arrêter l'écoute — à ne pas
+ * oublier : chaque abonnement actif consomme le quota Realtime du projet.
+ */
+export function ecouterLobby(lobbyId, onChange) {
+  const canal = db.channel('lobby-' + lobbyId)
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'battlogy_lobbies', filter: `id=eq.${lobbyId}` },
+      (payload) => onChange(payload.new))
+    .on('postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'battlogy_lobbies', filter: `id=eq.${lobbyId}` },
+      () => onChange(null))
+    .subscribe()
+
+  return () => db.removeChannel(canal)
 }
