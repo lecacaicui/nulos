@@ -146,3 +146,67 @@ export function quitterLobbyBeacon(lobbyId, accessToken, role) {
     }).catch(() => {})
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// ═══ Partie JcJ (Joueur contre Joueur) ═══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Modèle retenu : l'HÔTE fait tourner l'unique simulation du combat (les
+// deux camps) — comme aujourd'hui contre le bot, seul le pool de spawn
+// change (de aléatoire à piloté par les coups de l'invité). C'est la seule
+// source de vérité : aucun risque que les deux écrans se contredisent sur
+// l'issue de la partie. L'invité, lui, ne simule rien : il affiche les
+// instantanés reçus de l'hôte et lui envoie ses coups. Chacun gère sa
+// propre main/or en local (aucune latence réseau sur les actions du
+// joueur), voir battlogy.html.
+//
+// Deux canaux Realtime distincts :
+// - `lobby-<id>` (ecouterLobby ci-dessus) : la ligne BDD du lobby, pour la
+//   salle d'attente (arrivée/départ de l'invité, annulation…).
+// - `partie-<id>` (ci-dessous) : un canal "broadcast" pur (rien en BDD),
+//   pour les messages haute fréquence de la partie elle-même (coups joués,
+//   instantanés d'état, résultat final).
+
+/**
+ * Démarre la partie JcJ d'un lobby : passe son statut à 'en_cours'. Les
+ * deux joueurs, abonnés via ecouterLobby, reçoivent la mise à jour et
+ * démarrent chacun leur côté de la partie (voir battlogy.html). Seul
+ * l'hôte doit appeler cette fonction (le bouton "Lancer la partie" n'est
+ * affiché qu'à lui, côté salle d'attente, et seulement une fois l'invité
+ * présent).
+ */
+export async function demarrerPartieLobby(lobbyId) {
+  const { error } = await db.from('battlogy_lobbies')
+    .update({ statut: 'en_cours' })
+    .eq('id', lobbyId)
+  return { ok: !error, error }
+}
+
+/**
+ * Ouvre le canal Realtime "broadcast" dédié au déroulement d'une partie
+ * JcJ précise. `gestionnaires` accepte, chacun optionnel :
+ * - surCoupJoue(payload)  : un coup envoyé par l'autre joueur (host <- invité).
+ * - surEtat(payload)      : un instantané de l'état du combat (invité <- hôte).
+ * - surFinPartie(payload) : le résultat final (invité <- hôte).
+ * Retourne le canal — à garder pour envoyerEvenementPartie et à fermer
+ * avec fermerCanalPartie une fois la partie terminée/quittée.
+ */
+export function ouvrirCanalPartie(lobbyId, gestionnaires = {}) {
+  const canal = db.channel('partie-' + lobbyId)
+  if (gestionnaires.surCoupJoue)  canal.on('broadcast', { event: 'coup_joue' },  ({ payload }) => gestionnaires.surCoupJoue(payload))
+  if (gestionnaires.surEtat)      canal.on('broadcast', { event: 'etat' },       ({ payload }) => gestionnaires.surEtat(payload))
+  if (gestionnaires.surFinPartie) canal.on('broadcast', { event: 'fin_partie' }, ({ payload }) => gestionnaires.surFinPartie(payload))
+  canal.subscribe()
+  return canal
+}
+
+/** Envoie un évènement broadcast sur le canal de partie (voir ouvrirCanalPartie). */
+export function envoyerEvenementPartie(canal, event, payload) {
+  if (!canal) return
+  canal.send({ type: 'broadcast', event, payload })
+}
+
+/** Ferme le canal de partie — à appeler en quittant/terminant la partie JcJ. */
+export function fermerCanalPartie(canal) {
+  if (canal) db.removeChannel(canal)
+}
