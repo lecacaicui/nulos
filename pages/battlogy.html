@@ -455,7 +455,7 @@
       background: var(--couleur-conteneur);
       border-radius: 14px;
       padding: 1.75rem;
-      max-width: 480px;
+      max-width: 560px;
       width: 100%;
       max-height: 85vh;
       overflow-y: auto;
@@ -470,56 +470,104 @@
       color: var(--couleur-texte-faible); cursor: pointer; line-height: 1;
     }
     .modale-fermer:hover { color: var(--couleur-texte); }
-    /* ── Grille d'emplacements du deck (8 + 1 spécial verrouillé) ── */
+    /* ── Grille d'emplacements du deck (8 + 1 spécial verrouillé) ──
+       Disposition "tablette légendaire" : les 8 emplacements normaux en
+       4 colonnes × 2 lignes à gauche, et l'emplacement spécial verrouillé
+       mis en valeur dans une colonne dédiée à droite, sur toute la
+       hauteur (voir grid-template-areas). L'image fournie sert de fond
+       (à déposer dans pictures/deck_fond.jpg — voir commentaire plus bas
+       sur .deck-slots-grille). */
     .deck-slots-grille {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: .6rem;
+      grid-template-columns: repeat(4, 1fr) 1.25fr;
+      grid-template-rows: repeat(2, 1fr);
+      grid-template-areas:
+        "s1 s2 s3 s4 s9"
+        "s5 s6 s7 s8 s9";
+      gap: .55rem;
       margin-bottom: 1.5rem;
+      padding: 1rem .9rem;
+      border-radius: 16px;
+      position: relative;
+      /* Voile sombre pour garder les emplacements lisibles par-dessus la
+         pierre, quel que soit le thème clair/sombre du site. */
+      background:
+        linear-gradient(rgba(8,10,8,.58), rgba(8,10,8,.58)),
+        url('../pictures/deck_fond.jpg') center / cover no-repeat;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 6px 18px rgba(0,0,0,.35);
     }
+    /* Place chaque emplacement dans sa case de la grille, dans l'ordre où
+       renderModaleDeck() les génère (8 slots normaux puis le spécial). */
+    .deck-slot:nth-child(1) { grid-area: s1; }
+    .deck-slot:nth-child(2) { grid-area: s2; }
+    .deck-slot:nth-child(3) { grid-area: s3; }
+    .deck-slot:nth-child(4) { grid-area: s4; }
+    .deck-slot:nth-child(5) { grid-area: s5; }
+    .deck-slot:nth-child(6) { grid-area: s6; }
+    .deck-slot:nth-child(7) { grid-area: s7; }
+    .deck-slot:nth-child(8) { grid-area: s8; }
+    .deck-slot-special { grid-area: s9; }
+
     .deck-slot {
       aspect-ratio: 1;
-      border-radius: 12px;
+      border-radius: 10px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: .25rem;
+      gap: .2rem;
       position: relative;
       transition: filter .15s, transform .1s, border-color .15s, background .15s;
     }
     .deck-slot-vide {
-      border: 2px dashed var(--couleur-bordure);
-      background: var(--couleur-fond);
-      color: var(--couleur-texte-faible);
+      border: 2px dashed rgba(255,255,255,.28);
+      background: rgba(255,255,255,.05);
+      color: #d7ded2;
       cursor: default;
     }
-    .deck-slot-vide .deck-slot-plus { font-size: 1.6rem; line-height: 1; }
+    .deck-slot-vide .deck-slot-plus { font-size: 1.5rem; line-height: 1; }
     .deck-slot-remplie {
-      border: 2px solid var(--couleur-bouton);
-      background: var(--couleur-conteneur);
+      border: 2px solid #34d15b;
+      background: linear-gradient(160deg, rgba(34,197,94,.22), rgba(8,10,8,.7));
+      box-shadow: 0 0 14px rgba(34,197,94,.25) inset;
+      color: #eafbea;
       cursor: grab;
     }
     .deck-slot-remplie:active { cursor: grabbing; }
-    .deck-slot-remplie:hover { filter: brightness(.95); }
-    .deck-slot-survolee { border-color: #22c55e; background: #22c55e18; transform: scale(1.03); }
-    .deck-slot .deck-slot-emoji { font-size: 1.7rem; }
-    img.deck-slot-emoji { width: 30px; height: 30px; object-fit: contain; display: block; }
-    .deck-slot .deck-slot-nom { font-size: .6rem; font-weight: 700; text-align: center; padding: 0 .2rem; line-height: 1.15; }
+    .deck-slot-remplie:hover { filter: brightness(1.08); }
+    .deck-slot-survolee { border-color: #22c55e; background: #22c55e33; transform: scale(1.05); }
+    .deck-slot .deck-slot-emoji { font-size: 1.5rem; }
+    img.deck-slot-emoji { width: 26px; height: 26px; object-fit: contain; display: block; }
+    .deck-slot .deck-slot-nom { font-size: .58rem; font-weight: 700; text-align: center; padding: 0 .2rem; line-height: 1.15; }
     .deck-slot-retirer {
       position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%;
       background: #dc2626; color: #fff; font-size: .62rem; font-weight: 700; border: 2px solid var(--couleur-conteneur);
       display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1;
     }
     .deck-slot-retirer:hover { filter: brightness(.9); }
+    /* Emplacement spécial : mis en valeur (cadre doré), comme la case "9"
+       encadrée d'or de l'illustration — plus grand, plus lumineux, pour
+       bien signaler qu'il s'agit d'un futur emplacement légendaire et non
+       d'un slot désactivé comme un autre. */
     .deck-slot-special {
-      border: 2px dashed var(--couleur-bordure);
-      background: repeating-linear-gradient(45deg, transparent, transparent 6px, var(--couleur-bordure)55 6px, var(--couleur-bordure)55 12px);
-      opacity: .55;
+      aspect-ratio: auto;
+      height: 100%;
+      border: 2px solid #d4af37;
+      background: linear-gradient(165deg, rgba(212,175,55,.22), rgba(8,10,8,.78));
+      box-shadow: 0 0 0 1px rgba(212,175,55,.35), 0 0 22px rgba(212,175,55,.28) inset;
+      opacity: 1;
       cursor: not-allowed;
-      color: var(--couleur-texte-faible);
+      color: #f3e5b8;
+      gap: .35rem;
     }
-    .deck-slot-special .deck-slot-emoji { font-size: 1.3rem; }
+    .deck-slot-special .deck-slot-emoji { font-size: 2rem; filter: drop-shadow(0 0 6px rgba(212,175,55,.55)); }
+    .deck-slot-special .deck-slot-nom { font-size: .62rem; letter-spacing: .02em; }
+    @media (max-width: 420px) {
+      .deck-slots-grille { grid-template-columns: repeat(4, 1fr) 1fr; gap: .4rem; padding: .75rem .6rem; }
+      .deck-slot .deck-slot-emoji { font-size: 1.25rem; }
+      .deck-slot .deck-slot-nom { font-size: .52rem; }
+      .deck-slot-special .deck-slot-emoji { font-size: 1.6rem; }
+    }
 
     /* ── Collection de cartes disponibles ── */
     .deck-section-titre { font-size: .85rem; color: var(--couleur-texte-faible); font-weight: 600; margin: 0 0 .75rem; }
