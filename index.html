@@ -69,33 +69,46 @@
       flex-wrap: wrap;
       gap: .5rem;
     }
+    .bandeau-invite {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      padding: .9rem 1.1rem;
+      margin-bottom: 1.75rem;
+    }
+    .bandeau-invite p {
+      font-size: .85rem;
+      color: var(--couleur-texte-faible);
+      margin: 0;
+    }
+    .bandeau-invite .btn-group {
+      flex-direction: row;
+      gap: .6rem;
+    }
   </style>
 </head>
 <body>
   <div id="header-placeholder"></div>
 
   <main>
-    <!-- Visiteur non connecté -->
-    <div class="centered" id="vue-deconnecte" style="display:none">
-      <div class="card card-sm">
-        <h1>Accueil</h1>
-        <p>Bienvenue ! Connectez-vous ou créez un compte pour continuer.</p>
-
-        <div class="btn-group">
-          <a class="btn btn-primary" href="pages/connexion.html">
-            Se connecter
-          </a>
-          <a class="btn btn-secondary" href="pages/inscription.html">
-            Créer un compte
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Utilisateur connecté -->
-    <div class="centered" id="vue-connecte" style="display:none">
+    <!-- Page d'accueil : accessible à tous, connecté ou non (mode invité). -->
+    <div class="centered" id="vue-accueil" style="display:none">
       <div class="card card-pages">
         <h1>Accueil</h1>
+
+        <!-- Visible uniquement pour les visiteurs non connectés -->
+        <div class="bandeau-invite" id="bandeau-invite" style="display:none">
+          <p>Vous naviguez en mode invité — votre progression n'est pas sauvegardée.</p>
+          <div class="btn-group">
+            <a class="btn btn-primary" href="pages/connexion.html">Se connecter</a>
+            <a class="btn btn-secondary" href="pages/inscription.html">Créer un compte</a>
+          </div>
+        </div>
 
         <div class="annonces-zone" id="annonces-zone" style="display:none">
           <h2>📢 Annonces</h2>
@@ -165,11 +178,17 @@
   await chargerHeader('')
   await chargerFooter('')
 
-  const connecte = !!localStorage.getItem('username')
-  document.getElementById(connecte ? 'vue-connecte' : 'vue-deconnecte').style.display = 'flex'
+  // Mode non connecté : la grille de fonctionnalités reste accessible à
+  // tous. Seules les annonces (contenu propre aux membres) restent
+  // réservées aux comptes connectés ; un bandeau invite les visiteurs à
+  // se connecter ou créer un compte, sans bloquer l'accès à la page.
+  document.getElementById('vue-accueil').style.display = 'flex'
 
+  const connecte = !!localStorage.getItem('username')
   if (connecte) {
     await afficherAnnonces()
+  } else {
+    document.getElementById('bandeau-invite').style.display = 'flex'
   }
 })()
 
