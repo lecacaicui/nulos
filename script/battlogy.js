@@ -1,238 +1,484 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// ==========================================================================
+// BLOBATTLE — logique de jeu
+// ==========================================================================
+// Voir le commentaire en haut de blobattle.html pour le principe général.
+// Résumé :
+// - Chaque base (sauf les bases neutres) produit progressivement des blobs,
+//   jusqu'à une capacité maximale propre à chaque base (proportionnelle à
+//   sa taille) — un fin arc autour de la base indique son remplissage.
+// - Cliquer sur une de ses propres bases la sélectionne (halo blanc).
+//   Cliquer ensuite sur une autre base envoie la moitié des blobs de la
+//   base sélectionnée vers cette base, sous forme d'un groupe qui voyage
+//   à vitesse constante.
+// - À l'arrivée : si la base cible appartient au même camp, les blobs
+//   s'ajoutent. Sinon ils sont soustraits à la défense ; si la défense
+//   tombe à 0 ou moins, la base change de camp avec les blobs restants.
+// - Partie gagnée quand l'adversaire n'a plus aucune base, perdue quand
+//   le joueur n'a plus aucune base.
+// - Ce module ne dépend d'aucune API externe (pas de Supabase) : la partie
+//   est entièrement locale, contre une IA simple.
+// ==========================================================================
 
-const SUPABASE_URL = 'https://uqjciekcfrxscfwztttt.supabase.co'
-const SUPABASE_KEY = 'sb_publishable_Ly-L4hecBE_r-k4qd5zTkQ_VmaKUASz'
-export const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+const canvas = document.getElementById('blobattle-canvas')
+const ctx = canvas.getContext('2d')
 
-/**
- * Schéma attendu côté Supabase :
- *
- * create table battlogy_cartes_utilisateurs (
- *   user_id uuid not null references auth.users(id) on delete cascade,
- *   carte_id text not null,
- *   debloque_le timestamptz not null default now(),
- *   primary key (user_id, carte_id)
- * );
- *
- * create table battlogy_decks (
- *   user_id uuid primary key references auth.users(id) on delete cascade,
- *   cartes jsonb not null default '[]'::jsonb,   -- liste d'id de cartes, doublons permis, ordre libre
- *   mis_a_jour_le timestamptz not null default now()
- * );
- *
- * Penser à activer la RLS sur les deux tables et à restreindre
- * select/insert/update/delete à `user_id = auth.uid()` : chaque joueur ne
- * doit voir et modifier que ses propres cartes/deck.
- *
- * NOTE : les cartes elles-mêmes (stats, coût, etc.) restent en dur dans
- * battlogy.html (objet CARTES_SECOURS) tant que la table `battlogy_cartes`
- * est vide/inaccessible — voir chargerCartesJeu plus bas.
- */
+const overlay = document.getElementById('blobattle-overlay')
+const overlayTitle = document.getElementById('overlay-title')
+const overlayText = document.getElementById('overlay-text')
+const btnStart = document.getElementById('btn-start')
+const btnReset = document.getElementById('btn-reset')
 
-// Cartes débloquées d'office pour tout nouveau joueur (voir
-// garantirCartesDeDepart). Reprend simplement les cartes existantes
-// aujourd'hui, pour ne rien changer à l'expérience actuelle : une future
-// carte ajoutée à CARTES ne sera PAS automatiquement débloquée pour tout le
-// monde — ça, ce sera le rôle d'une vraie mécanique de progression, à
-// construire plus tard.
-export const CARTES_DEPART = [
-  'guerrier', 'archer', 'squelette', 'magicien', 'golem', 'statue', 'boule_de_feu', 'bombe_a_eau',
-  // Carte de catégorie 'legende' (voir battlogy.html) : débloquée d'office
-  // pour que tout joueur ait toujours au moins une carte légende
-  // disponible — équiper une carte légende est obligatoire dans l'éditeur
-  // de deck, voir la case spéciale dorée.
-  'roi_squelette'
-]
+const elStatPlayer = document.getElementById('stat-player')
+const elStatEnemy = document.getElementById('stat-enemy')
+const elStatBases = document.getElementById('stat-bases')
+const elStatTime = document.getElementById('stat-time')
 
-/** Renvoie l'ensemble (Set) des id de cartes débloquées par l'utilisateur. */
-export async function chargerCartesDebloquees(userId) {
-  if (!userId) return new Set()
-  const { data, error } = await db.from('battlogy_cartes_utilisateurs')
-    .select('carte_id')
-    .eq('user_id', userId)
-  if (error || !data) return new Set()
-  return new Set(data.map(l => l.carte_id))
+const elMessage = document.getElementById('blobattle-message')
+
+const TEXTE_INTRO = "Conquiers les bases adverses avec tes blobs. Une base produit automatiquement des unités. Sélectionne une base puis une destination pour attaquer."
+
+// ----- Couleurs par camp -----
+const COULEURS = {
+  player: '#3b82f6',
+  enemy: '#ef4444',
+  neutral: '#9ca3af'
 }
 
-/**
- * Débloque une carte pour l'utilisateur si elle ne l'est pas déjà.
- * Idempotent (clé primaire composite user_id + carte_id côté BDD). Pas
- * encore appelée par une vraie mécanique de jeu — prête pour plus tard
- * (récompense, palier de progression, etc.).
- */
-export async function debloquerCarte(userId, carteId) {
-  if (!userId || !carteId) return
-  const { error } = await db.from('battlogy_cartes_utilisateurs')
-    .upsert({ user_id: userId, carte_id: carteId }, { onConflict: 'user_id,carte_id', ignoreDuplicates: true })
-  if (error) console.error('debloquerCarte a échoué :', error)
+// ----- Paramètres de jeu -----
+const NB_BASES = 9
+const RAYON_MIN = 26
+const RAYON_MAX = 46
+const DISTANCE_MIN_ENTRE_BASES = 120
+const MARGE_CARTE = 60
+const VITESSE_ENVOI = 90            // px/seconde pour les groupes de blobs en transit
+const PRODUCTION_PAR_RAYON = 0.09   // blobs/seconde par pixel de rayon (bases joueur/ennemi uniquement)
+const CAPACITE_PAR_RAYON = 2.5      // capacité max = rayon * ce facteur (~65 à ~115 selon la base)
+const UNITS_DEPART_JOUEUR = 12
+const UNITS_DEPART_ENNEMI = 12
+const UNITS_MIN_POUR_ATTAQUER = 2
+const DELAI_IA_MS = 1400
+
+// ----- État de la partie -----
+let bases = []
+let envois = []            // groupes de blobs en transit
+let baseSelectionnee = null
+let pointeur = null        // position souris, pour la ligne de visée
+let etat = 'menu'          // 'menu' | 'jeu' | 'fini'
+let tempsEcoule = 0
+let dernierTimestamp = 0
+let idAnimation = null
+let prochaineActionIA = 0
+let messageTimeoutId = null
+
+// ==========================================================================
+// Génération de la carte
+// ==========================================================================
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
-/**
- * S'assure que le joueur possède au moins les cartes de départ (à appeler
- * une fois au chargement de la page). Ne touche à rien si le joueur a déjà
- * au moins une carte débloquée en BDD — ça ne concerne donc que les tout
- * premiers joueurs sans aucune ligne. Retourne l'ensemble à jour des
- * cartes débloquées.
- */
-export async function garantirCartesDeDepart(userId) {
-  if (!userId) return new Set()
-  const dejaDebloquees = await chargerCartesDebloquees(userId)
-  if (dejaDebloquees.size > 0) return dejaDebloquees
+function genererBases() {
+  const rect = canvas.getBoundingClientRect()
+  const largeur = rect.width
+  const hauteur = rect.height
 
-  const lignes = CARTES_DEPART.map(carte_id => ({ user_id: userId, carte_id }))
-  const { error } = await db.from('battlogy_cartes_utilisateurs').insert(lignes)
-  if (error) { console.error('garantirCartesDeDepart a échoué :', error); return dejaDebloquees }
-  return new Set(CARTES_DEPART)
+  const positions = []
+  let tentatives = 0
+
+  while (positions.length < NB_BASES && tentatives < 3000) {
+    tentatives++
+    const candidate = {
+      x: MARGE_CARTE + Math.random() * (largeur - MARGE_CARTE * 2),
+      y: MARGE_CARTE + Math.random() * (hauteur - MARGE_CARTE * 2),
+      r: RAYON_MIN + Math.random() * (RAYON_MAX - RAYON_MIN)
+    }
+    const tropProche = positions.some(p => distance(p, candidate) < DISTANCE_MIN_ENTRE_BASES)
+    if (!tropProche) positions.push(candidate)
+  }
+
+  // La base la plus à gauche revient au joueur, la plus à droite à l'IA :
+  // ça garantit un point de départ symétrique quel que soit le tirage.
+  positions.sort((a, b) => a.x - b.x)
+
+  return positions.map((p, i) => {
+    let owner = 'neutral'
+    let units = Math.floor(3 + Math.random() * 6)
+
+    if (i === 0) { owner = 'player'; units = UNITS_DEPART_JOUEUR }
+    else if (i === positions.length - 1) { owner = 'enemy'; units = UNITS_DEPART_ENNEMI }
+
+    return {
+      id: i,
+      x: p.x,
+      y: p.y,
+      r: p.r,
+      owner,
+      units,
+      capacite: Math.round(p.r * CAPACITE_PAR_RAYON),
+      production: PRODUCTION_PAR_RAYON * p.r
+    }
+  })
 }
 
-/** Charge la composition de deck sauvegardée (liste d'id, doublons permis), ou null si aucune. */
-export async function chargerDeck(userId) {
-  if (!userId) return null
-  const { data, error } = await db.from('battlogy_decks')
-    .select('cartes')
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (error || !data) return null
-  return Array.isArray(data.cartes) ? data.cartes : null
+// ==========================================================================
+// Entrées (clic / tactile / survol)
+// ==========================================================================
+
+function coordonneesCanvas(evt) {
+  const rect = canvas.getBoundingClientRect()
+  let clientX, clientY
+  if (evt.changedTouches && evt.changedTouches.length) {
+    clientX = evt.changedTouches[0].clientX
+    clientY = evt.changedTouches[0].clientY
+  } else {
+    clientX = evt.clientX
+    clientY = evt.clientY
+  }
+  return { x: clientX - rect.left, y: clientY - rect.top }
 }
 
-/** Sauvegarde (crée ou remplace) la composition de deck de l'utilisateur. */
-export async function sauvegarderDeck(userId, liste) {
-  if (!userId) return { ok: false }
-  const { error } = await db.from('battlogy_decks')
-    .upsert({ user_id: userId, cartes: liste, mis_a_jour_le: new Date().toISOString() }, { onConflict: 'user_id' })
-  if (error) { console.error('sauvegarderDeck a échoué :', error); return { ok: false, error } }
-  return { ok: true }
+function baseSousCurseur(pos) {
+  for (const base of bases) {
+    if (distance(base, pos) <= base.r) return base
+  }
+  return null
 }
 
-// ===========================================================================
-// ===== Cartes (définitions de jeu) — gestion complète en BDD =============
-// ===========================================================================
-/**
- * Schéma réel côté Supabase (table `battlogy_cartes`), colonnes typées pour
- * les propriétés de sort/troupe + `options` en réserve pour tout le reste
- * (ex: zoneAttaque/zoneAttaqueHex du Magicien, qui n'ont pas de colonne
- * dédiée) :
- *
- * create table public.battlogy_cartes (
- *   id text not null,
- *   nom text not null,
- *   emoji text null,
- *   cout integer not null,
- *   categorie text not null default 'troupe'::text,
- *   pv integer null,
- *   degats integer null,
- *   porte integer null,
- *   vitesse_attaque numeric null,
- *   vitesse_marche numeric null,
- *   temps_activation integer null,
- *   nombre integer not null default 1,
- *   taille numeric not null default 1,
- *   type_attaque text null,
- *   placement_libre boolean not null default false,
- *   immobile boolean not null default false,
- *   effet_instantane boolean not null default false,
- *   zone_hex numeric null,
- *   degats_chateau_mult numeric null,
- *   repousse numeric null,
- *   actif boolean not null default true,
- *   ordre integer not null default 0,
- *   image text null,
- *   options jsonb not null default '{}'::jsonb,
- *   constraint battlogy_cartes_pkey primary key (id)
- * );
- *
- * Penser à activer la RLS et à n'autoriser l'écriture (insert/update/delete)
- * qu'aux comptes admin/super_admin, la lecture étant ouverte à tous.
- *
- * `categorie` accepte désormais 'legende' en plus de 'troupe'/'sort' (texte
- * libre, aucune contrainte CHECK côté BDD) : une carte légende ne peut être
- * équipée que dans l'emplacement spécial de la modale de deck (voir
- * battlogy.html), au plus une par deck. Aucune colonne supplémentaire n'est
- * nécessaire : `battlogy_decks.cartes` (jsonb) continue de stocker un
- * simple tableau d'id — la carte légende équipée, s'il y en a une, y est
- * simplement incluse comme n'importe quel autre id.
- *
- * NOTE : `battlogy_cartes_utilisateurs` (plus haut dans ce fichier) reste
- * inchangée — elle continue de dire quelles cartes CHAQUE joueur a
- * débloquées. Ajouter une carte ici ne la débloque pour personne
- * automatiquement (voir le commentaire sur CARTES_DEPART).
- */
+function gererClic(evt) {
+  if (etat !== 'jeu') return
+  const pos = coordonneesCanvas(evt)
+  const base = baseSousCurseur(pos)
 
-/**
- * Convertit une ligne BDD vers le format attendu par le moteur de jeu (objet
- * CARTES, voir battlogy.html). Lit d'abord les colonnes dédiées
- * (placement_libre, immobile, effet_instantane, zone_hex,
- * degats_chateau_mult, repousse), puis étale `options` par-dessus en
- * dernier : ça laisse `options` disponible pour tout ce qui n'a pas de
- * colonne dédiée (ex: zoneAttaque/zoneAttaqueHex du Magicien), et permet
- * aussi de surcharger ponctuellement une colonne typée si jamais besoin.
- */
-function convertirCarteBDD(ligne) {
-  return {
-    id: ligne.id,
-    nom: ligne.nom,
-    emoji: ligne.emoji || null,
-    image: ligne.image || null,
-    cout: ligne.cout,
-    pv: ligne.pv,
-    degats: ligne.degats,
-    porte: ligne.porte,
-    vitesseAttaque: Number(ligne.vitesse_attaque),
-    vitesseMarche: ligne.vitesse_marche,
-    tempsActivation: ligne.temps_activation,
-    nombre: ligne.nombre,
-    taille: Number(ligne.taille),
-    typeAttaque: ligne.type_attaque,
-    categorie: ligne.categorie,
-    placementLibre: !!ligne.placement_libre,
-    immobile: !!ligne.immobile,
-    effetInstantane: !!ligne.effet_instantane,
-    ...(ligne.zone_hex != null ? { zoneHex: Number(ligne.zone_hex) } : {}),
-    ...(ligne.degats_chateau_mult != null ? { degatsChateauMult: Number(ligne.degats_chateau_mult) } : {}),
-    ...(ligne.repousse != null ? { repousse: Number(ligne.repousse) } : {}),
-    ...(ligne.options || {})
+  if (!base) { baseSelectionnee = null; return }
+
+  if (!baseSelectionnee) {
+    if (base.owner !== 'player') {
+      afficherMessage("Sélectionne d'abord une de tes bases (🟦).")
+      return
+    }
+    if (Math.floor(base.units) < UNITS_MIN_POUR_ATTAQUER) {
+      afficherMessage('Cette base doit avoir au moins 2 blobs pour attaquer.')
+      return
+    }
+    baseSelectionnee = base
+    return
+  }
+
+  if (base === baseSelectionnee) {
+    baseSelectionnee = null
+    return
+  }
+
+  envoyerBlobs(baseSelectionnee, base)
+  baseSelectionnee = null
+}
+
+canvas.addEventListener('click', gererClic)
+canvas.addEventListener('touchend', (evt) => { evt.preventDefault(); gererClic(evt) }, { passive: false })
+canvas.addEventListener('mousemove', (evt) => { pointeur = coordonneesCanvas(evt) })
+canvas.addEventListener('mouseleave', () => { pointeur = null })
+
+// ==========================================================================
+// Envoi de blobs & combat
+// ==========================================================================
+
+function envoyerBlobs(source, cible) {
+  const quantite = Math.floor(source.units / 2)
+  if (quantite < 1) return
+
+  source.units -= quantite
+  envois.push({
+    x: source.x,
+    y: source.y,
+    versId: cible.id,
+    proprietaire: source.owner,
+    quantite
+  })
+}
+
+function mettreAJourEnvois(dt) {
+  for (let i = envois.length - 1; i >= 0; i--) {
+    const e = envois[i]
+    const cible = bases[e.versId]
+    const dx = cible.x - e.x
+    const dy = cible.y - e.y
+    const dist = Math.hypot(dx, dy)
+    const pas = VITESSE_ENVOI * dt
+
+    if (dist <= pas) {
+      appliquerArrivee(e, cible)
+      envois.splice(i, 1)
+      continue
+    }
+
+    e.x += (dx / dist) * pas
+    e.y += (dy / dist) * pas
   }
 }
 
-/**
- * Charge les cartes actives depuis la BDD, au format attendu par le jeu.
- * Retourne null si la table est vide ou inaccessible, pour laisser
- * battlogy.html se replier sur ses cartes en dur (CARTES_SECOURS).
- */
-export async function chargerCartesJeu() {
-  const { data, error } = await db.from('battlogy_cartes')
-    .select('*')
-    .eq('actif', true)
-    .order('ordre', { ascending: true })
-  if (error || !data || data.length === 0) return null
-  const cartes = {}
-  data.forEach(ligne => { cartes[ligne.id] = convertirCarteBDD(ligne) })
-  return cartes
+function appliquerArrivee(envoi, cible) {
+  if (cible.owner === envoi.proprietaire) {
+    cible.units += envoi.quantite
+    return
+  }
+
+  cible.units -= envoi.quantite
+  if (cible.units < 0) {
+    cible.owner = envoi.proprietaire
+    cible.units = -cible.units
+  }
 }
 
-/** Liste TOUTES les cartes (actives ou non), pour l'administration. */
-export async function adminListerCartes() {
-  const { data, error } = await db.from('battlogy_cartes').select('*').order('ordre')
-  if (error) { console.error('adminListerCartes :', error); return [] }
-  return data
+// ==========================================================================
+// Production automatique
+// ==========================================================================
+
+function mettreAJourProduction(dt) {
+  for (const base of bases) {
+    if (base.owner === 'neutral') continue
+    if (base.units >= base.capacite) continue
+    base.units = Math.min(base.capacite, base.units + base.production * dt)
+  }
 }
 
-/** Crée ou met à jour une carte (upsert sur id). */
-export async function adminSauvegarderCarte(carte) {
-  const { error } = await db.from('battlogy_cartes').upsert(carte, { onConflict: 'id' })
-  if (error) { console.error('adminSauvegarderCarte :', error); return { ok: false, error } }
-  return { ok: true }
+// ==========================================================================
+// IA adverse
+// ==========================================================================
+
+function jouerIA(maintenant) {
+  if (maintenant < prochaineActionIA) return
+  prochaineActionIA = maintenant + DELAI_IA_MS + Math.random() * 800
+
+  const basesIA = bases.filter(b => b.owner === 'enemy' && b.units >= 4)
+  if (basesIA.length === 0) return
+
+  const source = basesIA.reduce((max, b) => (b.units > max.units ? b : max), basesIA[0])
+  const ciblesPossibles = bases.filter(b => b.owner !== 'enemy')
+  if (ciblesPossibles.length === 0) return
+
+  // Score bas = cible intéressante : peu défendue et proche.
+  let meilleureCible = null
+  let meilleurScore = Infinity
+  for (const cible of ciblesPossibles) {
+    const score = cible.units + distance(source, cible) * 0.05
+    if (score < meilleurScore) { meilleurScore = score; meilleureCible = cible }
+  }
+  if (!meilleureCible) return
+
+  // Évite les attaques suicidaires : n'envoie que si l'avantage est net.
+  if (Math.floor(source.units / 2) <= meilleureCible.units + 1) return
+
+  envoyerBlobs(source, meilleureCible)
 }
 
-/** Active/désactive une carte (n'apparaît plus dans le jeu si inactive, sans la supprimer). */
-export async function adminToggleActifCarte(id, actif) {
-  const { error } = await db.from('battlogy_cartes').update({ actif }).eq('id', id)
-  return { ok: !error, error }
+// ==========================================================================
+// Rendu
+// ==========================================================================
+
+function redimensionnerCanvas() {
+  const rect = canvas.getBoundingClientRect()
+  const ratio = window.devicePixelRatio || 1
+  canvas.width = Math.round(rect.width * ratio)
+  canvas.height = Math.round(rect.height * ratio)
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+  if (etat !== 'menu') dessiner()
 }
 
-/** Supprime définitivement une carte. */
-export async function adminSupprimerCarte(id) {
-  const { error } = await db.from('battlogy_cartes').delete().eq('id', id)
-  return { ok: !error, error }
+window.addEventListener('resize', redimensionnerCanvas)
+
+function dessiner() {
+  const rect = canvas.getBoundingClientRect()
+  ctx.clearRect(0, 0, rect.width, rect.height)
+
+  if (baseSelectionnee && pointeur) {
+    ctx.beginPath()
+    ctx.moveTo(baseSelectionnee.x, baseSelectionnee.y)
+    ctx.lineTo(pointeur.x, pointeur.y)
+    ctx.setLineDash([6, 6])
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+
+  for (const base of bases) dessinerBase(base)
+  for (const envoi of envois) dessinerEnvoi(envoi)
 }
+
+function dessinerBase(base) {
+  ctx.beginPath()
+  ctx.arc(base.x, base.y, base.r, 0, Math.PI * 2)
+  ctx.fillStyle = COULEURS[base.owner]
+  ctx.globalAlpha = base.owner === 'neutral' ? 0.55 : 0.9
+  ctx.fill()
+  ctx.globalAlpha = 1
+
+  // Jauge de remplissage vers la capacité max (bases jouées uniquement :
+  // les bases neutres ne produisent pas, la capacité n'y est pas visible).
+  if (base.owner !== 'neutral') {
+    const rempli = Math.min(1, base.units / base.capacite)
+    ctx.beginPath()
+    ctx.arc(base.x, base.y, base.r + 4, -Math.PI / 2, -Math.PI / 2 + rempli * Math.PI * 2)
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)'
+    ctx.lineWidth = 3
+    ctx.stroke()
+  }
+
+  if (base === baseSelectionnee) {
+    ctx.beginPath()
+    ctx.arc(base.x, base.y, base.r + 9, 0, Math.PI * 2)
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 3
+    ctx.stroke()
+  }
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 15px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(String(Math.floor(base.units)), base.x, base.y)
+}
+
+function dessinerEnvoi(envoi) {
+  ctx.beginPath()
+  ctx.arc(envoi.x, envoi.y, 9, 0, Math.PI * 2)
+  ctx.fillStyle = COULEURS[envoi.proprietaire]
+  ctx.fill()
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 10px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(String(envoi.quantite), envoi.x, envoi.y)
+}
+
+// ==========================================================================
+// Statistiques & message
+// ==========================================================================
+
+function mettreAJourStats() {
+  let unitsJoueur = 0
+  let unitsEnnemi = 0
+  let basesJoueur = 0
+
+  for (const b of bases) {
+    if (b.owner === 'player') { unitsJoueur += b.units; basesJoueur++ }
+    else if (b.owner === 'enemy') unitsEnnemi += b.units
+  }
+  for (const e of envois) {
+    if (e.proprietaire === 'player') unitsJoueur += e.quantite
+    else unitsEnnemi += e.quantite
+  }
+
+  elStatPlayer.textContent = Math.floor(unitsJoueur)
+  elStatEnemy.textContent = Math.floor(unitsEnnemi)
+  elStatBases.textContent = basesJoueur
+
+  const secondes = Math.floor(tempsEcoule)
+  const mm = String(Math.floor(secondes / 60)).padStart(2, '0')
+  const ss = String(secondes % 60).padStart(2, '0')
+  elStatTime.textContent = `${mm}:${ss}`
+}
+
+function afficherMessage(texte) {
+  elMessage.textContent = texte
+  elMessage.classList.add('visible')
+  clearTimeout(messageTimeoutId)
+  messageTimeoutId = setTimeout(() => elMessage.classList.remove('visible'), 1800)
+}
+
+// ==========================================================================
+// Fin de partie
+// ==========================================================================
+
+function verifierFinDePartie() {
+  const basesJoueur = bases.filter(b => b.owner === 'player').length
+  const basesEnnemi = bases.filter(b => b.owner === 'enemy').length
+
+  if (basesJoueur === 0) { terminerPartie(false); return true }
+  if (basesEnnemi === 0) { terminerPartie(true); return true }
+  return false
+}
+
+function terminerPartie(victoire) {
+  etat = 'fini'
+  cancelAnimationFrame(idAnimation)
+
+  overlayTitle.textContent = victoire ? '🎉 Victoire !' : '💀 Défaite'
+  overlayText.textContent = victoire
+    ? `Toutes les bases adverses sont tombées en ${elStatTime.textContent}.`
+    : "L'adversaire a conquis toutes tes bases. Retente ta chance !"
+  btnStart.textContent = 'Rejouer'
+  overlay.classList.remove('cachee')
+}
+
+// ==========================================================================
+// Boucle de jeu
+// ==========================================================================
+
+function boucle(timestamp) {
+  if (etat !== 'jeu') return
+
+  const dt = dernierTimestamp ? (timestamp - dernierTimestamp) / 1000 : 0
+  dernierTimestamp = timestamp
+  tempsEcoule += dt
+
+  mettreAJourProduction(dt)
+  mettreAJourEnvois(dt)
+  jouerIA(timestamp)
+  mettreAJourStats()
+  dessiner()
+
+  if (!verifierFinDePartie()) {
+    idAnimation = requestAnimationFrame(boucle)
+  }
+}
+
+// ==========================================================================
+// Démarrage / réinitialisation
+// ==========================================================================
+
+function demarrerPartie() {
+  redimensionnerCanvas()
+  bases = genererBases()
+  envois = []
+  baseSelectionnee = null
+  tempsEcoule = 0
+  dernierTimestamp = 0
+  prochaineActionIA = 0
+  etat = 'jeu'
+
+  overlay.classList.add('cachee')
+  mettreAJourStats()
+
+  idAnimation = requestAnimationFrame(boucle)
+}
+
+function reinitialiser() {
+  cancelAnimationFrame(idAnimation)
+  etat = 'menu'
+  bases = []
+  envois = []
+  baseSelectionnee = null
+  tempsEcoule = 0
+
+  overlayTitle.textContent = 'Blobattle'
+  overlayText.textContent = TEXTE_INTRO
+  btnStart.textContent = 'Lancer la partie'
+  overlay.classList.remove('cachee')
+
+  elStatPlayer.textContent = '0'
+  elStatEnemy.textContent = '0'
+  elStatBases.textContent = '0'
+  elStatTime.textContent = '00:00'
+
+  const rect = canvas.getBoundingClientRect()
+  ctx.clearRect(0, 0, rect.width, rect.height)
+}
+
+btnStart.addEventListener('click', demarrerPartie)
+btnReset.addEventListener('click', reinitialiser)
+
+// Prépare le canvas dès le chargement du module (avant tout clic sur "Lancer").
+redimensionnerCanvas()
