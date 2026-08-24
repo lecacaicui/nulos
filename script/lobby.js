@@ -220,6 +220,9 @@ export async function demarrerPartieLobby(lobbyId) {
  * - surCoupJoue(payload)  : un coup envoyé par l'autre joueur (host <- invité).
  * - surEtat(payload)      : un instantané de l'état du combat (invité <- hôte).
  * - surFinPartie(payload) : le résultat final (invité <- hôte).
+ * - surCapaciteActivee(payload) : activation d'une capacité de troupe
+ *   (ex: soin du Holy Dummy), host <- invité — même principe que
+ *   surCoupJoue, voir recevoirCapaciteInvite dans battlogy.html.
  * Retourne le canal — à garder pour envoyerEvenementPartie et à fermer
  * avec fermerCanalPartie une fois la partie terminée/quittée.
  */
@@ -229,6 +232,7 @@ export function ouvrirCanalPartie(lobbyId, gestionnaires = {}) {
   if (gestionnaires.surEtat)      canal.on('broadcast', { event: 'etat' },       ({ payload }) => gestionnaires.surEtat(payload))
   if (gestionnaires.surFinPartie) canal.on('broadcast', { event: 'fin_partie' }, ({ payload }) => gestionnaires.surFinPartie(payload))
   if (gestionnaires.surAbandon)   canal.on('broadcast', { event: 'abandon' },    ({ payload }) => gestionnaires.surAbandon(payload))
+  if (gestionnaires.surCapaciteActivee) canal.on('broadcast', { event: 'capacite_activee' }, ({ payload }) => gestionnaires.surCapaciteActivee(payload))
   canal.subscribe()
   return canal
 }
