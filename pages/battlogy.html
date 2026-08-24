@@ -730,6 +730,30 @@
       // module) plus bas dans la page — voir sauvegarderCompositionDeck.
       window.BattlogyDB = { userId, accessToken, sauvegarderDeck, creerLobby, annulerLobby, rejoindreLobby, quitterLobby, ecouterLobby, quitterLobbyBeacon, demarrerPartieLobby, ouvrirCanalPartie, envoyerEvenementPartie, fermerCanalPartie, envoyerAbandonBeacon }
 
+      // ─── Identité invité pour le multijoueur (JcJ) ───────────────────
+      // Créer/rejoindre un lobby nécessite un vrai auth.uid() Supabase
+      // (voir hote_user_id/RLS dans lobby.js) : un pseudo localStorage ne
+      // suffit pas. Pour un visiteur non connecté, on crée à la demande
+      // (au premier clic sur "Créer un lobby"/"Rejoindre", pas au
+      // chargement de la page) une session anonyme Supabase — un vrai
+      // compte auth.users, sans email/mot de passe. Une fois créée, elle
+      // met à jour window.BattlogyDB.userId/accessToken en place : tout le
+      // reste (RLS, nettoyage du lobby au départ via 'pagehide' plus bas,
+      // qui lit déjà accessToken) continue de fonctionner sans changement.
+      // Un compte réel n'a jamais besoin de cette étape (userId déjà posé
+      // ci-dessus).
+      window.BattlogyDB.assurerIdentitePourLobby = async function() {
+        if (window.BattlogyDB.userId) return window.BattlogyDB.userId
+        const { data, error } = await db.auth.signInAnonymously()
+        if (error || !data?.user) {
+          console.error('assurerIdentitePourLobby a échoué :', error)
+          return null
+        }
+        window.BattlogyDB.userId = data.user.id
+        window.BattlogyDB.accessToken = data.session?.access_token ?? window.BattlogyDB.accessToken
+        return window.BattlogyDB.userId
+      }
+
       if (userId) {
         const [cartes, deck] = await Promise.all([
           garantirCartesDeDepart(userId),
@@ -3717,17 +3741,37 @@
     navigator.clipboard.writeText(salleActuelle.code).then(() => afficherMessage('Code copié !'))
   })
 
+  // Pseudo affiché dans la salle d'attente pour un visiteur non connecté
+  // (pas de localStorage.username) — stable pour l'onglet en cours, pour
+  // éviter qu'il change entre créer/rejoindre un lobby dans la même visite.
+  function pseudoInvite() {
+    let pseudo = sessionStorage.getItem('pseudo_invite')
+    if (!pseudo) {
+      pseudo = 'Invité-' + Math.floor(1000 + Math.random() * 9000)
+      sessionStorage.setItem('pseudo_invite', pseudo)
+    }
+    return pseudo
+  }
+  function nomJoueurActuel() {
+    return localStorage.getItem('username') || pseudoInvite()
+  }
+
   // ── Créer un lobby ──
   document.getElementById('btn-creer-lobby').addEventListener('click', async () => {
-    const userId = window.BattlogyDB?.userId
-    if (!userId) { afficherMessage('Connecte-toi pour créer un lobby.'); return }
-
     const btn = document.getElementById('btn-creer-lobby')
     const texteInitial = btn.textContent
     btn.disabled = true
-    btn.textContent = 'Création…'
+    btn.textContent = 'Connexion…'
 
-    const resultat = await window.BattlogyDB.creerLobby(userId, localStorage.getItem('username'))
+    const userId = await window.BattlogyDB.assurerIdentitePourLobby()
+    if (!userId) {
+      btn.disabled = false; btn.textContent = texteInitial
+      afficherMessage('Impossible de créer le lobby (connexion invité échouée).')
+      return
+    }
+
+    btn.textContent = 'Création…'
+    const resultat = await window.BattlogyDB.creerLobby(userId, nomJoueurActuel())
 
     btn.disabled = false
     btn.textContent = texteInitial
@@ -3749,9 +3793,6 @@
   }
 
   async function confirmerRejoindre() {
-    const userId = window.BattlogyDB?.userId
-    if (!userId) { afficherMessage('Connecte-toi pour rejoindre un lobby.'); return }
-
     const code = document.getElementById('input-code-lobby').value.trim()
     const msgEl = document.getElementById('msg-rejoindre-lobby')
     if (!code) { msgEl.textContent = 'Entre un code.'; msgEl.className = 'msg err'; return }
@@ -3760,7 +3801,15 @@
     btn.disabled = true
     btn.textContent = 'Connexion…'
 
-    const resultat = await window.BattlogyDB.rejoindreLobby(code, localStorage.getItem('username'))
+    const userId = await window.BattlogyDB.assurerIdentitePourLobby()
+    if (!userId) {
+      btn.disabled = false; btn.textContent = 'Rejoindre'
+      msgEl.textContent = 'Connexion invité impossible.'
+      msgEl.className = 'msg err'
+      return
+    }
+
+    const resultat = await window.BattlogyDB.rejoindreLobby(code, nomJoueurActuel())
 
     btn.disabled = false
     btn.textContent = 'Rejoindre'
