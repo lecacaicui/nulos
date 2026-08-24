@@ -626,7 +626,7 @@
         <!-- ===== Onglet Cartes Battlogy ===== -->
         <div class="onglet-panneau" data-panneau="battlogy" id="battlogy-card">
           <h2>🃏 Cartes — Battlogy</h2>
-          <p class="note-verrouille">Gérez les cartes jouables dans Battlogy : stats, image, coût. Ajouter une carte ne la débloque pas automatiquement pour les joueurs existants. Désactiver une carte la retire du jeu sans la supprimer (les decks contenant cette carte l'ignoreront simplement).</p>
+          <p class="note-verrouille">Gérez les cartes jouables dans Battlogy : stats, image, coût. Ajouter une carte ne la débloque pas automatiquement pour les joueurs existants. Désactiver une carte la retire du jeu sans la supprimer (les decks contenant cette carte l'ignoreront simplement). Une carte de catégorie « Légende » ne peut être équipée que dans l'emplacement spécial doré du deck (une seule par deck, équiper une est obligatoire) — son éventuel effet sur-mesure se code directement dans battlogy.html (voir EFFETS_ARRIVEE).</p>
           <div class="row-actions" style="margin:.75rem 0;">
             <button class="btn-save" onclick="ouvrirFormCarteBattlogy(null)">+ Nouvelle carte</button>
           </div>
@@ -641,6 +641,7 @@
                 <option value="">Toutes</option>
                 <option value="troupe">Troupe</option>
                 <option value="sort">Sort</option>
+                <option value="legende">Légende</option>
               </select>
             </div>
             <div class="filtre-groupe">
@@ -886,6 +887,7 @@
             <select id="bt-categorie">
               <option value="troupe">Troupe (recrute une unité)</option>
               <option value="sort">Sort (statue, effet instantané…)</option>
+              <option value="legende">Légende (emplacement spécial, 1 max par deck)</option>
             </select>
           </div>
           <div>
@@ -946,7 +948,7 @@
         <label for="bt-options">Options avancées (JSON, optionnel — réservé aux sorts)</label>
         <textarea id="bt-options" rows="3" placeholder='ex: {"placementLibre":true,"effetInstantane":true,"zoneHex":2,"degatsChateauMult":0.4}'
           style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.85rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:monospace;"></textarea>
-        <p class="note-verrouille" style="margin-top:.3rem;">Propriétés reconnues : placementLibre, immobile, effetInstantane, zoneHex, degatsChateauMult, repousse, zoneAttaque, zoneAttaqueHex.</p>
+        <p class="note-verrouille" style="margin-top:.3rem;">Propriétés reconnues : placementLibre, immobile, effetInstantane, zoneHex, degatsChateauMult, repousse, zoneAttaque, zoneAttaqueHex. Pour une carte « Légende », les propriétés supplémentaires ne prennent effet que si un code correspondant a été ajouté dans battlogy.html (ex: auraSoinHex/auraSoinMontant pour le Roi Squelette, voir EFFETS_ARRIVEE) — ajouter une nouvelle légende avec un effet inédit nécessite toujours une intervention côté code.</p>
       </div>
       <div class="modale-admin-pied">
         <button class="btn btn-primary btn-full" onclick="sauvegarderCarteBattlogy()">Enregistrer</button>
@@ -1851,7 +1853,7 @@
         <td>${c.cout}</td>
         <td>${c.pv}</td>
         <td>${c.degats}</td>
-        <td><span class="tag" style="background:var(--couleur-bordure)">${c.categorie === 'sort' ? 'Sort' : 'Troupe'}</span></td>
+        <td><span class="tag" style="background:${c.categorie === 'legende' ? '#d4af3733' : 'var(--couleur-bordure)'}">${c.categorie === 'legende' ? 'Légende' : c.categorie === 'sort' ? 'Sort' : 'Troupe'}</span></td>
         <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
         <td>
           <div class="row-actions">

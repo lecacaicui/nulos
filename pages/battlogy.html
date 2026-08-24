@@ -559,16 +559,23 @@
       background: linear-gradient(165deg, rgba(212,175,55,.22), rgba(8,10,8,.78));
       box-shadow: 0 0 0 1px rgba(212,175,55,.35), 0 0 22px rgba(212,175,55,.28) inset;
       opacity: 1;
-      cursor: not-allowed;
       color: #f3e5b8;
       gap: .35rem;
     }
+    /* Emplacement légende VIDE : cliquable/dépose activée (attend une
+       carte de catégorie 'legende', voir renderModaleDeck côté JS). */
+    .deck-slot-special-vide { cursor: pointer; }
+    /* Emplacement légende REMPLI : peut être re-glissé vers la collection
+       pour être retiré, comme n'importe quel autre emplacement rempli. */
+    .deck-slot-special-remplie { cursor: grab; }
+    .deck-slot-special-remplie:active { cursor: grabbing; }
+    .deck-slot-special.deck-slot-survolee { border-color: #f3e5b8; box-shadow: 0 0 0 1px #f3e5b8, 0 0 26px rgba(243,229,184,.5) inset; }
     .deck-slot-special .deck-slot-emoji { font-size: 2.1rem; filter: drop-shadow(0 0 6px rgba(212,175,55,.55)); }
-    /* Le nom d'origine ("Bientôt disponible") reste dans le DOM pour
-       l'accessibilité/le title, mais l'étiquette visible est déplacée
-       sous la carte via ::after, à la manière de la légende de
-       l'illustration. */
-    .deck-slot-special .deck-slot-nom { display: none; }
+    /* L'étiquette de l'emplacement reste fixe ("LÉGENDE", via ::after,
+       à la manière de la légende de l'illustration) qu'il soit vide ou
+       occupé ; le nom de la carte équipée, lui, n'est pas répété dans le
+       slot (déjà visible dans la collection) — seul un `title` le donne
+       au survol, voir renderSlotLegendeHTML(). */
     .deck-slot-special::after {
       content: "LÉGENDE";
       position: absolute;
@@ -617,6 +624,11 @@
     .deck-carte-verrouillee { opacity: .4; filter: grayscale(1); cursor: not-allowed; }
     .deck-carte-verrouillee:hover { transform: none; }
     .deck-carte-equipee { border-color: var(--couleur-bouton); }
+    /* Carte de catégorie 'legende' dans la collection : liseré doré pour
+       la distinguer d'un coup d'œil, cohérent avec l'emplacement spécial. */
+    .deck-collection-carte-legende { border-color: #d4af37; }
+    .deck-collection-carte-legende.deck-carte-equipee { border-color: #f3e5b8; box-shadow: 0 0 0 1px #d4af37; }
+    .deck-collection-carte-legende:not(.deck-carte-verrouillee) { cursor: pointer; }
     .deck-collection-carte .deck-emoji { font-size: 1.5rem; }
     img.deck-emoji { width: 26px; height: 26px; object-fit: contain; display: block; }
     .deck-collection-carte .deck-nom { font-size: .68rem; font-weight: 700; }
@@ -734,8 +746,10 @@
     <div class="modale-deck">
       <button class="modale-fermer" onclick="fermerModaleDeck()">✕</button>
       <h2>🃏 Éditer mon deck</h2>
-      <div class="modale-deck-compteur"><span id="deck-compteur">0</span>/8 cartes — jusqu'à 2 exemplaires de chaque carte. Glisse-dépose ou clique sur +/−.</div>
+      <div class="modale-deck-compteur"><span id="deck-compteur">0</span>/8 cartes — jusqu'à 2 exemplaires de chaque carte, plus 1 carte légende obligatoire dans la case dorée. Glisse-dépose ou clique sur +/−.</div>
       <div class="deck-slots-grille" id="deck-slots-grille"></div>
+      <div class="deck-section-titre">🏆 Carte légende <span style="font-weight:400;color:var(--couleur-texte-faible)">— une seule, obligatoire, à glisser (ou cliquer) dans la case dorée</span></div>
+      <div class="deck-collection-grille" id="deck-collection-legende"></div>
       <div class="deck-section-titre">Cartes disponibles</div>
       <div class="deck-collection-grille" id="deck-collection-grille"></div>
       <div class="modale-deck-actions">
@@ -1008,6 +1022,28 @@
       repousse: 90,
       // Ralentit (gèle) les unités touchées — voir multiplicateurVitesseStatuts.
       statut: { type: 'gel', duree: 2500, params: { ralentissement: 0.45 } }
+    },
+    // ── Carte LÉGENDE ──────────────────────────────────────────────
+    // Nouvelle catégorie 'legende' : réservée à l'unique emplacement
+    // spécial (doré) de la modale de deck — voir DECK_SLOT_LEGENDE plus
+    // bas, MAX_LEGENDE, editionLegende et renderModaleDeck. Au plus une
+    // carte légende par deck, et en équiper une est obligatoire dès qu'au
+    // moins une est débloquée (voir le bouton "Enregistrer" de la modale).
+    // Ce sont des cartes "complexes" : au-delà des stats ci-dessous,
+    // chacune peut brancher un comportement sur-mesure ailleurs dans le
+    // moteur (ici, un soin de zone à l'arrivée — voir EFFETS_ARRIVEE et
+    // soignerZoneAlliee). D'autres légendes pourront ajouter leurs
+    // propres hooks au fil du temps, au cas par cas.
+    roi_squelette: {
+      id: 'roi_squelette', nom: 'Roi Squelette', emoji: '💀👑', cout: 6,
+      categorie: 'legende',
+      pv: 260, degats: 16, porte: 34, vitesseAttaque: 0.9,
+      vitesseMarche: 26, tempsActivation: 1000, nombre: 1,
+      taille: 1.2, typeAttaque: 'melee',
+      // Rayon (en unités hex) et montant de l'aura de soin déclenchée une
+      // seule fois à sa pose sur les troupes alliées proches — voir
+      // EFFETS_ARRIVEE.roi_squelette.
+      auraSoinHex: 2, auraSoinMontant: 40
     }
   }
 
@@ -1039,8 +1075,15 @@
   const RATIO_RAYON_UNITE = 1
 
   // ─── Deck / Main / Or : constantes de jeu ──────────────────────
-  const DECK_TAILLE           = 8   // 8 emplacements (+1 emplacement spécial verrouillé, voir modale d'édition)
+  const DECK_TAILLE           = 8   // 8 emplacements troupe/sort (+1 emplacement légende séparé, voir MAX_LEGENDE)
   const MAX_COPIES_PAR_CARTE  = 2   // une carte peut occuper jusqu'à 2 des 8 emplacements
+  // Emplacement spécial (doré) de la modale de deck : réservé aux cartes de
+  // catégorie 'legende', une seule à la fois. Équiper une carte légende y
+  // est obligatoire dès qu'au moins une est débloquée (voir
+  // btn-deck-sauver plus bas) — impossible sinon de lancer une partie
+  // "légitimement" configurée, même si le repli de chargerCompositionDeck
+  // évite de bloquer un joueur qui n'en a encore débloqué aucune.
+  const MAX_LEGENDE           = 1
   const MAIN_TAILLE_MAX       = 5
   const POIDS_DEPART          = 1
   const POIDS_MIN             = 0
@@ -1075,7 +1118,8 @@
   // module script/battlogy.js pour le chargement/la sauvegarde).
   const DECK_PAR_DEFAUT = [
     'guerrier', 'archer', 'squelette', 'magicien',
-    'golem', 'statue', 'boule_de_feu', 'bombe_a_eau'
+    'golem', 'statue', 'boule_de_feu', 'bombe_a_eau',
+    'roi_squelette'   // carte légende par défaut, voir MAX_LEGENDE
   ]
 
   // ─── État de la partie ──────────────────────────────────────────
@@ -1162,18 +1206,40 @@
     cartesDebloquees = new Set(Object.keys(CARTES))
   }
 
+  // Retourne la composition complète du deck (troupes/sorts + éventuelle
+  // carte légende), au format attendu par deckSlots : un tableau plat
+  // d'id, la carte légende (s'il y en a une) étant simplement le dernier
+  // élément. Sépare légende et troupes/sorts pendant le filtrage : une
+  // carte légende ne compte jamais dans les 8 emplacements normaux, et au
+  // plus une (MAX_LEGENDE) est conservée même si `source` en contenait
+  // plusieurs (ex: ancienne sauvegarde corrompue).
   function chargerCompositionDeck() {
     const source = deckSauvegarde ?? DECK_PAR_DEFAUT
     const compteurs = {}
     const filtree = []
+    let legende = null
     for (const id of source) {
       if (!CARTES[id] || !cartesDebloquees.has(id)) continue
+      if (CARTES[id].categorie === 'legende') {
+        if (legende == null) legende = id
+        continue
+      }
       compteurs[id] = (compteurs[id] || 0) + 1
       if (compteurs[id] > MAX_COPIES_PAR_CARTE) continue   // plafond : 2 exemplaires max par carte
       filtree.push(id)
       if (filtree.length >= DECK_TAILLE) break
     }
-    return filtree.length > 0 ? filtree : DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)).slice(0, DECK_TAILLE)
+    // Repli légende : si la sauvegarde n'en contenait aucune (ou une carte
+    // légende désormais verrouillée/supprimée), on équipe automatiquement
+    // la première carte légende débloquée par le joueur — pour ne jamais
+    // partir sans légende dès qu'il en possède au moins une.
+    if (legende == null) {
+      legende = Object.keys(CARTES).find(id => CARTES[id].categorie === 'legende' && cartesDebloquees.has(id)) ?? null
+    }
+    const troupes = filtree.length > 0
+      ? filtree
+      : DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id) && CARTES[id]?.categorie !== 'legende').slice(0, DECK_TAILLE)
+    return legende ? [...troupes, legende] : troupes
   }
 
   function sauvegarderCompositionDeck(liste) {
@@ -1938,6 +2004,16 @@
     statue: (u, carte) => {
       creerEffetSol(u.x, u.y, '#a855f7', 44)
       creerTexteFlottant(u.x, u.y - 20, carte.nom, '#d8b4fe')
+    },
+    // Carte légende (voir CARTES_SECOURS.roi_squelette) : à sa pose, soigne
+    // instantanément les troupes alliées proches — exemple de "carte
+    // complexe" dont l'effet dépasse les stats déclarées dans CARTES.
+    // Futures cartes légende : ajouter ici leur propre entrée par id.
+    roi_squelette: (u, carte) => {
+      if (carte.auraSoinHex) soignerZoneAlliee(u.x, u.y, carte.auraSoinHex * VS, u.team, carte.auraSoinMontant || 0)
+      creerEffetSol(u.x, u.y, '#d4af37', 60)
+      creerTexteFlottant(u.x, u.y - 22, carte.nom, '#f3e5b8')
+      declencherSecousse(3, 160)
     }
   }
 
@@ -2445,6 +2521,22 @@
         if (team === 'joueur') ennemiChateauPV = Math.max(0, ennemiChateauPV - degatsChateau)
         else joueurChateauPV = Math.max(0, joueurChateauPV - degatsChateau)
       }
+    }
+  }
+
+  // ── Soin de zone (cartes légende, ex: Roi Squelette) ─────────────────
+  // Symétrique d'appliquerDegatsZone, mais cible les ALLIÉS de `team` (pas
+  // les adversaires) et augmente leurs PV au lieu de les réduire, plafonné
+  // à pvMax. N'affecte jamais les châteaux — un point d'extension simple
+  // pour de futures cartes légende à effet de soin/buff de zone.
+  function soignerZoneAlliee(x, y, rayon, team, montant) {
+    if (montant <= 0) return
+    const allies = team === 'joueur' ? unitesJoueur : unitesEnnemi
+    for (const u of allies) {
+      if (u.pv <= 0) continue
+      const dx = u.x - x, dy = u.y - y
+      if (Math.hypot(dx, dy) > rayon + rayonUnite(u)) continue
+      u.pv = Math.min(u.pvMax, u.pv + montant)
     }
   }
 
@@ -3539,9 +3631,11 @@
   // depuis la composition sauvegardée (ou celle par défaut) à chaque
   // ouverture de la modale.
   let editionSlots = []
+  let editionLegende = null   // id de la carte légende équipée dans l'emplacement spécial, ou null
 
-  const elSlots      = document.getElementById('deck-slots-grille')
-  const elCollection = document.getElementById('deck-collection-grille')
+  const elSlots            = document.getElementById('deck-slots-grille')
+  const elCollection       = document.getElementById('deck-collection-grille')
+  const elCollectionLegende = document.getElementById('deck-collection-legende')
 
   // Construit un tableau de DECK_TAILLE emplacements à partir d'une liste
   // d'id (plafonnée à MAX_COPIES_PAR_CARTE exemplaires par carte, tronquée,
@@ -3560,6 +3654,25 @@
     return resultat
   }
 
+  // Rendu de l'emplacement spécial (doré), vide ou occupé par la carte
+  // légende équipée. Reçoit la classe `deck-slot-remplie` quand rempli
+  // pour rester détecté par les gestionnaires de clic/glisser existants
+  // (voir plus bas), au même titre que les emplacements normaux.
+  function renderSlotLegendeHTML() {
+    if (!editionLegende) {
+      return `
+        <div class="deck-slot deck-slot-special deck-slot-special-vide" data-slot="legende" title="Emplacement Légende — clique ou glisse ta carte légende ici">
+          <span class="deck-slot-emoji">🔒</span>
+        </div>`
+    }
+    const carte = CARTES[editionLegende]
+    return `
+      <div class="deck-slot deck-slot-special deck-slot-remplie deck-slot-special-remplie" draggable="true" data-slot="legende" data-carte="${editionLegende}" title="${carte.nom} — cliquer ou glisser vers la collection pour retirer">
+        <button type="button" class="deck-slot-retirer" data-slot="legende" title="Retirer">✕</button>
+        ${iconeCarteHTML(carte, 'deck-slot-emoji')}
+      </div>`
+  }
+
   function renderModaleDeck() {
     const nb = editionSlots.filter(Boolean).length
     document.getElementById('deck-compteur').textContent = nb
@@ -3575,13 +3688,11 @@
           ${iconeCarteHTML(carte, 'deck-slot-emoji')}
           <span class="deck-slot-nom">${carte.nom}</span>
         </div>`
-    }).join('') + `
-      <div class="deck-slot deck-slot-special" title="Emplacement spécial — bientôt disponible">
-        <span class="deck-slot-emoji">🔒</span>
-        <span class="deck-slot-nom">Bientôt disponible</span>
-      </div>`
+    }).join('') + renderSlotLegendeHTML()
 
-    elCollection.innerHTML = Object.values(CARTES).map(carte => {
+    // Collection "normale" : troupes et sorts uniquement, les cartes
+    // légende ont leur propre grille (elCollectionLegende, voir plus bas).
+    elCollection.innerHTML = Object.values(CARTES).filter(carte => carte.categorie !== 'legende').map(carte => {
       const verrouillee = !cartesDebloquees.has(carte.id)
       const qte = verrouillee ? 0 : editionSlots.filter(id => id === carte.id).length
       const deckPlein = nb >= DECK_TAILLE
@@ -3601,10 +3712,40 @@
           ${stepperHtml}
         </div>`
     }).join('')
+
+    // Collection des cartes légende : pas de stepper (MAX_LEGENDE = 1),
+    // un simple clic (ou glisser-déposer) sur une carte débloquée
+    // l'équipe directement dans l'emplacement spécial, en remplaçant
+    // l'éventuelle légende déjà équipée.
+    const cartesLegende = Object.values(CARTES).filter(carte => carte.categorie === 'legende')
+    elCollectionLegende.innerHTML = cartesLegende.length === 0
+      ? `<div class="note-verrouille">Aucune carte légende définie pour le moment.</div>`
+      : cartesLegende.map(carte => {
+          const verrouillee = !cartesDebloquees.has(carte.id)
+          const equipee = editionLegende === carte.id
+          const peutEquiper = !verrouillee && !equipee
+          return `
+            <div class="deck-collection-carte deck-collection-carte-legende${verrouillee ? ' deck-carte-verrouillee' : ''}${equipee ? ' deck-carte-equipee' : ''}"
+                 draggable="${peutEquiper ? 'true' : 'false'}" data-carte="${carte.id}">
+              ${iconeCarteHTML(carte, 'deck-emoji')}
+              <span class="deck-nom">${carte.nom}${verrouillee ? ' 🔒' : ''}</span>
+              <span class="deck-cout">${verrouillee ? 'Verrouillée' : (equipee ? 'Équipée' : 'Coût ' + carte.cout)}</span>
+            </div>`
+        }).join('')
+  }
+
+  // Équipe une carte légende dans l'emplacement spécial, en remplaçant
+  // l'éventuelle légende déjà équipée (MAX_LEGENDE = 1 : jamais de stack).
+  function equiperLegende(carteId) {
+    if (!cartesDebloquees.has(carteId)) return
+    if (CARTES[carteId]?.categorie !== 'legende') return
+    editionLegende = carteId
+    renderModaleDeck()
   }
 
   function equiperCarteDansDeck(carteId) {
     if (!cartesDebloquees.has(carteId)) return
+    if (CARTES[carteId]?.categorie === 'legende') { equiperLegende(carteId); return }
     if (editionSlots.filter(id => id === carteId).length >= MAX_COPIES_PAR_CARTE) {
       afficherMessage(`Maximum ${MAX_COPIES_PAR_CARTE} exemplaires de cette carte.`)
       return
@@ -3616,6 +3757,11 @@
   }
 
   function retirerCarteDuDeck(carteId) {
+    if (CARTES[carteId]?.categorie === 'legende') {
+      if (editionLegende === carteId) editionLegende = null
+      renderModaleDeck()
+      return
+    }
     const index = editionSlots.lastIndexOf(carteId)
     if (index === -1) return
     editionSlots[index] = null
@@ -3626,8 +3772,11 @@
   // dans l'emplacement `indexCible`. Si elle vient d'un autre emplacement,
   // les deux emplacements échangent leur contenu. Si elle vient de la
   // collection, on vérifie le plafond de MAX_COPIES_PAR_CARTE exemplaires.
+  // Réservée aux emplacements normaux (troupe/sort) — une carte légende ne
+  // passe jamais par ici, voir l'aiguillage dans le handler `drop` plus bas.
   function deposerCarteDansSlot(carteId, indexCible, from, slotOrigine) {
     if (!cartesDebloquees.has(carteId)) return
+    if (CARTES[carteId]?.categorie === 'legende') return   // sécurité : jamais dans un slot normal
     if (from === 'slot') {
       const contenuCible = editionSlots[indexCible]
       editionSlots[slotOrigine] = contenuCible
@@ -3647,7 +3796,9 @@
   }
 
   function ouvrirModaleDeck() {
-    editionSlots = construireSlotsDepuis(chargerCompositionDeck())
+    const composition = chargerCompositionDeck()
+    editionLegende = composition.find(id => CARTES[id]?.categorie === 'legende') ?? null
+    editionSlots = construireSlotsDepuis(composition.filter(id => CARTES[id]?.categorie !== 'legende'))
     renderModaleDeck()
     document.getElementById('modale-deck-fond').classList.add('ouverte')
   }
@@ -3911,9 +4062,18 @@
     else retirerCarteDuDeck(carteId)
   })
 
+  // Cartes légende : pas de stepper, un clic direct sur la carte (si
+  // débloquée et pas déjà équipée) l'équipe dans l'emplacement spécial.
+  elCollectionLegende.addEventListener('click', (e) => {
+    const tuile = e.target.closest('.deck-collection-carte-legende')
+    if (!tuile || tuile.classList.contains('deck-carte-verrouillee')) return
+    equiperLegende(tuile.dataset.carte)
+  })
+
   elSlots.addEventListener('click', (e) => {
     const tuile = e.target.closest('.deck-slot-remplie')
     if (!tuile) return
+    if (tuile.dataset.slot === 'legende') { editionLegende = null; renderModaleDeck(); return }
     editionSlots[Number(tuile.dataset.slot)] = null
     renderModaleDeck()
   })
@@ -3925,13 +4085,17 @@
     if (tuileCollection && cartesDebloquees.has(tuileCollection.dataset.carte)) {
       e.dataTransfer.setData('text/plain', JSON.stringify({ carteId: tuileCollection.dataset.carte, from: 'collection' }))
     } else if (tuileSlot) {
-      e.dataTransfer.setData('text/plain', JSON.stringify({ carteId: tuileSlot.dataset.carte, from: 'slot', slot: Number(tuileSlot.dataset.slot) }))
+      // slot vaut 'legende' pour l'emplacement spécial, sinon un index
+      // numérique — conservé tel quel (pas de Number()) pour transporter
+      // les deux cas jusqu'au handler `drop` ci-dessous.
+      const slotAttr = tuileSlot.dataset.slot
+      e.dataTransfer.setData('text/plain', JSON.stringify({ carteId: tuileSlot.dataset.carte, from: 'slot', slot: slotAttr === 'legende' ? 'legende' : Number(slotAttr) }))
     }
   })
 
   elSlots.addEventListener('dragover', (e) => {
     const slot = e.target.closest('.deck-slot')
-    if (!slot || slot.classList.contains('deck-slot-special')) return
+    if (!slot) return
     e.preventDefault()
     slot.classList.add('deck-slot-survolee')
   })
@@ -3941,13 +4105,25 @@
   })
   elSlots.addEventListener('drop', (e) => {
     const slot = e.target.closest('.deck-slot')
-    if (!slot || slot.classList.contains('deck-slot-special')) return
+    if (!slot) return
     e.preventDefault()
     slot.classList.remove('deck-slot-survolee')
     const donnees = e.dataTransfer.getData('text/plain')
     if (!donnees) return
     const { carteId, from, slot: slotOrigine } = JSON.parse(donnees)
-    deposerCarteDansSlot(carteId, Number(slot.dataset.slot), from, slotOrigine)
+    const carte = CARTES[carteId]
+    if (!carte) return
+    const cibleLegende = slot.dataset.slot === 'legende'
+    // Une carte légende ne peut aller que dans l'emplacement spécial, et
+    // réciproquement seul l'emplacement spécial peut la recevoir : toute
+    // autre combinaison est silencieusement ignorée.
+    if (cibleLegende !== (carte.categorie === 'legende')) return
+    if (cibleLegende) {
+      editionLegende = carteId
+      renderModaleDeck()
+    } else {
+      deposerCarteDansSlot(carteId, Number(slot.dataset.slot), from, slotOrigine)
+    }
   })
 
   // Glisser une carte équipée jusque dans la collection = la retirer du deck.
@@ -3957,18 +4133,38 @@
     const donnees = e.dataTransfer.getData('text/plain')
     if (!donnees) return
     const { from, slot: slotOrigine } = JSON.parse(donnees)
-    if (from === 'slot') { editionSlots[slotOrigine] = null; renderModaleDeck() }
+    if (from !== 'slot') return
+    if (slotOrigine === 'legende') { editionLegende = null } else { editionSlots[slotOrigine] = null }
+    renderModaleDeck()
+  })
+  elCollectionLegende.addEventListener('dragover', (e) => e.preventDefault())
+  elCollectionLegende.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const donnees = e.dataTransfer.getData('text/plain')
+    if (!donnees) return
+    const { from, slot: slotOrigine } = JSON.parse(donnees)
+    if (from === 'slot' && slotOrigine === 'legende') { editionLegende = null; renderModaleDeck() }
   })
 
   document.getElementById('btn-deck-reset').addEventListener('click', () => {
-    editionSlots = construireSlotsDepuis(DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id)))
+    const defaut = DECK_PAR_DEFAUT.filter(id => cartesDebloquees.has(id))
+    editionLegende = defaut.find(id => CARTES[id]?.categorie === 'legende') ?? null
+    editionSlots = construireSlotsDepuis(defaut.filter(id => CARTES[id]?.categorie !== 'legende'))
     renderModaleDeck()
   })
 
   document.getElementById('btn-deck-sauver').addEventListener('click', () => {
     const liste = editionSlots.filter(Boolean)
     if (liste.length === 0) { afficherMessage('Le deck doit contenir au moins une carte.'); return }
-    sauvegarderCompositionDeck(liste)
+    // Carte légende obligatoire dès qu'au moins une est débloquée : on ne
+    // bloque évidemment pas un joueur qui n'en a encore débloqué aucune.
+    const legendeDisponible = Object.values(CARTES).some(c => c.categorie === 'legende' && cartesDebloquees.has(c.id))
+    if (legendeDisponible && !editionLegende) {
+      afficherMessage('Équipe une carte légende dans la case dorée avant d’enregistrer.')
+      return
+    }
+    const composition = editionLegende ? [...liste, editionLegende] : liste
+    sauvegarderCompositionDeck(composition)
     afficherMessage('Deck enregistré.')
     fermerModaleDeck()
   })
@@ -4049,9 +4245,8 @@
    *  KeyW…, l'emplacement physique de la touche), donc le raccourci reste
    *  sur A/Z/E/R/T quelle que soit la disposition du clavier.
    *
-   *  DECK (choisi par le joueur, jusqu'à 10 emplacements, doublons
-   *  autorisés pour l'instant — limite finale visée : 2 exemplaires par
-   *  carte, pas encore appliquée)
+   *  DECK (8 emplacements troupe/sort, jusqu'à 2 exemplaires par carte,
+   *  + 1 emplacement LÉGENDE séparé, voir ci-dessous)
    *  ------------------------------------------------------------------
    *  - Édité via la modale "Éditer mon deck" (bouton à côté de "Lancer la
    *    partie"), sauvegardé en BDD (Supabase, table battlogy_decks, une
@@ -4060,6 +4255,23 @@
    *    cartes débloquées par le joueur (table battlogy_cartes_utilisateurs)
    *    peuvent être ajoutées au deck ; les autres apparaissent verrouillées
    *    🔒 dans la modale.
+   *
+   *  CARTES LÉGENDE (categorie 'legende')
+   *  ------------------------------------------------------------------
+   *  - Emplacement spécial doré, séparé des 8 emplacements normaux (voir
+   *    MAX_LEGENDE) : au plus UNE carte légende par deck, et en équiper
+   *    une est obligatoire dès qu'au moins une est débloquée (le bouton
+   *    "Enregistrer" de la modale refuse sinon de sauvegarder).
+   *  - Une fois en partie, une carte légende se tire et se joue exactement
+   *    comme les autres (même pioche pondérée, même main, même coût en
+   *    or) — seule sa place dans l'ÉDITEUR de deck est restreinte.
+   *  - Ce sont des cartes à effet "complexe" : au-delà de leurs stats
+   *    déclarées dans CARTES, chacune peut brancher un comportement
+   *    sur-mesure ailleurs dans le moteur (ex: roi_squelette soigne les
+   *    alliés proches à sa pose, voir EFFETS_ARRIVEE et
+   *    soignerZoneAlliee). Ajouter une nouvelle carte légende avec un
+   *    effet inédit demande donc toujours un peu de code dédié, en plus
+   *    de sa fiche dans l'admin.
    *  - C'est un "paquet infini" à tirage pondéré : chaque emplacement (même
    *    en cas de doublon) a son propre poids, indépendant des autres.
    *    Poids de départ 1, borné entre 0 (POIDS_MIN) et 2.5 (POIDS_MAX).
