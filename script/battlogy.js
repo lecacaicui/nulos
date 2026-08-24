@@ -36,7 +36,12 @@ export const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 // monde — ça, ce sera le rôle d'une vraie mécanique de progression, à
 // construire plus tard.
 export const CARTES_DEPART = [
-  'guerrier', 'archer', 'squelette', 'magicien', 'golem', 'statue', 'boule_de_feu', 'bombe_a_eau'
+  'guerrier', 'archer', 'squelette', 'magicien', 'golem', 'statue', 'boule_de_feu', 'bombe_a_eau',
+  // Carte de catégorie 'legende' (voir battlogy.html) : débloquée d'office
+  // pour que tout joueur ait toujours au moins une carte légende
+  // disponible — équiper une carte légende est obligatoire dans l'éditeur
+  // de deck, voir la case spéciale dorée.
+  'roi_squelette'
 ]
 
 /** Renvoie l'ensemble (Set) des id de cartes débloquées par l'utilisateur. */
@@ -139,6 +144,14 @@ export async function sauvegarderDeck(userId, liste) {
  *
  * Penser à activer la RLS et à n'autoriser l'écriture (insert/update/delete)
  * qu'aux comptes admin/super_admin, la lecture étant ouverte à tous.
+ *
+ * `categorie` accepte désormais 'legende' en plus de 'troupe'/'sort' (texte
+ * libre, aucune contrainte CHECK côté BDD) : une carte légende ne peut être
+ * équipée que dans l'emplacement spécial de la modale de deck (voir
+ * battlogy.html), au plus une par deck. Aucune colonne supplémentaire n'est
+ * nécessaire : `battlogy_decks.cartes` (jsonb) continue de stocker un
+ * simple tableau d'id — la carte légende équipée, s'il y en a une, y est
+ * simplement incluse comme n'importe quel autre id.
  *
  * NOTE : `battlogy_cartes_utilisateurs` (plus haut dans ce fichier) reste
  * inchangée — elle continue de dire quelles cartes CHAQUE joueur a
