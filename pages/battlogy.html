@@ -1044,6 +1044,31 @@
       // seule fois à sa pose sur les troupes alliées proches — voir
       // EFFETS_ARRIVEE.roi_squelette.
       auraSoinHex: 2, auraSoinMontant: 40
+    },
+    // Carte légende PLACEHOLDER — gabarit minimal utilisé pour tester le
+    // système de capacité activable en jeu (voir `capacite` ci-dessous,
+    // CAPACITE_ACTIVE dans le moteur : creerUnite, mettreAJourUnite,
+    // activerCapacite, tenterActiverCapacite, gererClicArene). Reprend par
+    // ailleurs des stats de troupe basique (mêlée, mono-cible) et un effet
+    // d'arrivée à zone façon "atterrissage", sur le même principe que
+    // EFFETS_ARRIVEE.golem/statue mais avec dégâts + repoussée aux ennemis.
+    holy_dummy: {
+      id: 'holy_dummy', nom: 'Holy Dummy', emoji: '🕊️', cout: 3,
+      categorie: 'legende',
+      pv: 150, degats: 14, porte: 34, vitesseAttaque: 1,
+      vitesseMarche: 32, tempsActivation: 900, nombre: 1,
+      taille: 1.1, typeAttaque: 'melee',
+      // Effet d'arrivée (voir EFFETS_ARRIVEE.holy_dummy) : dégâts de zone +
+      // repoussée aux ENNEMIS situés à l'endroit où elle atterrit — n'a
+      // aucun effet sur les alliés. Une fois posée, elle attaque ensuite
+      // normalement en mêlée mono-cible (typeAttaque/porte/degats ci-dessus).
+      degatsArriveeHex: 1.5, degatsArrivee: 30, repousseArrivee: 70,
+      // Capacité activable en jeu (voir `capacite` : creerUnite l'attache à
+      // l'unité, un clic/tap dessus tant qu'elle est vivante sur le terrain
+      // la déclenche — voir gererClicArene). `type: 'soin_pourcentage'` +
+      // `valeur: 0.5` = rend la moitié de ses PV MAX (arrondi, plafonné à
+      // pvMax). Coûte 1 or par activation, 5s de recharge entre deux.
+      capacite: { cout: 1, cooldownMs: 5000, type: 'soin_pourcentage', valeur: 0.5 }
     }
   }
 
@@ -1249,6 +1274,22 @@
     }
   }
 
+  // Une seule troupe légende alliée peut être présente sur le terrain à la
+  // fois (voir MAX_LEGENDE = un seul emplacement légende par deck de toute
+  // façon) : tant que la carte légende du deck est déjà EN MAIN ou déjà
+  // POSÉE (vivante) sur le terrain, elle ne doit plus pouvoir être repiochée
+  // — voir son exclusion du tirage dans poidsEffectifDeck ci-dessous. Ses
+  // chances redeviennent normales dès qu'elle meurt au combat (retirée de
+  // unitesJoueur, voir mettreAJourUnites) ou est mise à la défausse (retirée
+  // de main, voir detruireCarteMain/tenterPoserCarte) : aucun état à
+  // remettre à zéro manuellement, cette fonction se contente de relire l'état
+  // courant de la main et du terrain à chaque tirage.
+  function legendeIndisponiblePourTirage(carteId) {
+    if (main.some(m => m.carteId === carteId)) return true
+    if (unitesJoueur.some(u => u.carteId === carteId && u.pv > 0)) return true
+    return false
+  }
+
   // ─── Tirage pondéré dans le deck ────────────────────────────────
   // `bonusPetitCout` : uniquement utilisé pour la main de départ (3
   // cartes), applique un bonus x2 aux cartes coûtant 3 or ou moins, en
@@ -1256,6 +1297,7 @@
   function poidsEffectifDeck(bonusPetitCout) {
     return deckSlots.map(slot => {
       const carte = CARTES[slot.carteId]
+      if (carte.categorie === 'legende' && legendeIndisponiblePourTirage(slot.carteId)) return 0
       let p = Math.max(POIDS_MIN, slot.poids)
       if (carte.cout > orCapaciteMax) p *= MULT_COUT_TROP_CHER
       if (bonusPetitCout && carte.cout <= 3) p *= MULT_INITIAL_PAS_CHER
@@ -2014,6 +2056,21 @@
       creerEffetSol(u.x, u.y, '#d4af37', 60)
       creerTexteFlottant(u.x, u.y - 22, carte.nom, '#f3e5b8')
       declencherSecousse(3, 160)
+    },
+    // Carte légende (voir CARTES_SECOURS.holy_dummy) : à sa pose, dégâts de
+    // zone + repoussée sur les ENNEMIS présents à l'endroit où elle
+    // atterrit (jamais les alliés — voir appliquerDegatsZone, qui ne cible
+    // que le camp adverse à `u.team`). Purement à l'arrivée : une fois
+    // posée, elle combat ensuite normalement en mêlée mono-cible.
+    holy_dummy: (u, carte) => {
+      if (carte.degatsArriveeHex) {
+        appliquerDegatsZone(u.x, u.y, carte.degatsArriveeHex * VS, u.team, carte.degatsArrivee || 0, {
+          repousse: carte.repousseArrivee || 0
+        })
+      }
+      creerEffetSol(u.x, u.y, '#fde68a', 56)
+      creerTexteFlottant(u.x, u.y - 22, carte.nom, '#fef3c7')
+      declencherSecousse(3, 160)
     }
   }
 
@@ -2121,6 +2178,13 @@
       immobile: !!carte.immobile,
       etat: carte.immobile ? 'immobile' : 'activation',
       statuts: [],
+      // Capacité activable en jeu (voir CARTES : `capacite`, et plus bas
+      // activerCapacite/tenterActiverCapacite/gererClicArene). `null` pour
+      // toute unité sans capacité définie sur sa carte — c'est le cas de la
+      // grande majorité des troupes, seules certaines cartes légende (ex :
+      // Holy Dummy) en portent une pour l'instant.
+      capacite: carte.capacite || null,
+      capaciteCooldownRestant: 0,
       // Vitesse de projection en cours (px/s), suite à un effet de
       // repousse (ex: Bombe à eau) — voir appliquerDegatsZone et
       // mettreAJourKnockback. Nulle tant qu'aucune repousse n'est en cours.
@@ -2368,6 +2432,12 @@
 
   function mettreAJourUnite(unite, dt) {
     if (unite.pv <= 0) return
+    // Recharge de la capacité activable (voir CARTES.capacite) : décompte
+    // indépendant de l'état de l'unité (marche, attaque, immobile…), pour
+    // qu'elle continue de se recharger même pendant un combat.
+    if (unite.capacite && unite.capaciteCooldownRestant > 0) {
+      unite.capaciteCooldownRestant = Math.max(0, unite.capaciteCooldownRestant - dt)
+    }
     mettreAJourKnockback(unite, dt) // projection en cours (repousse), indépendante de l'IA de marche
     mettreAJourStatuts(unite, dt) // dégâts sur la durée, même immobile (statue qui brûle)
     if (unite.pv <= 0) return // le statut a pu achever l'unité ce tick
@@ -2538,6 +2608,42 @@
       if (Math.hypot(dx, dy) > rayon + rayonUnite(u)) continue
       u.pv = Math.min(u.pvMax, u.pv + montant)
     }
+  }
+
+  // ── Capacités activables (cartes légende, ex : Holy Dummy) ───────────
+  // Une unité peut porter une `capacite` (voir CARTES) que le joueur
+  // déclenche en cliquant/tapant dessus tant qu'elle est vivante sur le
+  // terrain (voir gererClicArene plus bas). Trois fonctions séparées :
+  //  - activerCapacite : applique l'EFFET et relance le cooldown, sans
+  //    jamais toucher à l'or — c'est la seule à connaître les différents
+  //    TYPES d'effet, partagée par tous les chemins qui l'exécutent après
+  //    coup/or déjà validés.
+  //  - tenterActiverCapacite : chemin "simulation locale authoritative"
+  //    (solo, ou hôte pour SES propres troupes) — vérifie et débite l'or.
+  //  - recevoirCapaciteInvite / declencherCapacitePvPInvite, plus bas avec
+  //    le reste du réseau JcJ : chemin invité (aucune simulation locale,
+  //    l'hôte fait confiance à l'invité pour l'or/le cooldown, exactement
+  //    comme recevoirCoupInvite pour la pose de troupes).
+  function activerCapacite(unite) {
+    const cap = unite.capacite
+    if (!cap || unite.pv <= 0) return
+    unite.capaciteCooldownRestant = cap.cooldownMs
+    if (cap.type === 'soin_pourcentage') {
+      const gain = Math.round(unite.pvMax * cap.valeur)
+      unite.pv = Math.min(unite.pvMax, unite.pv + gain)
+      creerTexteFlottant(unite.x, unite.y - rayonUnite(unite) - 16, '+' + gain + ' PV', '#facc15')
+      creerParticules(unite.x, unite.y, '#facc15', 12, { vitesseMax: 90, dureeMax: 500 })
+    }
+  }
+
+  function tenterActiverCapacite(unite) {
+    const cap = unite.capacite
+    if (!cap || unite.pv <= 0) return
+    if (unite.capaciteCooldownRestant > 0) { afficherMessage('Capacité en recharge.'); return }
+    if (or < cap.cout) { afficherMessage("Pas assez d'or."); return }
+    or -= cap.cout
+    activerCapacite(unite)
+    renderMain() // rafraîchit l'affichage de l'or (jauge du bas)
   }
 
   function mettreAJourProjectiles(dt) {
@@ -2828,6 +2934,22 @@
       ctx.font = '11px sans-serif'
       ctx.fillStyle = '#ffffffcc'
       ctx.fillText('⏳', u.x, yBarre - 6)
+    }
+
+    // Indicateur de capacité activable (voir CARTES.capacite) : uniquement
+    // sur ses propres unités, puisque seul le joueur peut cliquer dessus
+    // (voir gererClicArene) — un cœur plein/doré quand la capacité est
+    // prête, grisé avec le temps restant (s) pendant la recharge.
+    if (u.capacite && u.team === 'joueur') {
+      const prete = u.capaciteCooldownRestant <= 0
+      ctx.font = '12px sans-serif'
+      ctx.fillStyle = prete ? '#facc15' : '#ffffff66'
+      ctx.fillText('❤', u.x - 12, yBarre - 6)
+      if (!prete) {
+        ctx.font = '9px sans-serif'
+        ctx.fillStyle = '#ffffffaa'
+        ctx.fillText(Math.ceil(u.capaciteCooldownRestant / 1000) + 's', u.x + 3, yBarre - 5)
+      }
     }
 
     dessinerStatuts(u)
@@ -3125,6 +3247,38 @@
     }
   }
 
+  // ── Capacité activable : détection du clic/tap sur sa propre unité ──
+  // Cherche, parmi les unités du joueur, celle qui porte une capacité (voir
+  // CARTES.capacite) et se trouve sous le point cliqué/touché — retourne
+  // `null` sinon. N'importe jamais sur les unités ennemies : seules les
+  // siennes sont activables.
+  function uniteAvecCapaciteSousLeCurseur(clientX, clientY) {
+    const pt = clientVersCanvas(clientX, clientY)
+    if (!pt) return null
+    for (const u of unitesJoueur) {
+      if (!u.capacite || u.pv <= 0) continue
+      const r = rayonUnite(u) + 6 // légère marge, plus facile à viser au tactile
+      if (Math.hypot(pt.x - u.x, pt.y - u.y) <= r) return u
+    }
+    return null
+  }
+
+  // Gestionnaire de clic/tap sur l'arène : ignoré pendant un glisser de
+  // carte en cours (carteEnCours) pour ne jamais interférer avec la pose de
+  // troupes — voir initGlisserDeposer/finGlisser. En JcJ côté invité,
+  // aucune simulation locale : on passe par declencherCapacitePvPInvite
+  // (réseau) plutôt que tenterActiverCapacite (simulation directe).
+  function gererClicArene(e) {
+    if (!partieCommencee || partieTerminee || carteEnCours) return
+    const unite = uniteAvecCapaciteSousLeCurseur(e.clientX, e.clientY)
+    if (!unite) return
+    if (modePartie === 'pvp' && rolePvP === 'invite') {
+      declencherCapacitePvPInvite(unite)
+    } else {
+      tenterActiverCapacite(unite)
+    }
+  }
+
   // `uid` identifie l'exemplaire précis dans la main (indispensable dès
   // qu'on autorise les doublons : deux cartes "guerrier" en main ont
   // chacune leur propre uid).
@@ -3306,6 +3460,12 @@
 
   document.getElementById('btn-pioche-urgence').addEventListener('click', piocherUrgence)
 
+  // Capacité activable (voir gererClicArene) : lié une seule fois sur
+  // l'élément canvas lui-même (présent dès le HTML statique, contrairement
+  // aux cartes de la main qui sont re-rendues à chaque changement — pas
+  // besoin de re-binder ce listener après un resize/initArena).
+  document.getElementById('game-canvas').addEventListener('pointerdown', gererClicArene)
+
   // ─── Écran de démarrage / fin de partie ────────────────────────
   function actualiserCartesDisponibles(disponible) {
     renderMain()
@@ -3395,7 +3555,8 @@
       surCoupJoue:  rolePvP === 'hote'   ? recevoirCoupInvite    : null,
       surEtat:      rolePvP === 'invite' ? recevoirEtatHote      : null,
       surFinPartie: rolePvP === 'invite' ? recevoirFinPartieHote : null,
-      surAbandon:   recevoirAbandonAdversaire
+      surAbandon:   recevoirAbandonAdversaire,
+      surCapaciteActivee: rolePvP === 'hote' ? recevoirCapaciteInvite : null
     })
 
     demarrerPartie() // réutilise l'init existante (deck, main, or, PV châteaux…)
@@ -3445,6 +3606,43 @@
     else poserCarte(carte, x, y, 'ennemi')
   }
 
+  // ── Invité → Hôte : "j'active la capacité de mon unité tel id" ──
+  // Même principe que envoyerCoupPvP/recevoirCoupInvite (l'or et le
+  // cooldown sont déjà vérifiés localement côté invité, voir
+  // declencherCapacitePvPInvite plus bas — l'hôte fait confiance et
+  // applique directement l'effet dans SA simulation, seule source de
+  // vérité). `id` identifie l'unité dans unitesEnnemi (du point de vue de
+  // l'hôte, c'est le camp de l'invité).
+  function envoyerCapacitePvP(uniteId) {
+    if (!canalPartie) return
+    window.BattlogyDB.envoyerEvenementPartie(canalPartie, 'capacite_activee', { id: uniteId })
+  }
+
+  // ── Hôte : reçoit une activation de capacité envoyée par l'invité.
+  function recevoirCapaciteInvite(payload) {
+    if (rolePvP !== 'hote' || !partieCommencee || partieTerminee) return
+    const unite = unitesEnnemi.find(u => u.id === payload.id)
+    if (unite) activerCapacite(unite)
+  }
+
+  // ── Invité : chemin appelé par gererClicArene à sa place de
+  // tenterActiverCapacite — aucune simulation locale (voir boucleDeJeu),
+  // donc pas d'appel à activerCapacite ici : seulement une vérification/
+  // débit optimiste de son propre or et cooldown (déjà connus localement
+  // via unite.capaciteCooldownRestant, reçu de l'hôte — voir
+  // versUniteReseau/convertir plus bas), puis envoi à l'hôte qui seul
+  // applique réellement l'effet. Le prochain instantané reçu fait foi.
+  function declencherCapacitePvPInvite(unite) {
+    const cap = CARTES[unite.carteId]?.capacite
+    if (!cap || unite.pv <= 0) return
+    if ((unite.capaciteCooldownRestant || 0) > 0) { afficherMessage('Capacité en recharge.'); return }
+    if (or < cap.cout) { afficherMessage("Pas assez d'or."); return }
+    or -= cap.cout
+    unite.capaciteCooldownRestant = cap.cooldownMs
+    renderMain()
+    envoyerCapacitePvP(unite.id)
+  }
+
   // ── Hôte : diffuse un instantané de l'état du combat (positions/PV des
   // unités, PV châteaux, projectiles, temps de combat) — appelé toutes les
   // INTERVALLE_ETAT_MS depuis boucleDeJeu. Coordonnées normalisées (voir
@@ -3452,7 +3650,14 @@
   // l'écran de l'invité.
   function versUniteReseau(u) {
     return { id: u.id, c: u.carteId, x: u.x / canvas.width, y: u.y / canvas.height,
-      pv: Math.round(u.pv), pvMax: u.pvMax, taille: u.taille, etat: u.etat }
+      pv: Math.round(u.pv), pvMax: u.pvMax, taille: u.taille, etat: u.etat,
+      // Cooldown restant de la capacité (voir CARTES.capacite) : transmis
+      // uniquement pour les unités qui en portent une, sinon `undefined`
+      // (pas de champ inutile pour la grande majorité des troupes) — permet
+      // à l'invité d'afficher/vérifier localement l'état de recharge, voir
+      // declencherCapacitePvPInvite et dessinerUnite.
+      ...(u.capacite ? { cd: Math.round(u.capaciteCooldownRestant) } : {})
+    }
   }
 
   function envoyerEtatPvP() {
@@ -3552,7 +3757,12 @@
           id: ur.id, carteId: ur.c, emoji: carte ? carte.emoji : '',
           team: teamAffichee,
           x: xn * canvas.width, y: (1 - yn) * canvas.height,
-          pv: ur.pv, pvMax: ur.pvMax, taille: ur.taille, etat: ur.etat, statuts: []
+          pv: ur.pv, pvMax: ur.pvMax, taille: ur.taille, etat: ur.etat, statuts: [],
+          // Reconstruit depuis `carte.capacite` (connue localement, voir
+          // CARTES) plutôt que transmise telle quelle — seul le cooldown
+          // restant (ur.cd) vient réellement du réseau, voir versUniteReseau.
+          capacite: carte?.capacite || null,
+          capaciteCooldownRestant: ur.cd ?? 0
         }
       })
     }
@@ -4194,6 +4404,10 @@
    *    (posable n'importe où sur le terrain, y compris en zone ennemie).
    *    Reste comptée comme une alliée pour tout le reste (elle peut donc
    *    "ouvrir la route" à d'autres troupes si elle est posée loin devant).
+   *  - Holy Dummy 🕊️ (coût 3, LÉGENDE, placeholder) : mêlée mono-cible,
+   *    150 PV, 14 dégâts — voir CARTES LÉGENDE et CAPACITÉS ACTIVABLES
+   *    ci-dessous pour ses deux effets spéciaux (zone à l'arrivée + soin
+   *    activable).
    *
    *  RÈGLES DE PLACEMENT (identiques pour le joueur ET le bot ennemi,
    *  simplement inversées de camp)
@@ -4268,10 +4482,13 @@
    *  - Ce sont des cartes à effet "complexe" : au-delà de leurs stats
    *    déclarées dans CARTES, chacune peut brancher un comportement
    *    sur-mesure ailleurs dans le moteur (ex: roi_squelette soigne les
-   *    alliés proches à sa pose, voir EFFETS_ARRIVEE et
-   *    soignerZoneAlliee). Ajouter une nouvelle carte légende avec un
-   *    effet inédit demande donc toujours un peu de code dédié, en plus
-   *    de sa fiche dans l'admin.
+   *    alliés proches à sa pose, voir EFFETS_ARRIVEE et soignerZoneAlliee ;
+   *    holy_dummy fait des dégâts de zone + repoussée aux ennemis à sa
+   *    pose, voir EFFETS_ARRIVEE.holy_dummy et appliquerDegatsZone, et
+   *    porte en plus une capacité activable, voir CAPACITÉS ACTIVABLES
+   *    ci-dessous). Ajouter une nouvelle carte légende avec un effet
+   *    inédit demande donc toujours un peu de code dédié, en plus de sa
+   *    fiche dans l'admin.
    *  - C'est un "paquet infini" à tirage pondéré : chaque emplacement (même
    *    en cas de doublon) a son propre poids, indépendant des autres.
    *    Poids de départ 1, borné entre 0 (POIDS_MIN) et 2.5 (POIDS_MAX).
@@ -4280,6 +4497,45 @@
    *  - Malus de tirage (appliqué uniquement au moment du tirage, n'altère
    *    pas le poids stocké) : ×0.7 pour toute carte dont le coût dépasse
    *    la capacité max d'or actuelle du joueur (orCapaciteMax).
+   *  - UNIQUE SUR LE TERRAIN : une seule troupe légende alliée peut être
+   *    présente à la fois. Concrètement, tant que la carte légende est déjà
+   *    EN MAIN ou déjà POSÉE (vivante) sur le terrain, elle est totalement
+   *    exclue du tirage (poids effectif ramené à 0 pour ce tirage, voir
+   *    legendeIndisponiblePourTirage/poidsEffectifDeck) — impossible de la
+   *    repiocher en double. Ses chances redeviennent normales dès qu'elle
+   *    meurt au combat ou qu'elle est mise à la défausse (zone de
+   *    destruction) : rien à faire de spécial, son poids stocké a
+   *    simplement continué d'évoluer normalement pendant qu'elle était
+   *    exclue (il peut donc revenir plus fort qu'avant, comme n'importe
+   *    quelle autre carte non tirée depuis un moment).
+   *
+   *  CAPACITÉS ACTIVABLES (CARTES.capacite)
+   *  ------------------------------------------------------------------
+   *  - Une carte peut porter un champ `capacite: { cout, cooldownMs, type,
+   *    ... }`, attaché à l'unité à sa création (creerUnite). Tant que
+   *    l'unité est vivante sur le terrain, le joueur PROPRIÉTAIRE peut
+   *    cliquer/taper dessus (voir gererClicArene, lié une fois sur le
+   *    canvas) pour la déclencher, contre `cout` en or et avec `cooldownMs`
+   *    de recharge entre deux activations (décompte à chaque frame, voir
+   *    mettreAJourUnite, même unité immobile/en activation). Un cœur 🤍/🩶
+   *    au-dessus de son unité indique si elle est prête ou en recharge
+   *    (avec le temps restant en secondes, voir dessinerUnite) — visible
+   *    uniquement sur ses propres unités.
+   *  - Seul type géré pour l'instant : `soin_pourcentage` (voir
+   *    activerCapacite), `valeur` étant la fraction des PV MAX rendue
+   *    (arrondie, plafonnée à pvMax) — ex : holy_dummy = { cout: 1,
+   *    cooldownMs: 5000, type: 'soin_pourcentage', valeur: 0.5 } rend la
+   *    moitié de ses PV max pour 1 or, toutes les 5s maximum.
+   *  - JcJ : l'hôte applique l'effet directement dans sa simulation
+   *    (tenterActiverCapacite, ou recevoirCapaciteInvite pour l'unité de
+   *    l'invité) ; l'invité, qui ne simule rien localement, vérifie/débite
+   *    son propre or et envoie juste l'activation à l'hôte
+   *    (declencherCapacitePvPInvite/envoyerCapacitePvP, canal
+   *    'capacite_activee') — même principe de confiance que pour la pose
+   *    de troupes (voir envoyerCoupPvP/recevoirCoupInvite). Le cooldown
+   *    restant des unités concernées est transmis dans chaque instantané
+   *    réseau (champ `cd`, voir versUniteReseau/convertir) pour que
+   *    l'invité affiche/vérifie un état à jour.
    *
    *  MAIN
    *  ----
