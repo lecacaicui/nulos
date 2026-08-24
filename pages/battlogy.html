@@ -862,7 +862,11 @@
       id: 'golem', nom: 'Golem', emoji: '🪨', cout: 4,
       pv: 280, degats: 8, porte: 32, vitesseAttaque: 0.8,
       vitesseMarche: 20, tempsActivation: 1100, nombre: 1,
-      taille: 1.3, typeAttaque: 'melee'
+      taille: 1.3, typeAttaque: 'melee',
+      // Masse (voir appliquerDegatsZone/mettreAJourKnockback) : plus
+      // lourd que la moyenne (1 par défaut), donc repoussé bien moins loin
+      // par un même effet de repousse (ex: Bombe à eau).
+      masse: 1.8
     },
     // Carte spéciale, catégorisée comme un "sort" (fait apparaître une
     // statue plutôt que de recruter une troupe classique). Contourne les
@@ -877,7 +881,12 @@
       categorie: 'sort', placementLibre: true, immobile: true,
       pv: 120, degats: 0, porte: 0, vitesseAttaque: 0,
       vitesseMarche: 0, tempsActivation: 0, nombre: 1,
-      taille: 1
+      taille: 1,
+      // Très lourde : un effet de repousse ne la déplace que d'une
+      // fraction de la distance normale. `immobile` ne bloque plus la
+      // repousse elle-même (voir appliquerDegatsZone) — seule l'IA de
+      // marche/attaque reste désactivée pour cette unité.
+      masse: 3
     },
     // ── Sorts à effet instantané ──────────────────────────────────
     // Contrairement à la Statue (aussi un "sort", mais qui fait apparaître
@@ -1916,6 +1925,10 @@
       degats: carte.degats,
       porte: carte.porte,
       taille: carte.taille || 1,
+      // Masse (défaut 1) : divise la vitesse initiale d'un effet de
+      // repousse (voir appliquerDegatsZone) — plus elle est élevée, moins
+      // l'unité est projetée par un même impact (ex: Golem, Statue).
+      masse: carte.masse || 1,
       typeAttaque: carte.typeAttaque || 'melee',
       // Attaque à distance avec éclaboussure (ex: le Magicien) : tout
       // ennemi dans ce rayon (px, converti depuis zoneAttaqueHex — voir
@@ -2318,13 +2331,17 @@
       if (d > rayon + rayonUnite(u)) continue
       u.pv = Math.max(0, u.pv - degats)
       if (statut && u.pv > 0) appliquerStatut(u, statut.type, statut.duree, statut.params || {})
-      if (repousse > 0 && u.pv > 0 && !u.immobile) {
+      if (repousse > 0 && u.pv > 0) {
         const n = d > 0.001 ? d : 1
         // Impulsion de vitesse à l'opposé du point d'impact, plutôt qu'un
         // déplacement instantané : voir mettreAJourKnockback pour le
-        // freinage progressif appliqué frame après frame.
-        u.knockbackVx = (dx / n) * repousse * REPOUSSE_VITESSE_FACTEUR
-        u.knockbackVy = (dy / n) * repousse * REPOUSSE_VITESSE_FACTEUR
+        // freinage progressif appliqué frame après frame. La masse de
+        // l'unité (1 par défaut, voir creerUnite) atténue cette vitesse :
+        // une unité lourde (Golem, Statue…) est projetée bien moins loin.
+        // Note : `immobile` (ex: Statue) ne bloque plus la repousse — seule
+        // son IA de marche/attaque reste désactivée, voir mettreAJourUnite.
+        u.knockbackVx = (dx / n) * repousse * REPOUSSE_VITESSE_FACTEUR / u.masse
+        u.knockbackVy = (dy / n) * repousse * REPOUSSE_VITESSE_FACTEUR / u.masse
       }
     }
     if (multChateau > 0) {
