@@ -486,7 +486,7 @@
         "s5 s6 s7 s8 s9";
       gap: 1.1rem;
       margin-bottom: 1.5rem;
-      padding: 1.1rem 1rem;
+      padding: 1.1rem 1rem 1.6rem;
       border-radius: 16px;
       position: relative;
       /* Voile sombre pour garder les emplacements lisibles par-dessus la
@@ -554,7 +554,7 @@
       aspect-ratio: 5 / 7;
       align-self: center;
       justify-self: center;
-      width: 70%;
+      width: 92%;
       border: 2px solid #d4af37;
       background: linear-gradient(165deg, rgba(212,175,55,.22), rgba(8,10,8,.78));
       box-shadow: 0 0 0 1px rgba(212,175,55,.35), 0 0 22px rgba(212,175,55,.28) inset;
@@ -563,14 +563,32 @@
       color: #f3e5b8;
       gap: .35rem;
     }
-    .deck-slot-special .deck-slot-emoji { font-size: 1.6rem; filter: drop-shadow(0 0 6px rgba(212,175,55,.55)); }
-    .deck-slot-special .deck-slot-nom { font-size: .62rem; letter-spacing: .02em; }
+    .deck-slot-special .deck-slot-emoji { font-size: 2.1rem; filter: drop-shadow(0 0 6px rgba(212,175,55,.55)); }
+    /* Le nom d'origine ("Bientôt disponible") reste dans le DOM pour
+       l'accessibilité/le title, mais l'étiquette visible est déplacée
+       sous la carte via ::after, à la manière de la légende de
+       l'illustration. */
+    .deck-slot-special .deck-slot-nom { display: none; }
+    .deck-slot-special::after {
+      content: "LÉGENDE";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: .5rem;
+      font-size: .7rem;
+      font-weight: 800;
+      letter-spacing: .14em;
+      color: #d4af37;
+      white-space: nowrap;
+    }
     @media (max-width: 420px) {
       .deck-slots-grille { grid-template-columns: repeat(4, 1fr) 1fr; gap: .6rem; padding: .8rem .6rem; }
       .deck-slot .deck-slot-emoji { font-size: 1.25rem; }
       .deck-slot .deck-slot-nom { font-size: .52rem; }
-      .deck-slot-special { width: 80%; }
-      .deck-slot-special .deck-slot-emoji { font-size: 1.3rem; }
+      .deck-slot-special { width: 95%; }
+      .deck-slot-special .deck-slot-emoji { font-size: 1.5rem; }
+      .deck-slot-special::after { font-size: .6rem; margin-top: .35rem; }
     }
 
     /* ── Collection de cartes disponibles ── */
