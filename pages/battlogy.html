@@ -484,9 +484,9 @@
       grid-template-areas:
         "s1 s2 s3 s4 s9"
         "s5 s6 s7 s8 s9";
-      gap: .55rem;
+      gap: 1.1rem;
       margin-bottom: 1.5rem;
-      padding: 1rem .9rem;
+      padding: 1.1rem 1rem;
       border-radius: 16px;
       position: relative;
       /* Voile sombre pour garder les emplacements lisibles par-dessus la
@@ -509,12 +509,13 @@
     .deck-slot-special { grid-area: s9; }
 
     .deck-slot {
-      aspect-ratio: 1;
+      aspect-ratio: 5 / 7;
       border-radius: 10px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      align-self: center;
       gap: .2rem;
       position: relative;
       transition: filter .15s, transform .1s, border-color .15s, background .15s;
@@ -550,8 +551,10 @@
        bien signaler qu'il s'agit d'un futur emplacement légendaire et non
        d'un slot désactivé comme un autre. */
     .deck-slot-special {
-      aspect-ratio: auto;
-      height: 100%;
+      aspect-ratio: 5 / 7;
+      align-self: center;
+      justify-self: center;
+      width: 70%;
       border: 2px solid #d4af37;
       background: linear-gradient(165deg, rgba(212,175,55,.22), rgba(8,10,8,.78));
       box-shadow: 0 0 0 1px rgba(212,175,55,.35), 0 0 22px rgba(212,175,55,.28) inset;
@@ -560,13 +563,14 @@
       color: #f3e5b8;
       gap: .35rem;
     }
-    .deck-slot-special .deck-slot-emoji { font-size: 2rem; filter: drop-shadow(0 0 6px rgba(212,175,55,.55)); }
+    .deck-slot-special .deck-slot-emoji { font-size: 1.6rem; filter: drop-shadow(0 0 6px rgba(212,175,55,.55)); }
     .deck-slot-special .deck-slot-nom { font-size: .62rem; letter-spacing: .02em; }
     @media (max-width: 420px) {
-      .deck-slots-grille { grid-template-columns: repeat(4, 1fr) 1fr; gap: .4rem; padding: .75rem .6rem; }
+      .deck-slots-grille { grid-template-columns: repeat(4, 1fr) 1fr; gap: .6rem; padding: .8rem .6rem; }
       .deck-slot .deck-slot-emoji { font-size: 1.25rem; }
       .deck-slot .deck-slot-nom { font-size: .52rem; }
-      .deck-slot-special .deck-slot-emoji { font-size: 1.6rem; }
+      .deck-slot-special { width: 80%; }
+      .deck-slot-special .deck-slot-emoji { font-size: 1.3rem; }
     }
 
     /* ── Collection de cartes disponibles ── */
