@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blobattle</title>
+  <link rel="stylesheet" href="../style/style.css">
+  <script>
+  (function(){
+    var t = localStorage.getItem('theme_couleurs');
+    if (!t) return;
+    try {
+      var c = JSON.parse(t);
+      var r = document.documentElement.style;
+      r.setProperty('--couleur-fond', c.couleur_fond);
+      r.setProperty('--couleur-conteneur', c.couleur_conteneur);
+      r.setProperty('--couleur-bordure', c.couleur_bordure);
+      r.setProperty('--couleur-bouton', c.couleur_bouton);
+      var h = c.couleur_fond.replace('#','');
+      var lum = (0.299*parseInt(h.substring(0,2),16) + 0.587*parseInt(h.substring(2,4),16) + 0.114*parseInt(h.substring(4,6),16)) / 255;
+      r.setProperty('--couleur-texte', lum < 0.5 ? '#f1f1f1' : '#1a1a1a');
+      r.setProperty('--couleur-texte-faible', lum < 0.5 ? '#9ca3af' : '#6b7280');
+    } catch(e) {}
+  })();
+  </script>
+
+  <style>body { visibility: hidden; }</style>
+
+  <style>
+    /* ===== Blobattle — adapté aux variables de thème du site ===== */
+    .jelly-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem 6rem;
+    }
+    .jelly-wrap h1 { margin-bottom: .25rem; }
+    .jelly-wrap .subtitle { margin-bottom: 1.5rem; }
+
+    .jelly-status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-bottom: 1.25rem;
+    }
+    .jelly-status {
+      font-size: .85rem;
+      color: var(--couleur-texte-faible);
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 999px;
+      padding: .5rem 1.1rem;
+    }
+
+    .jelly-mode-group { display: flex; gap: .4rem; }
+    .jelly-mode-btn {
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      color: var(--couleur-texte);
+      padding: .5rem 1rem;
+      border-radius: 999px;
+      font-size: .82rem;
+      cursor: pointer;
+      transition: filter .15s, border-color .15s, background .15s;
+    }
+    .jelly-mode-btn:hover { filter: brightness(.96); }
+    .jelly-mode-btn.selected {
+      background: var(--couleur-bouton);
+      border-color: var(--couleur-bouton);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .jelly-layout {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .jelly-layout { grid-template-columns: 1fr; }
+    }
+
+    .panneau-jeu {
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: background .15s, border-color .15s;
+    }
+
+    #jelly-canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 900 / 620;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+      cursor: crosshair;
+    }
+
+    .panneau-jeu h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--couleur-bordure);
+      padding-bottom: .5rem;
+      margin-bottom: .85rem;
+      color: var(--couleur-texte);
+    }
+
+    .jelly-hint { color: var(--couleur-texte-faible); font-size: .85rem; line-height: 1.5; }
+    .jelly-hint.small { font-size: .75rem; margin-top: .4rem; }
+
+    .jelly-legend { margin-top: 1.1rem; display: flex; flex-direction: column; gap: .5rem; }
+    .jelly-legend-row { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--couleur-texte-faible); }
+    .jelly-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+    .jelly-legend.types { margin-top: 1rem; padding-top: .85rem; border-top: 1px dashed var(--couleur-bordure); gap: .35rem; font-size: .78rem; color: var(--couleur-texte-faible); }
+
+    #jelly-sel-title { font-size: 1.05rem; font-weight: 700; margin-bottom: .6rem; }
+
+    #jelly-sel-bar { width: 100%; height: 12px; border-radius: 6px; background: var(--couleur-fond); border: 1px solid var(--couleur-bordure); overflow: hidden; }
+    #jelly-sel-bar-fill { height: 100%; width: 0%; background: var(--couleur-bouton); transition: width .2s; }
+    #jelly-sel-bar-label { font-size: .72rem; color: var(--couleur-texte-faible); margin-top: .3rem; text-align: right; }
+
+    #jelly-sel-meta { font-size: .8rem; color: var(--couleur-texte-faible); margin: .75rem 0; line-height: 1.6; }
+    #jelly-sel-meta b { color: var(--couleur-texte); }
+
+    .jelly-section { margin-top: .9rem; padding-top: .85rem; border-top: 1px dashed var(--couleur-bordure); }
+    .jelly-section-title { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--couleur-texte-faible); margin-bottom: .5rem; }
+
+    .jelly-btn-row { display: flex; gap: .4rem; }
+    .jelly-btn-col { display: flex; flex-direction: column; gap: .4rem; }
+
+    .jelly-pct-btn, .jelly-action-btn {
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      color: var(--couleur-texte);
+      padding: .5rem .65rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      text-align: left;
+      transition: filter .15s, border-color .15s;
+    }
+    .jelly-pct-btn { flex: 1; text-align: center; }
+    .jelly-pct-btn:hover, .jelly-action-btn:hover { filter: brightness(.95); }
+    .jelly-pct-btn.selected { background: var(--couleur-bouton); border-color: var(--couleur-bouton); color: #fff; font-weight: 700; }
+    .jelly-action-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .jelly-action-btn small { display: block; color: var(--couleur-texte-faible); font-weight: normal; margin-top: .15rem; }
+    .jelly-action-btn.spell-active { border-color: var(--couleur-bouton); background: var(--couleur-fond); box-shadow: 0 0 0 1px var(--couleur-bouton); }
+
+    #jelly-deselect { width: 100%; margin-top: 1rem; }
+
+    /* Overlay fin de partie — même patron que les modales existantes du site */
+    .jelly-modale-fond {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      align-items: center; justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .jelly-modale-fond.ouverte { display: flex; }
+    .jelly-modale {
+      background: var(--couleur-conteneur);
+      border-radius: 14px;
+      padding: 2rem;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    }
+    .jelly-modale h2 { font-size: 1.4rem; margin-bottom: .5rem; }
+    .jelly-modale p { color: var(--couleur-texte-faible); margin-bottom: 1.25rem; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <main>
+    <div class="jelly-wrap">
+      <a class="retour" href="../index.html" style="display:inline-block;margin-bottom:1rem;">← Retour à l'accueil</a>
+      <h1>🧫 Blobattle</h1>
+      <p class="subtitle">Conquérez toutes les gelées de la carte en gérant production, attaques et sorts.</p>
+
+      <div class="jelly-status-bar">
+        <span class="jelly-status" id="jelly-status">Chargement…</span>
+        <div class="jelly-mode-group" role="group" aria-label="Mode de jeu">
+          <button class="jelly-mode-btn selected" id="jelly-mode-bot" data-mode="bot">🤖 Contre un bot</button>
+          <button class="jelly-mode-btn" id="jelly-mode-test" data-mode="test">🧪 Mode test</button>
+        </div>
+        <button class="btn btn-secondary" id="jelly-restart">↻ Nouvelle partie</button>
+      </div>
+      <p class="jelly-hint small" id="jelly-mode-hint" style="margin-top:-.75rem;margin-bottom:1.25rem;">En mode test, toutes les gelées adverses sont neutres (grises) et n'attaquent jamais — pratiquez librement.</p>
+
+      <div class="jelly-layout">
+        <div class="panneau-jeu">
+          <canvas id="jelly-canvas" width="900" height="620"></canvas>
+        </div>
+
+        <div class="panneau-jeu">
+          <h2>Gelée sélectionnée</h2>
+
+          <div id="jelly-panel-empty">
+            <p class="jelly-hint">Cliquez sur une de vos gelées bleues pour la sélectionner, puis sur une cible pour lui envoyer des cellules.</p>
+            <div class="jelly-legend">
+              <div class="jelly-legend-row"><span class="jelly-dot" style="background:var(--couleur-bouton)"></span> Vous</div>
+              <div class="jelly-legend-row"><span class="jelly-dot" style="background:#ef4444"></span> Ennemi</div>
+              <div class="jelly-legend-row"><span class="jelly-dot" style="background:#9ca3af"></span> Neutre / gelé</div>
+            </div>
+            <div class="jelly-legend types">
+              <div><b>●</b> Basique — polyvalente</div>
+              <div><b>◎</b> Ronde — production</div>
+              <div><b>■</b> Carrée — défense</div>
+              <div><b>▲</b> Triangle — sorts</div>
+            </div>
+          </div>
+
+          <div id="jelly-panel-selected" style="display:none">
+            <div id="jelly-sel-title"></div>
+            <div id="jelly-sel-bar"><div id="jelly-sel-bar-fill"></div></div>
+            <div id="jelly-sel-bar-label"></div>
+            <div id="jelly-sel-meta"></div>
+
+            <div class="jelly-section">
+              <div class="jelly-section-title">Envoyer</div>
+              <div class="jelly-btn-row" id="jelly-send-percents">
+                <button class="jelly-pct-btn" data-pct="0.25">25%</button>
+                <button class="jelly-pct-btn selected" data-pct="0.5">50%</button>
+                <button class="jelly-pct-btn" data-pct="1">100%</button>
+              </div>
+              <p class="jelly-hint small">Cliquez ensuite une gelée cible sur la carte.</p>
+            </div>
+
+            <div class="jelly-section" id="jelly-upgrade-section">
+              <div class="jelly-section-title">Amélioration</div>
+              <div class="jelly-btn-col" id="jelly-upgrade-buttons"></div>
+            </div>
+
+            <div class="jelly-section" id="jelly-spell-section" style="display:none">
+              <div class="jelly-section-title">Sorts</div>
+              <div class="jelly-btn-col" id="jelly-spell-buttons"></div>
+              <p class="jelly-hint small" id="jelly-spell-hint" style="display:none">Choisissez une cible pour le sort…</p>
+            </div>
+
+            <button class="btn btn-secondary" id="jelly-deselect">Désélectionner</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="jelly-modale-fond" id="jelly-overlay">
+    <div class="jelly-modale">
+      <h2 id="jelly-overlay-title"></h2>
+      <p id="jelly-overlay-text"></p>
+      <button class="btn btn-primary" id="jelly-overlay-restart">Rejouer</button>
+    </div>
+  </div>
+
+  <div id="footer-placeholder"></div>
+
+  <script type="module">
+    import { chargerHeader, chargerFooter, appliquerTheme } from '../script/header.js'
+    ;(async () => {
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()
+      await chargerHeader('../')
+      await chargerFooter('../')
+    })()
+  </script>
+
+  <script>
+  /* ============================================================
+     JELLY WAR — moteur de jeu (couleurs pilotées par le thème du site)
+     ============================================================ */
+
+  const CONFIG = {
+    world: { width: 900, height: 620, jellyCount: 13, minDist: 95 },
+    waveSpeed: 140,
+    basic: {
+      produceRate: 0.35, maxCells: 30,
+      upgradeCost: { round: 15, square: 20, triangle: 25 }
+    },
+    round: {
+      levels: [
+        { cap: 10, prod: 1.0 }, { cap: 20, prod: 1.5 }, { cap: 30, prod: 2.0 },
+        { cap: 40, prod: 2.5 }, { cap: 50, prod: 3.0 }
+      ],
+      upgradeCosts: [10, 15, 20, 30], maxLevel: 5
+    },
+    square: {
+      levels: [{ cap: 50 }, { cap: 60 }, { cap: 70 }, { cap: 80 }, { cap: 90 }],
+      upgradeCosts: [10, 15, 20, 30], maxLevel: 5,
+      damageReductionFactor: 5, projectileChipPerLevel: 2
+    },
+    triangle: {
+      upgradeCosts: [20, 30], maxLevel: 3,
+      spellOrder: ['poison', 'ice', 'rage'],
+      spells: {
+        poison: { cost: 15, minCells: 15, castTime: 2.0, dps: 1.5, duration: 8 },
+        ice:    { cost: 20, minCells: 20, castTime: 2.5, duration: 10 },
+        rage:   { cost: 30, minCells: 30, castTime: 3.0 }
+      }
+    },
+    ai: { thinkInterval: 2.4, minCellsToAct: 10, sendFraction: 0.6 }
+  };
+
+  // Couleurs des camps : le bleu "joueur" suit la couleur d'accent du thème
+  // du site (--couleur-bouton), pour rester cohérent même si l'admin change
+  // le thème. Rouge/gris restent fixes (mêmes teintes que le reste du site).
+  function getCampColors(){
+    const styles = getComputedStyle(document.documentElement);
+    const player = (styles.getPropertyValue('--couleur-bouton') || '#2563eb').trim() || '#2563eb';
+    return { player, enemy: '#ef4444', neutral: '#9ca3af' };
+  }
+  let CAMP_COLOR = getCampColors();
+
+  let jellies = [], waves = [], particles = [];
+  let selectedJelly = null, pendingSpell = null, sendPercent = 0.5;
+  let gameOver = false, idCounter = 1;
+  let gameMode = 'bot'; // 'bot' : IA ennemie active — 'test' : adversaires neutres, aucune IA
+
+  const canvas = document.getElementById('jelly-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function randRange(a, b){ return a + Math.random() * (b - a); }
+
+  function makeJelly(camp, type, x, y){
+    const j = { id: idCounter++, camp, type, x, y, r: 26, cells: 0, maxCells: CONFIG.basic.maxCells,
+      level: 1, spells: [], poison: null, cast: null, pulse: 0 };
+    applyTypeDefaults(j);
+    return j;
+  }
+
+  function applyTypeDefaults(j){
+    if (j.type === 'basic') j.maxCells = CONFIG.basic.maxCells;
+    else if (j.type === 'round') j.maxCells = CONFIG.round.levels[j.level - 1].cap;
+    else if (j.type === 'square') j.maxCells = CONFIG.square.levels[j.level - 1].cap;
+    else if (j.type === 'triangle'){ j.maxCells = 40; if (j.spells.length === 0) j.spells = ['poison']; }
+  }
+
+  function generateMap(){
+    CAMP_COLOR = getCampColors();
+    jellies = []; waves = []; particles = [];
+    selectedJelly = null; pendingSpell = null; gameOver = false;
+    document.getElementById('jelly-overlay').classList.remove('ouverte');
+
+    const W = CONFIG.world.width, H = CONFIG.world.height;
+    const positions = [];
+    function tryPlace(){
+      for (let a = 0; a < 300; a++){
+        const x = randRange(60, W - 60), y = randRange(60, H - 60);
+        if (positions.every(p => Math.hypot(p.x - x, p.y - y) > CONFIG.world.minDist)){ positions.push({x,y}); return {x,y}; }
+      }
+      return { x: randRange(60, W-60), y: randRange(60, H-60) };
+    }
+
+    // En mode test, l'adversaire "de départ" est neutre (gris) au lieu de
+    // rouge : mêmes gelées sur la carte, mais aucune IA ne les pilote.
+    const oppCamp = gameMode === 'test' ? 'neutral' : 'enemy';
+
+    let p = tryPlace(); let j = makeJelly('player', 'round', p.x, p.y); j.cells = 12; j.level = 2; applyTypeDefaults(j); jellies.push(j);
+    p = tryPlace(); j = makeJelly('player', 'basic', p.x, p.y); j.cells = 14; jellies.push(j);
+    p = tryPlace(); j = makeJelly(oppCamp, 'round', p.x, p.y); j.cells = 12; j.level = 2; applyTypeDefaults(j); jellies.push(j);
+    p = tryPlace(); j = makeJelly(oppCamp, 'basic', p.x, p.y); j.cells = 14; jellies.push(j);
+
+    const remaining = CONFIG.world.jellyCount - jellies.length;
+    const neutralTypes = ['basic','basic','basic','round','square','triangle','basic'];
+    for (let i = 0; i < remaining; i++){
+      p = tryPlace();
+      j = makeJelly('neutral', neutralTypes[i % neutralTypes.length], p.x, p.y);
+      j.cells = Math.round(randRange(4, 16));
+      jellies.push(j);
+    }
+    refreshPanel();
+  }
+
+  let lastTime = performance.now(), aiTimer = 0;
+  function loop(now){
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+    if (!gameOver) update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt){
+    updateProduction(dt); updatePoison(dt); updateCasting(dt);
+    updateWaves(dt); updateParticles(dt); updateAI(dt);
+    checkWinLose(); refreshPanel();
+  }
+
+  function updateProduction(dt){
+    for (const j of jellies){
+      if (j.camp === 'neutral' || j.poison) continue;
+      let rate = 0;
+      if (j.type === 'basic') rate = CONFIG.basic.produceRate;
+      else if (j.type === 'round') rate = CONFIG.round.levels[j.level - 1].prod;
+      if (rate > 0) j.cells = Math.min(j.maxCells, j.cells + rate * dt);
+    }
+  }
+
+  function updatePoison(dt){
+    for (const j of jellies){
+      if (!j.poison) continue;
+      j.poison.timeLeft -= dt;
+      j.cells = Math.max(0, j.cells - j.poison.dps * dt);
+      if (j.poison.timeLeft <= 0) j.poison = null;
+    }
+  }
+
+  function updateCasting(dt){
+    for (const j of jellies){
+      if (!j.cast) continue;
+      j.cast.timeLeft -= dt;
+      if (j.cast.timeLeft <= 0){ resolveSpell(j, j.cast.spell, j.cast.target); j.cast = null; }
+    }
+  }
+
+  function resolveSpell(caster, spellName, target){
+    if (spellName === 'poison'){
+      const cfg = CONFIG.triangle.spells.poison;
+      target.poison = { timeLeft: cfg.duration, dps: cfg.dps };
+      spawnParticle(target.x, target.y, '#22c55e', 'Poison !');
+    } else if (spellName === 'ice'){
+      target.camp = 'neutral'; target.poison = null; target.cast = null;
+      spawnParticle(target.x, target.y, '#38bdf8', 'Gelée !');
+    } else if (spellName === 'rage'){
+      target.camp = caster.camp;
+      spawnParticle(target.x, target.y, '#f59e0b', 'Rage !');
+    }
+  }
+
+  function updateWaves(dt){
+    const arrived = [];
+    for (const w of waves){ w.progress += dt / w.duration; if (w.progress >= 1){ w.progress = 1; arrived.push(w); } }
+    for (const w of arrived) resolveArrival(w);
+    waves = waves.filter(w => w.progress < 1);
+  }
+
+  function resolveArrival(wave){
+    const target = wave.target;
+    target.pulse = 1;
+    if (target.camp === wave.camp){ target.cells = Math.min(target.maxCells, target.cells + wave.amount); return; }
+
+    let effective = wave.amount;
+    if (target.type === 'square' && target.camp !== 'neutral'){
+      effective = effective / CONFIG.square.damageReductionFactor;
+      effective -= target.level * CONFIG.square.projectileChipPerLevel;
+      if (effective < 0) effective = 0;
+      spawnParticle(target.x, target.y, '#f59e0b', 'Interception !');
+    }
+
+    if (effective >= target.cells){
+      const remainder = effective - target.cells;
+      target.camp = wave.camp;
+      target.cells = Math.min(target.maxCells, remainder);
+      target.poison = null; target.cast = null;
+      spawnParticle(target.x, target.y, CAMP_COLOR[wave.camp], 'Conquis !');
+    } else {
+      target.cells -= effective;
+    }
+  }
+
+  function spawnParticle(x, y, color, text){ particles.push({ x, y: y - 30, color, text, life: 1.2 }); }
+  function updateParticles(dt){
+    for (const p of particles) p.life -= dt;
+    particles = particles.filter(p => p.life > 0);
+    for (const j of jellies) if (j.pulse > 0) j.pulse = Math.max(0, j.pulse - dt * 2.5);
+  }
+
+  function updateAI(dt){
+    if (gameMode === 'test') return; // aucune IA en mode test
+    aiTimer += dt;
+    if (aiTimer < CONFIG.ai.thinkInterval) return;
+    aiTimer = 0;
+    const myJellies = jellies.filter(j => j.camp === 'enemy' && j.cells >= CONFIG.ai.minCellsToAct && !j.cast);
+    if (myJellies.length === 0) return;
+    const targets = jellies.filter(j => j.camp !== 'enemy');
+    if (targets.length === 0) return;
+    for (const source of myJellies){
+      if (Math.random() > 0.7) continue;
+      let best = null, bestScore = Infinity;
+      for (const t of targets){
+        const dist = Math.hypot(t.x - source.x, t.y - source.y);
+        const score = t.cells * 2 + dist * 0.05;
+        if (score < bestScore){ bestScore = score; best = t; }
+      }
+      if (best) sendCells(source, best, CONFIG.ai.sendFraction);
+    }
+  }
+
+  function sendCells(source, target, fraction){
+    if (source === target) return;
+    const amount = Math.floor(source.cells * fraction);
+    if (amount <= 0) return;
+    source.cells -= amount;
+    const dist = Math.hypot(target.x - source.x, target.y - source.y);
+    const duration = Math.max(0.25, dist / CONFIG.waveSpeed);
+    waves.push({ fromX: source.x, fromY: source.y, toX: target.x, toY: target.y, camp: source.camp, amount, target, progress: 0, duration });
+  }
+
+  function upgradeToType(j, newType){
+    const cost = CONFIG.basic.upgradeCost[newType];
+    if (j.type !== 'basic' || j.cells < cost) return;
+    j.cells -= cost; j.type = newType; j.level = 1; applyTypeDefaults(j);
+  }
+  function upgradeRound(j){
+    if (j.type !== 'round' || j.level >= CONFIG.round.maxLevel) return;
+    const cost = CONFIG.round.upgradeCosts[j.level - 1];
+    if (j.cells < cost) return;
+    j.cells -= cost; j.level++; j.maxCells = CONFIG.round.levels[j.level - 1].cap;
+  }
+  function upgradeSquare(j){
+    if (j.type !== 'square' || j.level >= CONFIG.square.maxLevel) return;
+    const cost = CONFIG.square.upgradeCosts[j.level - 1];
+    if (j.cells < cost) return;
+    j.cells -= cost; j.level++; j.maxCells = CONFIG.square.levels[j.level - 1].cap;
+  }
+  function upgradeTriangle(j){
+    if (j.type !== 'triangle' || j.level >= CONFIG.triangle.maxLevel) return;
+    const cost = CONFIG.triangle.upgradeCosts[j.level - 1];
+    if (j.cells < cost) return;
+    j.cells -= cost; j.level++; j.spells.push(CONFIG.triangle.spellOrder[j.level - 1]);
+  }
+
+  function checkWinLose(){
+    if (gameMode === 'test'){
+      // Pas d'adversaire actif : la partie se termine quand tout est bleu.
+      const nonPlayerCount = jellies.filter(j => j.camp !== 'player').length;
+      if (nonPlayerCount === 0) endGame(true);
+      return;
+    }
+    const enemyCount = jellies.filter(j => j.camp === 'enemy').length;
+    const playerCount = jellies.filter(j => j.camp === 'player').length;
+    if (enemyCount === 0) endGame(true);
+    else if (playerCount === 0) endGame(false);
+  }
+
+  function endGame(victory){
+    gameOver = true;
+    const overlay = document.getElementById('jelly-overlay');
+    document.getElementById('jelly-overlay-title').textContent = victory ? '🏆 Victoire !' : '💀 Défaite';
+    document.getElementById('jelly-overlay-text').textContent = victory
+      ? (gameMode === 'test' ? "Toutes les gelées ont été conquises." : "Toutes les gelées ennemies ont été conquises. La carte est à vous.")
+      : "Vous ne contrôlez plus aucune gelée. La conquête a échoué.";
+    overlay.classList.add('ouverte');
+  }
+
+  function drawJelly(j){
+    const isSelected = j === selectedJelly;
+    const color = CAMP_COLOR[j.camp];
+    ctx.save();
+    ctx.beginPath(); ctx.arc(j.x, j.y, j.r, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.globalAlpha = j.camp === 'neutral' ? 0.55 : 0.92; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.lineWidth = isSelected ? 3 : 1.5;
+    ctx.strokeStyle = isSelected ? '#f59e0b' : 'rgba(255,255,255,0.5)';
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2;
+    const s = j.r * 0.38;
+    if (j.type === 'round'){ ctx.beginPath(); ctx.arc(j.x, j.y - j.r - 10, 5, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fill(); }
+    else if (j.type === 'square'){ ctx.strokeRect(j.x - s/2, j.y - s/2, s, s); }
+    else if (j.type === 'triangle'){
+      ctx.beginPath(); ctx.moveTo(j.x, j.y - s*0.7); ctx.lineTo(j.x - s*0.65, j.y + s*0.5); ctx.lineTo(j.x + s*0.65, j.y + s*0.5); ctx.closePath(); ctx.stroke();
+    }
+
+    if (j.type !== 'basic'){
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Lv' + j.level, j.x, j.y + j.r + 14);
+    }
+    if (j.poison){
+      ctx.beginPath(); ctx.arc(j.x, j.y, j.r + 7, 0, Math.PI*2);
+      ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (j.cast){
+      const pct = 1 - (j.cast.timeLeft / j.cast.totalTime);
+      ctx.beginPath(); ctx.arc(j.x, j.y, j.r + 10, -Math.PI/2, -Math.PI/2 + pct * Math.PI * 2);
+      ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 3; ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff'; ctx.fillText(Math.floor(j.cells), j.x, j.y);
+  }
+
+  function drawWave(w){
+    const x = w.fromX + (w.toX - w.fromX) * w.progress;
+    const y = w.fromY + (w.toY - w.fromY) * w.progress;
+    const color = CAMP_COLOR[w.camp];
+    ctx.save();
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.3; ctx.lineWidth = 1.5; ctx.setLineDash([3,5]);
+    ctx.beginPath(); ctx.moveTo(w.fromX, w.fromY); ctx.lineTo(w.toX, w.toY); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const r = 5 + Math.min(6, Math.log2(w.amount + 1));
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'var(--couleur-texte)'; ctx.fillStyle = '#111827';
+    ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(w.amount, x, y - r - 6);
+  }
+
+  function drawParticle(p){
+    ctx.save(); ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(p.text, p.x, p.y - (1.2 - p.life) * 20);
+    ctx.restore();
+  }
+
+  function render(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const w of waves) drawWave(w);
+    for (const j of jellies) drawJelly(j);
+    for (const p of particles) drawParticle(p);
+    if (pendingSpell){
+      ctx.save(); ctx.fillStyle = '#f59e0b'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Choisissez une cible pour le sort', canvas.width / 2, 20);
+      ctx.restore();
+    }
+  }
+
+  function hitTest(x, y){
+    for (const j of jellies) if (Math.hypot(j.x - x, j.y - y) <= j.r) return j;
+    return null;
+  }
+
+  canvas.addEventListener('click', (e) => {
+    if (gameOver) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX, y = (e.clientY - rect.top) * scaleY;
+    const clicked = hitTest(x, y);
+    if (!clicked) return;
+
+    if (pendingSpell && selectedJelly){
+      castSpell(selectedJelly, pendingSpell, clicked);
+      pendingSpell = null; refreshPanel(); return;
+    }
+    if (!selectedJelly){
+      if (clicked.camp === 'player') selectedJelly = clicked;
+    } else {
+      if (clicked === selectedJelly) selectedJelly = null;
+      else if (selectedJelly.camp === 'player') sendCells(selectedJelly, clicked, sendPercent);
+    }
+    refreshPanel();
+  });
+
+  function castSpell(caster, spellName, target){
+    if (caster.type !== 'triangle' || caster.cast) return;
+    if (!caster.spells.includes(spellName)) return;
+    const cfg = CONFIG.triangle.spells[spellName];
+    if (caster.cells < cfg.minCells) return;
+    caster.cells -= cfg.cost;
+    caster.cast = { spell: spellName, target, timeLeft: cfg.castTime, totalTime: cfg.castTime };
+  }
+
+  const elEmpty = document.getElementById('jelly-panel-empty');
+  const elSelected = document.getElementById('jelly-panel-selected');
+  const elTitle = document.getElementById('jelly-sel-title');
+  const elBarFill = document.getElementById('jelly-sel-bar-fill');
+  const elBarLabel = document.getElementById('jelly-sel-bar-label');
+  const elMeta = document.getElementById('jelly-sel-meta');
+  const elUpgradeBtns = document.getElementById('jelly-upgrade-buttons');
+  const elSpellSection = document.getElementById('jelly-spell-section');
+  const elSpellBtns = document.getElementById('jelly-spell-buttons');
+  const elSpellHint = document.getElementById('jelly-spell-hint');
+
+  const TYPE_LABEL = { basic: 'Basique', round: 'Ronde', square: 'Carrée', triangle: 'Triangle' };
+  const CAMP_LABEL = { player: 'Vous', enemy: 'Ennemi', neutral: 'Neutre' };
+  const SPELL_LABEL = { poison: 'Poison', ice: 'Glace', rage: 'Rage' };
+
+  function refreshPanel(){
+    if (!selectedJelly || !jellies.includes(selectedJelly)){
+      selectedJelly = null;
+      elEmpty.style.display = 'block'; elSelected.style.display = 'none';
+      return;
+    }
+    elEmpty.style.display = 'none'; elSelected.style.display = 'block';
+
+    const j = selectedJelly;
+    elTitle.textContent = `${TYPE_LABEL[j.type]} — ${CAMP_LABEL[j.camp]}`;
+    elTitle.style.color = CAMP_COLOR[j.camp];
+
+    const pct = Math.min(100, (j.cells / j.maxCells) * 100);
+    elBarFill.style.width = pct + '%';
+    elBarLabel.textContent = `${Math.floor(j.cells)} / ${j.maxCells} cellules`;
+
+    let metaHtml = `<div>Niveau : <b>${j.type === 'basic' ? '—' : j.level}</b></div>`;
+    if (j.poison) metaHtml += `<div style="color:#22c55e">☠ Empoisonnée (${j.poison.timeLeft.toFixed(1)}s)</div>`;
+    if (j.camp === 'neutral') metaHtml += `<div>❄ Inactive — à reconquérir</div>`;
+    if (j.cast) metaHtml += `<div style="color:#f59e0b">✨ Incantation ${SPELL_LABEL[j.cast.spell]}… (${j.cast.timeLeft.toFixed(1)}s)</div>`;
+    elMeta.innerHTML = metaHtml;
+
+    elUpgradeBtns.innerHTML = '';
+    const canAct = j.camp === 'player' && !j.cast;
+    document.getElementById('jelly-upgrade-section').style.display = canAct ? 'block' : 'none';
+
+    if (canAct){
+      if (j.type === 'basic'){
+        for (const t of ['round','square','triangle']){
+          const cost = CONFIG.basic.upgradeCost[t];
+          elUpgradeBtns.appendChild(makeButton(`Évoluer en ${TYPE_LABEL[t]} <small>Coût : ${cost} cellules</small>`, j.cells >= cost, () => { upgradeToType(j, t); refreshPanel(); }));
+        }
+      } else if (j.type === 'round' && j.level < CONFIG.round.maxLevel){
+        const cost = CONFIG.round.upgradeCosts[j.level - 1];
+        elUpgradeBtns.appendChild(makeButton(`Améliorer (Niv. ${j.level + 1}) <small>Coût : ${cost} · production &amp; capacité ↑</small>`, j.cells >= cost, () => { upgradeRound(j); refreshPanel(); }));
+      } else if (j.type === 'square' && j.level < CONFIG.square.maxLevel){
+        const cost = CONFIG.square.upgradeCosts[j.level - 1];
+        elUpgradeBtns.appendChild(makeButton(`Renforcer (Niv. ${j.level + 1}) <small>Coût : ${cost} · capacité ↑</small>`, j.cells >= cost, () => { upgradeSquare(j); refreshPanel(); }));
+      } else if (j.type === 'triangle' && j.level < CONFIG.triangle.maxLevel){
+        const cost = CONFIG.triangle.upgradeCosts[j.level - 1];
+        const nextSpell = CONFIG.triangle.spellOrder[j.level];
+        elUpgradeBtns.appendChild(makeButton(`Débloquer ${SPELL_LABEL[nextSpell]} <small>Coût : ${cost} cellules</small>`, j.cells >= cost, () => { upgradeTriangle(j); refreshPanel(); }));
+      } else {
+        elUpgradeBtns.innerHTML = '<p class="jelly-hint small">Niveau maximum atteint.</p>';
+      }
+    }
+
+    if (canAct && j.type === 'triangle'){
+      elSpellSection.style.display = 'block';
+      elSpellBtns.innerHTML = '';
+      for (const spellName of j.spells){
+        const cfg = CONFIG.triangle.spells[spellName];
+        const enabled = j.cells >= cfg.minCells;
+        const btn = makeButton(`${SPELL_LABEL[spellName]} <small>Coût ${cfg.cost} · min ${cfg.minCells} · incantation ${cfg.castTime}s</small>`, enabled, () => { pendingSpell = (pendingSpell === spellName) ? null : spellName; refreshPanel(); });
+        if (pendingSpell === spellName) btn.classList.add('spell-active');
+        elSpellBtns.appendChild(btn);
+      }
+      elSpellHint.style.display = pendingSpell ? 'block' : 'none';
+    } else {
+      elSpellSection.style.display = 'none';
+    }
+  }
+
+  function makeButton(html, enabled, onClick){
+    const b = document.createElement('button');
+    b.className = 'jelly-action-btn';
+    b.innerHTML = html;
+    b.disabled = !enabled;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  document.querySelectorAll('.jelly-pct-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.jelly-pct-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      sendPercent = parseFloat(btn.dataset.pct);
+    });
+  });
+
+  document.getElementById('jelly-deselect').addEventListener('click', () => { selectedJelly = null; pendingSpell = null; refreshPanel(); });
+  document.getElementById('jelly-restart').addEventListener('click', generateMap);
+  document.getElementById('jelly-overlay-restart').addEventListener('click', generateMap);
+
+  document.querySelectorAll('.jelly-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (mode === gameMode) return;
+      gameMode = mode;
+      document.querySelectorAll('.jelly-mode-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      generateMap();
+    });
+  });
+
+  setInterval(() => {
+    const p = jellies.filter(j => j.camp === 'player').length;
+    const e = jellies.filter(j => j.camp === 'enemy').length;
+    const n = jellies.filter(j => j.camp === 'neutral').length;
+    document.getElementById('jelly-status').textContent = `Vos gelées : ${p}  ·  Ennemies : ${e}  ·  Neutres : ${n}`;
+  }, 300);
+
+  generateMap();
+  requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
