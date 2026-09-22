@@ -235,3 +235,4 @@ export async function adminToggleActifCarte(id, actif) {
 export async function adminSupprimerCarte(id) {
   const { error } = await db.from('battlogy_cartes').delete().eq('id', id)
   return { ok: !error, error }
+}
