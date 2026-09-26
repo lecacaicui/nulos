@@ -96,6 +96,59 @@ export async function chargerDeck(userId) {
   return Array.isArray(data.cartes) ? data.cartes : null
 }
 
+/**
+ * [ADMIN] Débloque une carte pour n'importe quel utilisateur (pas seulement
+ * l'utilisateur connecté). Nécessite une policy RLS supplémentaire sur
+ * `battlogy_cartes_utilisateurs` autorisant l'insert pour les comptes
+ * admin/super_admin, par ex. :
+ *
+ * create policy "admins peuvent debloquer des cartes pour autrui"
+ *   on battlogy_cartes_utilisateurs for insert
+ *   with check (
+ *     exists (
+ *       select 1 from profils
+ *       where profils.user_id = auth.uid()
+ *         and profils.niveau in ('admin', 'super_admin')
+ *     )
+ *   );
+ *
+ * Idempotent comme debloquerCarte (upsert + ignoreDuplicates).
+ */
+export async function adminDonnerCarte(userId, carteId) {
+  if (!userId || !carteId) return { ok: false }
+  const { error } = await db.from('battlogy_cartes_utilisateurs')
+    .upsert({ user_id: userId, carte_id: carteId }, { onConflict: 'user_id,carte_id', ignoreDuplicates: true })
+  if (error) { console.error('adminDonnerCarte a échoué :', error); return { ok: false, error } }
+  return { ok: true }
+}
+
+/**
+ * [ADMIN] Retire une carte débloquée à un utilisateur. Nécessite une policy
+ * RLS similaire à celle d'adminDonnerCarte mais pour delete.
+ */
+export async function adminRetirerCarteUtilisateur(userId, carteId) {
+  if (!userId || !carteId) return { ok: false }
+  const { error } = await db.from('battlogy_cartes_utilisateurs')
+    .delete().eq('user_id', userId).eq('carte_id', carteId)
+  if (error) { console.error('adminRetirerCarteUtilisateur a échoué :', error); return { ok: false, error } }
+  return { ok: true }
+}
+
+/**
+ * [ADMIN] Liste les cartes débloquées par un utilisateur donné (id de carte
+ * + date de déblocage). Nécessite une policy RLS de select équivalente à
+ * celle d'adminDonnerCarte (sinon la lecture reste limitée à auth.uid()).
+ */
+export async function adminListerCartesUtilisateur(userId) {
+  if (!userId) return []
+  const { data, error } = await db.from('battlogy_cartes_utilisateurs')
+    .select('carte_id, debloque_le')
+    .eq('user_id', userId)
+    .order('debloque_le', { ascending: false })
+  if (error) { console.error('adminListerCartesUtilisateur :', error); return [] }
+  return data
+}
+
 /** Sauvegarde (crée ou remplace) la composition de deck de l'utilisateur. */
 export async function sauvegarderDeck(userId, liste) {
   if (!userId) return { ok: false }
