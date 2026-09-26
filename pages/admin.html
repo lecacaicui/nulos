@@ -434,6 +434,7 @@
                   <th>Inscription</th>
                   <th>Dernière connexion</th>
                   <th>Changer le niveau</th>
+                  <th>Cartes</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -957,6 +958,25 @@
     </div>
   </div>
 
+  <!-- ===== Modale Cartes utilisateur (Battlogy) ===== -->
+  <div class="modale-fond" id="modale-cartes-user-fond" onclick="if(event.target===this) fermerModaleCartesUtilisateur()">
+    <div class="modale-admin">
+      <div class="modale-admin-entete">
+        <h2>🃏 Cartes de <span id="cu-username"></span></h2>
+        <button class="modale-fermer" onclick="fermerModaleCartesUtilisateur()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <h3 style="font-size:.95rem; margin-bottom:.5rem;">Cartes débloquées</h3>
+        <div id="cu-liste-debloquees"><p class="note-verrouille">Chargement…</p></div>
+        <div class="row-actions" style="margin-top:1.25rem; flex-wrap:wrap;">
+          <select id="cu-select-carte" style="flex:1; min-width:160px;"></select>
+          <button class="btn-save" onclick="donnerCarteUtilisateur()">Donner</button>
+        </div>
+        <div class="msg-inline" id="msg-cartes-user" style="margin-top:.5rem;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== Modale Annonce ===== -->
   <div class="modale-fond" id="modale-annonce-fond" onclick="if(event.target===this) fermerModaleAnnonce()">
     <div class="modale-admin">
@@ -1059,7 +1079,8 @@
       adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
     } from '../script/mda.js'
     import {
-      adminListerCartes, adminSauvegarderCarte, adminToggleActifCarte, adminSupprimerCarte
+      adminListerCartes, adminSauvegarderCarte, adminToggleActifCarte, adminSupprimerCarte,
+      adminDonnerCarte, adminRetirerCarteUtilisateur, adminListerCartesUtilisateur
     } from '../script/battlogy.js'
 
     const STORAGE_BUCKET = 'pictures'
@@ -1365,9 +1386,10 @@
           <td style="font-size:.8rem;white-space:nowrap">${formaterDate(u.date_inscription)}</td>
           <td style="font-size:.8rem;white-space:nowrap">${u.derniere_connexion ? formaterDate(u.derniere_connexion) : '<span class="note-verrouille">Jamais</span>'}</td>
           <td>${cellSelect}</td>
+          <td><button class="btn-save" onclick="ouvrirModaleCartesUtilisateur('${esc(u.user_id)}', '${esc(u.username)}')">🃏 Gérer</button></td>
           <td>${cellAction}</td>
         </tr>`
-      }).join('') || '<tr><td colspan="5" class="note-verrouille">Aucun utilisateur trouvé.</td></tr>'
+      }).join('') || '<tr><td colspan="8" class="note-verrouille">Aucun utilisateur trouvé.</td></tr>'
     }
 
     window.resetFiltresUsers = function() {
@@ -1960,6 +1982,69 @@
       if (!confirm(`Supprimer définitivement la carte "${nom}" ? Cette action est irréversible.`)) return
       await adminSupprimerCarte(id)
       await chargerCartesBattlogy()
+    }
+
+    // ===== Cartes d'un utilisateur (Battlogy) — donner / retirer =====
+    // Réutilise cartesBattlogyCache si déjà chargé (super_admin), sinon
+    // charge une copie légère juste pour les noms (lecture ouverte à tous,
+    // voir la note RLS dans battlogy.js).
+    let toutesCartesNomsCache = []
+    let cuUserId = null
+    let cuCartesDebloquees = []
+
+    async function chargerToutesCartesNoms() {
+      toutesCartesNomsCache = cartesBattlogyCache.length ? cartesBattlogyCache : await adminListerCartes()
+    }
+
+    window.ouvrirModaleCartesUtilisateur = async function(userId, username) {
+      cuUserId = userId
+      document.getElementById('cu-username').textContent = username
+      document.getElementById('msg-cartes-user').textContent = ''
+      document.getElementById('cu-liste-debloquees').innerHTML = '<p class="note-verrouille">Chargement…</p>'
+      document.getElementById('modale-cartes-user-fond').classList.add('ouverte')
+      if (!toutesCartesNomsCache.length) await chargerToutesCartesNoms()
+      await rafraichirCartesUtilisateur()
+    }
+
+    window.fermerModaleCartesUtilisateur = function() {
+      document.getElementById('modale-cartes-user-fond').classList.remove('ouverte')
+      cuUserId = null
+    }
+
+    async function rafraichirCartesUtilisateur() {
+      cuCartesDebloquees = await adminListerCartesUtilisateur(cuUserId)
+      const nomsParId = {}
+      toutesCartesNomsCache.forEach(c => { nomsParId[c.id] = c.nom })
+
+      const liste = document.getElementById('cu-liste-debloquees')
+      liste.innerHTML = cuCartesDebloquees.map(l => `
+        <div class="ligne-composition">
+          <div class="infos"><span>${esc(nomsParId[l.carte_id] ?? l.carte_id)}</span></div>
+          <button class="btn-delete" onclick="retirerCarteUtilisateur('${esc(l.carte_id)}')">Retirer</button>
+        </div>`).join('') || '<p class="note-verrouille">Aucune carte débloquée.</p>'
+
+      const idsDebloques = new Set(cuCartesDebloquees.map(l => l.carte_id))
+      const select = document.getElementById('cu-select-carte')
+      const dispo = toutesCartesNomsCache.filter(c => !idsDebloques.has(c.id))
+      select.innerHTML = dispo.length
+        ? dispo.map(c => `<option value="${esc(c.id)}">${esc(c.nom)}</option>`).join('')
+        : '<option value="">— Toutes les cartes sont déjà débloquées —</option>'
+    }
+
+    window.donnerCarteUtilisateur = async function() {
+      const carteId = document.getElementById('cu-select-carte').value
+      const msgEl = document.getElementById('msg-cartes-user')
+      if (!carteId) { msgEl.textContent = 'Aucune carte à donner.'; msgEl.className = 'msg-inline err'; return }
+      const { ok, error } = await adminDonnerCarte(cuUserId, carteId)
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Carte donnée'; msgEl.className = 'msg-inline ok'
+      await rafraichirCartesUtilisateur()
+    }
+
+    window.retirerCarteUtilisateur = async function(carteId) {
+      if (!confirm('Retirer cette carte au joueur ?')) return
+      await adminRetirerCarteUtilisateur(cuUserId, carteId)
+      await rafraichirCartesUtilisateur()
     }
 
     // ===== Annonces =====
