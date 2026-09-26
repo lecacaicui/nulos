@@ -1,0 +1,2166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administration</title>
+  <link rel="stylesheet" href="../style/style.css">
+  <script>
+  (function(){
+    var t = localStorage.getItem('theme_couleurs');
+    if (!t) return;
+    try {
+      var c = JSON.parse(t);
+      var r = document.documentElement.style;
+      r.setProperty('--couleur-fond', c.couleur_fond);
+      r.setProperty('--couleur-conteneur', c.couleur_conteneur);
+      r.setProperty('--couleur-bordure', c.couleur_bordure);
+      r.setProperty('--couleur-bouton', c.couleur_bouton);
+      var h = c.couleur_fond.replace('#','');
+      var lum = (0.299*parseInt(h.substring(0,2),16) + 0.587*parseInt(h.substring(2,4),16) + 0.114*parseInt(h.substring(4,6),16)) / 255;
+      r.setProperty('--couleur-texte', lum < 0.5 ? '#f1f1f1' : '#1a1a1a');
+      r.setProperty('--couleur-texte-faible', lum < 0.5 ? '#9ca3af' : '#6b7280');
+    } catch(e) {}
+  })();
+  </script>
+  <style>body { visibility: hidden; }</style>
+  <style>
+    /* ===== Modales ===== */
+    .modale-fond {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .modale-fond.ouverte { display: flex; }
+    .modale-admin {
+      background: var(--couleur-conteneur);
+      border-radius: 14px;
+      max-width: 440px;
+      width: 100%;
+      max-height: calc(100vh - 4rem);
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,.25);
+      margin: 2rem auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* Modale large : réservée aux formulaires avec beaucoup de champs (ex: cartes Battlogy) */
+    .modale-admin.modale-admin-lg { max-width: 680px; }
+    .modale-admin-entete {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.5rem 2rem 0;
+      flex-shrink: 0;
+    }
+    .modale-admin-corps {
+      padding: .75rem 2rem 1.25rem;
+      overflow-y: auto;
+      flex: 1 1 auto;
+    }
+    .modale-admin-pied {
+      padding: 1rem 2rem 1.5rem;
+      flex-shrink: 0;
+      border-top: 1px solid var(--couleur-bordure);
+      background: var(--couleur-conteneur);
+    }
+    .modale-fermer {
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .modale-fermer:hover { color: var(--couleur-texte); }
+    .modale-admin h2 { font-size: 1.2rem; margin-bottom: .25rem; }
+    .modale-admin h3 { color: var(--couleur-texte); }
+    /* Grille de champs numériques (ex: coût/PV/dégâts) : plus lisible qu'un flex-wrap qui casse mal */
+    .champs-grille-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .6rem;
+    }
+    @media (max-width: 560px) {
+      .champs-grille-3 { grid-template-columns: 1fr 1fr; }
+    }
+    .img-mini { width: 75px; height: 75px; object-fit: contain; vertical-align: middle; }
+    .tag-rarete {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 700;
+      color: white;
+    }
+    .ligne-composition {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      padding: .4rem 0;
+      border-bottom: 1px solid var(--couleur-bordure);
+      font-size: .85rem;
+    }
+    .ligne-composition:last-child { border-bottom: none; }
+    .ligne-composition .infos { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+
+    /* ===== Onglets ===== */
+    .admin-onglets {
+      display: flex;
+      gap: .35rem;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .onglet {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.4rem;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-bottom: none;
+      border-radius: 12px 12px 0 0;
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      white-space: nowrap;
+      position: relative;
+      top: 1px;
+      transition: color .15s, background .15s;
+    }
+    .onglet:hover { color: var(--couleur-texte); }
+    .onglet.actif { background: var(--couleur-conteneur); color: var(--couleur-texte); }
+    .onglet.actif::after {
+      content: '';
+      position: absolute;
+      left: .9rem; right: .9rem; bottom: -1px;
+      height: 3px;
+      background: var(--couleur-bouton);
+      border-radius: 3px 3px 0 0;
+    }
+    .onglet-icone { font-size: 1.05rem; line-height: 1; }
+    .onglet-panneau { display: none; }
+    .onglet-panneau.actif { display: block; animation: onglet-apparait .12s ease-out; }
+    @keyframes onglet-apparait {
+      from { opacity: 0; transform: translateY(2px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .onglet-panneaux {
+      background: var(--couleur-conteneur);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 0 10px 10px 10px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      transition: background .15s, border-color .15s;
+    }
+    .onglet-panneau h2 { margin-bottom: .5rem; font-size: 1.1rem; }
+
+    /* ===== Barres de filtres ===== */
+    .filtres-bar {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin: 1rem 0;
+      padding: .9rem 1rem;
+      background: var(--couleur-fond);
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 10px;
+    }
+    .filtres-bar label {
+      margin: 0 0 .2rem;
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--couleur-texte-faible);
+    }
+    .filtre-groupe { display: flex; flex-direction: column; }
+    .filtre-input {
+      padding: .4rem .7rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 7px;
+      font-size: .85rem;
+      background: var(--couleur-conteneur);
+      color: var(--couleur-texte);
+      min-width: 160px;
+    }
+    .filtre-input:focus { outline: none; border-color: var(--couleur-bouton); }
+    .filtre-select {
+      padding: .4rem .6rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 7px;
+      font-size: .85rem;
+      background: var(--couleur-conteneur);
+      color: var(--couleur-texte);
+      cursor: pointer;
+    }
+    .filtre-reset {
+      padding: .4rem .8rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 7px;
+      font-size: .8rem;
+      background: none;
+      color: var(--couleur-texte-faible);
+      cursor: pointer;
+      align-self: flex-end;
+    }
+    .filtre-reset:hover { color: var(--couleur-texte); border-color: var(--couleur-texte); }
+    .filtres-compteur { font-size: .8rem; color: var(--couleur-texte-faible); align-self: flex-end; margin-left: auto; white-space: nowrap; }
+
+    /* ===== En-têtes de tableau triables ===== */
+    .th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+    .th-sort:hover { color: var(--couleur-bouton); }
+    .th-sort .sort-arrow { font-size: .7rem; margin-left: .25rem; opacity: .4; }
+    .th-sort.actif .sort-arrow { opacity: 1; color: var(--couleur-bouton); }
+
+    /* ===== Table responsive ===== */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* ===== Responsive général ===== */
+    @media (max-width: 768px) {
+      .main-admin { padding: 1rem 1rem 5rem; }
+      .page-header { flex-direction: column; align-items: flex-start; gap: .75rem; }
+      .page-header h1 { font-size: 1.4rem; }
+      .onglet { padding: .6rem .9rem; font-size: .8rem; }
+      .onglet-panneaux { padding: 1rem; }
+      .filtres-bar { flex-direction: column; gap: .6rem; }
+      .filtre-input, .filtre-select { width: 100%; min-width: unset; }
+      .filtres-compteur { margin-left: 0; }
+      .row-actions { flex-wrap: wrap; }
+      table { min-width: 480px; }
+      .theme-grid { flex-direction: column; gap: 1rem; }
+      .modale-admin { margin: 1rem auto; max-height: calc(100vh - 2rem); }
+      .modale-admin-entete { padding: 1.25rem 1.25rem 0; }
+      .modale-admin-corps { padding: .75rem 1.25rem 1rem; }
+      .modale-admin-pied { padding: .85rem 1.25rem 1.25rem; }
+    }
+    @media (max-width: 480px) {
+      .onglet-icone { display: none; }
+      table { min-width: 400px; }
+      td, th { padding: .5rem .5rem; font-size: .82rem; }
+    }
+    /* ===== Picker image (upload + bibliothèque BDD) ===== */
+    .img-picker-wrap { display: flex; flex-direction: column; gap: .5rem; margin-top: .25rem; }
+    .img-picker-tabs { display: flex; gap: .4rem; }
+    .img-picker-tab {
+      padding: .3rem .8rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px 6px 0 0;
+      background: var(--couleur-fond);
+      color: var(--couleur-texte-faible);
+      font-size: .8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: none;
+      transition: background .12s, color .12s;
+    }
+    .img-picker-tab.actif { background: var(--couleur-conteneur); color: var(--couleur-texte); }
+    .img-picker-body {
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 0 6px 6px 6px;
+      background: var(--couleur-conteneur);
+      padding: .75rem;
+    }
+    .img-picker-panneau { display: none; }
+    .img-picker-panneau.actif { display: block; }
+    .img-picker-preview-wrap {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: .6rem;
+    }
+    .img-picker-preview {
+      width: 56px; height: 56px;
+      object-fit: contain;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px;
+      display: none;
+      flex-shrink: 0;
+    }
+    .img-picker-nom-actuel {
+      font-size: .78rem;
+      color: var(--couleur-texte-faible);
+      font-style: italic;
+      word-break: break-all;
+    }
+    /* Bibliothèque */
+    .img-bib-search {
+      width: 100%;
+      padding: .4rem .6rem;
+      border: 1px solid var(--couleur-bordure);
+      border-radius: 6px;
+      font-size: .82rem;
+      background: var(--couleur-fond);
+      color: var(--couleur-texte);
+      margin-bottom: .6rem;
+    }
+    .img-bib-grille {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+      gap: .4rem;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .img-bib-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .2rem;
+      padding: .35rem;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      background: var(--couleur-fond);
+      transition: border-color .12s, background .12s;
+    }
+    .img-bib-item:hover { border-color: var(--couleur-bouton); background: var(--couleur-conteneur); }
+    .img-bib-item.selectionne { border-color: var(--couleur-bouton); background: color-mix(in srgb, var(--couleur-bouton) 12%, var(--couleur-conteneur)); }
+    .img-bib-item img { width: 48px; height: 48px; object-fit: contain; }
+    .img-bib-item span { font-size: .6rem; color: var(--couleur-texte-faible); text-align: center; word-break: break-all; line-height: 1.2; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .img-bib-vide { font-size: .82rem; color: var(--couleur-texte-faible); text-align: center; padding: 1rem 0; }
+    /* Upload */
+    .img-upload-zone {
+      border: 2px dashed var(--couleur-bordure);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      font-size: .82rem;
+      color: var(--couleur-texte-faible);
+    }
+    .img-upload-zone:hover, .img-upload-zone.drag { border-color: var(--couleur-bouton); background: color-mix(in srgb, var(--couleur-bouton) 8%, var(--couleur-conteneur)); }
+    .img-upload-zone input[type="file"] { display: none; }
+    .img-upload-msg { font-size: .78rem; margin-top: .4rem; }
+  </style>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+  <main class="main-admin">
+    <div id="acces-refuse" class="acces-refuse" style="display:none">
+      ⛔ Accès refusé — réservé aux administrateurs.<br><br>
+      <a href="../index.html">← Retour à l'accueil</a>
+    </div>
+    <div id="contenu" style="display:none">
+      <div class="page-header">
+        <div>
+          <h1>Administration</h1>
+          <a class="retour" href="../index.html">← Retour à l'accueil</a>
+        </div>
+        <span class="badge" id="badge-role">Admin</span>
+      </div>
+
+      <div class="admin-onglets" id="admin-onglets">
+        <button class="onglet actif" data-onglet="utilisateurs" onclick="ouvrirOnglet('utilisateurs')">
+          <span class="onglet-icone">👤</span> Utilisateurs
+        </button>
+        <button class="onglet" id="onglet-theme" data-onglet="theme" onclick="ouvrirOnglet('theme')" style="display:none">
+          <span class="onglet-icone">🎨</span> Thème
+        </button>
+        <button class="onglet" id="onglet-creatures" data-onglet="creatures" onclick="ouvrirOnglet('creatures')" style="display:none">
+          <span class="onglet-icone">🐾</span> Créatures
+        </button>
+        <button class="onglet" id="onglet-lootbox" data-onglet="lootbox" onclick="ouvrirOnglet('lootbox')" style="display:none">
+          <span class="onglet-icone">🎁</span> Loot Box
+        </button>
+        <button class="onglet" id="onglet-mda" data-onglet="mda" onclick="ouvrirOnglet('mda')" style="display:none">
+          <span class="onglet-icone">😇</span> Ennemis MDA
+        </button>
+        <button class="onglet" id="onglet-battlogy" data-onglet="battlogy" onclick="ouvrirOnglet('battlogy')" style="display:none">
+          <span class="onglet-icone">🃏</span> Cartes Battlogy
+        </button>
+        <button class="onglet" data-onglet="annonces" onclick="ouvrirOnglet('annonces')">
+          <span class="onglet-icone">📢</span> Annonces
+        </button>
+      </div>
+
+      <div class="onglet-panneaux">
+
+        <!-- ===== Onglet Utilisateurs ===== -->
+        <div class="onglet-panneau actif" data-panneau="utilisateurs">
+          <h2>👤 Comptes utilisateurs</h2>
+          <p class="note-verrouille">Gérez le niveau d'accès des comptes du site, ou supprimez-en un.</p>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="u-filtre-nom" placeholder="Nom d'utilisateur…" oninput="appliquerFiltresUsers()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Niveau</label>
+              <select class="filtre-select" id="u-filtre-niveau" onchange="appliquerFiltresUsers()">
+                <option value="">Tous les niveaux</option>
+                <option value="commun">Commun</option>
+                <option value="plus">Plus</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="u-tri" onchange="appliquerFiltresUsers()">
+                <option value="username-asc">Nom A→Z</option>
+                <option value="username-desc">Nom Z→A</option>
+                <option value="niveau-asc">Niveau ↑</option>
+                <option value="niveau-desc">Niveau ↓</option>
+                <option value="badges-desc">Badges (plus)</option>
+                <option value="badges-asc">Badges (moins)</option>
+                <option value="date_inscription-desc">Inscription (récent)</option>
+                <option value="date_inscription-asc">Inscription (ancien)</option>
+                <option value="derniere_connexion-desc">Connexion (récente)</option>
+                <option value="derniere_connexion-asc">Connexion (ancienne)</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresUsers()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="u-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nom d'utilisateur</th>
+                  <th>Niveau actuel</th>
+                  <th>Badges</th>
+                  <th>Inscription</th>
+                  <th>Dernière connexion</th>
+                  <th>Changer le niveau</th>
+                  <th>Cartes</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== Onglet Thème ===== -->
+        <div class="onglet-panneau" data-panneau="theme" id="theme-card">
+          <h2>🎨 Thème du site</h2>
+          <p class="note-verrouille">Couleurs utilisées sur tout le site. Choisissez un préréglage ou personnalisez chaque couleur, puis cliquez sur "Appliquer" pour enregistrer.</p>
+          <div class="theme-presets">
+            <button class="btn-preset" onclick="appliquerPreset('clair')">☀️ Thème clair</button>
+            <button class="btn-preset" onclick="appliquerPreset('sombre')">🌙 Thème sombre</button>
+          </div>
+          <div class="theme-grid">
+            <div class="theme-field">
+              <label for="couleur-fond">Fond du site</label>
+              <input type="color" id="couleur-fond">
+            </div>
+            <div class="theme-field">
+              <label for="couleur-conteneur">Conteneurs</label>
+              <input type="color" id="couleur-conteneur">
+            </div>
+            <div class="theme-field">
+              <label for="couleur-bordure">Bordures</label>
+              <input type="color" id="couleur-bordure">
+            </div>
+            <div class="theme-field">
+              <label for="couleur-bouton">Boutons</label>
+              <input type="color" id="couleur-bouton">
+            </div>
+            <div class="theme-field">
+              <label>&nbsp;</label>
+              <button class="btn-save" id="btn-save-theme" onclick="sauvegarderTheme()">Appliquer</button>
+            </div>
+            <span class="msg-inline" id="msg-theme"></span>
+          </div>
+        </div>
+
+        <!-- ===== Onglet Créatures ===== -->
+        <div class="onglet-panneau" data-panneau="creatures" id="creatures-card">
+          <h2>🐾 Créatures</h2>
+          <p class="note-verrouille">Gérez les créatures obtenables dans les loot box.</p>
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormCreature(null)">+ Nouvelle créature</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="c-filtre-nom" placeholder="Nom de la créature…" oninput="appliquerFiltresCreatures()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Rareté</label>
+              <select class="filtre-select" id="c-filtre-rarete" onchange="appliquerFiltresCreatures()">
+                <option value="">Toutes</option>
+                <option value="commun">Commun</option>
+                <option value="rare">Rare</option>
+                <option value="epique">Épique</option>
+                <option value="legendaire">Légendaire</option>
+                <option value="cosmique">Cosmique</option>
+                <option value="secret">Secret</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="c-filtre-statut" onchange="appliquerFiltresCreatures()">
+                <option value="">Tous</option>
+                <option value="actif">Active</option>
+                <option value="inactif">Désactivée</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="c-tri" onchange="appliquerFiltresCreatures()">
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="rarete-asc">Rareté ↑</option>
+                <option value="rarete-desc">Rareté ↓</option>
+                <option value="multiplicateur-desc">Multiplicateur ↓</option>
+                <option value="multiplicateur-asc">Multiplicateur ↑</option>
+                <option value="prix_vente-desc">Prix revente ↓</option>
+                <option value="prix_vente-asc">Prix revente ↑</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresCreatures()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="c-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>Rareté</th><th>Multiplicateur</th><th>Prix revente</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-creatures"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== Onglet Loot Box ===== -->
+        <div class="onglet-panneau" data-panneau="lootbox" id="lootbox-card">
+          <h2>🎁 Loot Box</h2>
+          <p class="note-verrouille">Gérez les loot box disponibles : prix, image, et composition.</p>
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormLootBox(null)">+ Nouvelle loot box</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="lb-filtre-nom" placeholder="Nom de la loot box…" oninput="appliquerFiltresLootBoxes()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="lb-filtre-statut" onchange="appliquerFiltresLootBoxes()">
+                <option value="">Tous</option>
+                <option value="actif">Active</option>
+                <option value="inactif">Désactivée</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="lb-tri" onchange="appliquerFiltresLootBoxes()">
+                <option value="ordre-asc">Ordre ↑</option>
+                <option value="ordre-desc">Ordre ↓</option>
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="prix-asc">Prix ↑</option>
+                <option value="prix-desc">Prix ↓</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresLootBoxes()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="lb-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>Prix</th><th>Ordre</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-lootboxes"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== Onglet Ennemis MDA ===== -->
+        <div class="onglet-panneau" data-panneau="mda" id="mda-card">
+          <h2>😇 Ennemis — Main de l'Ange</h2>
+          <p class="note-verrouille">Gérez les ennemis affrontables sur la page Main de l'Ange : PV, dégâts d'attaque, délai d'attaque (tous les N tours) et effet spécial (théorique pour l'instant, pas encore actif en jeu).</p>
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormEnnemiMDA(null)">+ Nouvel ennemi</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="m-filtre-nom" placeholder="Nom de l'ennemi…" oninput="appliquerFiltresEnnemisMDA()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="m-filtre-statut" onchange="appliquerFiltresEnnemisMDA()">
+                <option value="">Tous</option>
+                <option value="actif">Actif</option>
+                <option value="inactif">Désactivé</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="m-tri" onchange="appliquerFiltresEnnemisMDA()">
+                <option value="ordre-asc">Ordre ↑</option>
+                <option value="ordre-desc">Ordre ↓</option>
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="pv-desc">PV ↓</option>
+                <option value="pv-asc">PV ↑</option>
+                <option value="degats_attaque-desc">Dégâts ↓</option>
+                <option value="degats_attaque-asc">Dégâts ↑</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresEnnemisMDA()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="m-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>PV</th><th>Dégâts</th><th>Délai (tours)</th><th>Effet spécial</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-mda"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== Onglet Cartes Battlogy ===== -->
+        <div class="onglet-panneau" data-panneau="battlogy" id="battlogy-card">
+          <h2>🃏 Cartes — Battlogy</h2>
+          <p class="note-verrouille">Gérez les cartes jouables dans Battlogy : stats, image, coût. Ajouter une carte ne la débloque pas automatiquement pour les joueurs existants. Désactiver une carte la retire du jeu sans la supprimer (les decks contenant cette carte l'ignoreront simplement). Une carte de catégorie « Légende » ne peut être équipée que dans l'emplacement spécial doré du deck (une seule par deck, équiper une est obligatoire) — son éventuel effet sur-mesure se code directement dans battlogy.html (voir EFFETS_ARRIVEE).</p>
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormCarteBattlogy(null)">+ Nouvelle carte</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="bt-filtre-nom" placeholder="Nom de la carte…" oninput="appliquerFiltresCartesBattlogy()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Catégorie</label>
+              <select class="filtre-select" id="bt-filtre-categorie" onchange="appliquerFiltresCartesBattlogy()">
+                <option value="">Toutes</option>
+                <option value="troupe">Troupe</option>
+                <option value="sort">Sort</option>
+                <option value="legende">Légende</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Statut</label>
+              <select class="filtre-select" id="bt-filtre-statut" onchange="appliquerFiltresCartesBattlogy()">
+                <option value="">Tous</option>
+                <option value="actif">Active</option>
+                <option value="inactif">Désactivée</option>
+              </select>
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="bt-tri" onchange="appliquerFiltresCartesBattlogy()">
+                <option value="ordre-asc">Ordre ↑</option>
+                <option value="ordre-desc">Ordre ↓</option>
+                <option value="nom-asc">Nom A→Z</option>
+                <option value="nom-desc">Nom Z→A</option>
+                <option value="cout-asc">Coût ↑</option>
+                <option value="cout-desc">Coût ↓</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresCartesBattlogy()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="bt-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Image</th><th>Nom</th><th>Coût</th><th>PV</th><th>Dégâts</th><th>Catégorie</th><th>Statut</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-battlogy"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== Onglet Annonces ===== -->
+        <div class="onglet-panneau" data-panneau="annonces">
+          <h2>📢 Annonces</h2>
+          <p class="note-verrouille">Gérez les messages affichés sur la page d'accueil. Les administrateurs et super administrateurs peuvent en publier.</p>
+
+          <div class="row-actions" style="margin:.75rem 0 1.25rem; align-items:flex-end; flex-wrap:wrap;">
+            <div class="filtre-groupe" style="min-width:220px;">
+              <label for="mon-pseudo">Mon pseudo (affiché comme auteur des annonces)</label>
+              <input class="filtre-input" type="text" id="mon-pseudo" placeholder="Laisser vide pour utiliser votre nom de compte" maxlength="30" style="width:100%;">
+            </div>
+            <button class="btn-save" onclick="sauvegarderMonPseudo()">Enregistrer le pseudo</button>
+            <span class="msg-inline" id="msg-pseudo"></span>
+          </div>
+
+          <div class="row-actions" style="margin:.75rem 0;">
+            <button class="btn-save" onclick="ouvrirFormAnnonce(null)">+ Nouvelle annonce</button>
+          </div>
+          <div class="filtres-bar">
+            <div class="filtre-groupe">
+              <label>Recherche</label>
+              <input class="filtre-input" type="text" id="a-filtre-titre" placeholder="Titre de l'annonce…" oninput="appliquerFiltresAnnonces()">
+            </div>
+            <div class="filtre-groupe">
+              <label>Trier par</label>
+              <select class="filtre-select" id="a-tri" onchange="appliquerFiltresAnnonces()">
+                <option value="date_publication-desc">Dernière publication ↓</option>
+                <option value="date_publication-asc">Dernière publication ↑</option>
+                <option value="date_creation-desc">Date de création ↓</option>
+                <option value="date_creation-asc">Date de création ↑</option>
+                <option value="titre-asc">Titre A→Z</option>
+                <option value="titre-desc">Titre Z→A</option>
+              </select>
+            </div>
+            <button class="filtre-reset" onclick="resetFiltresAnnonces()">✕ Réinitialiser</button>
+            <span class="filtres-compteur" id="a-compteur"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Titre</th><th>Auteur</th><th>Créée le</th><th>Dernière publication</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="tbody-annonces"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Modale Créature ===== -->
+  <div class="modale-fond" id="modale-creature-fond" onclick="if(event.target===this) fermerModaleCreature()">
+    <div class="modale-admin">
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-creature">Nouvelle créature</h2>
+        <button class="modale-fermer" onclick="fermerModaleCreature()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <label for="c-id">Identifiant unique (texte, ex: flamby)</label>
+        <input type="text" id="c-id" placeholder="ex: flamby">
+        <label for="c-nom">Nom affiché</label>
+        <input type="text" id="c-nom" placeholder="ex: Flamby">
+        <label for="c-rarete">Rareté</label>
+        <select id="c-rarete">
+          <option value="commun">Commun</option>
+          <option value="rare">Rare</option>
+          <option value="epique">Épique</option>
+          <option value="legendaire">Légendaire</option>
+          <option value="cosmique">Cosmique</option>
+          <option value="secret">Secret (caché du site)</option>
+        </select>
+        <label for="c-multiplicateur">Multiplicateur de production (ex: 1.15)</label>
+        <input type="number" id="c-multiplicateur" step="0.01" min="1" placeholder="1.10">
+        <label>Image</label>
+        <div class="img-picker-wrap" id="c-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="c-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="c-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('c')">🖼 Choisir / importer une image</button>
+        </div>
+        <input type="hidden" id="c-image">
+        <div class="msg-inline" id="c-image-msg" style="margin-left:0"></div>
+        <label for="c-prix-vente">Prix de revente si doublon (pièces)</label>
+        <input type="number" id="c-prix-vente" min="0" step="1" placeholder="100">
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderCreature()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-creature"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modale Loot Box ===== -->
+  <div class="modale-fond" id="modale-lootbox-fond" onclick="if(event.target===this) fermerModaleLootBox()">
+    <div class="modale-admin">
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-lootbox">Nouvelle loot box</h2>
+        <button class="modale-fermer" onclick="fermerModaleLootBox()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <label for="lb-id">Identifiant unique (texte, ex: premium)</label>
+        <input type="text" id="lb-id" placeholder="ex: premium">
+        <label for="lb-nom">Nom affiché</label>
+        <input type="text" id="lb-nom" placeholder="ex: Loot Box Premium">
+        <label for="lb-prix">Prix (pièces)</label>
+        <input type="number" id="lb-prix" min="0" step="1" placeholder="400000">
+        <label>Image</label>
+        <div class="img-picker-wrap" id="lb-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="lb-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="lb-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('lb')">🖼 Choisir / importer une image</button>
+        </div>
+        <input type="hidden" id="lb-image">
+        <div class="msg-inline" id="lb-image-msg" style="margin-left:0"></div>
+        <label for="lb-ordre">Ordre d'affichage</label>
+        <input type="number" id="lb-ordre" step="1" placeholder="1">
+        <div id="composition-lootbox" style="display:none; margin-top:1.5rem; text-align:left;">
+          <h3 style="font-size:.95rem; margin-bottom:.5rem;">Composition (créatures de cette boîte)</h3>
+          <div id="liste-composition"></div>
+          <div class="row-actions" style="margin-top:.75rem; flex-wrap:wrap;">
+            <select id="ajout-creature-select" style="flex:1; min-width:140px;"></select>
+            <input type="number" id="ajout-creature-poids" value="10" min="0.01" step="0.01" style="width:80px;" placeholder="poids">
+            <button class="btn-save" onclick="ajouterCreatureALaBox()">Ajouter</button>
+          </div>
+        </div>
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderLootBox()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-lootbox"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modale Ennemi MDA ===== -->
+  <div class="modale-fond" id="modale-mda-fond" onclick="if(event.target===this) fermerModaleEnnemiMDA()">
+    <div class="modale-admin">
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-mda">Nouvel ennemi</h2>
+        <button class="modale-fermer" onclick="fermerModaleEnnemiMDA()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <label for="m-id">Identifiant unique (texte, ex: charb)</label>
+        <input type="text" id="m-id" placeholder="ex: charb">
+        <label for="m-nom">Nom affiché</label>
+        <input type="text" id="m-nom" placeholder="ex: Charb">
+        <label>Image</label>
+        <div class="img-picker-wrap" id="m-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="m-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="m-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('m')">🖼 Choisir / importer une image</button>
+        </div>
+        <input type="hidden" id="m-image">
+        <div class="msg-inline" id="m-image-msg" style="margin-left:0"></div>
+        <label for="m-pv">Points de vie (PV)</label>
+        <input type="number" id="m-pv" min="1" step="1" placeholder="10">
+        <label for="m-degats">Dégâts d'attaque</label>
+        <input type="number" id="m-degats" min="0" step="1" placeholder="1">
+        <label for="m-delai">Délai d'attaque (attaque tous les N tours)</label>
+        <input type="number" id="m-delai" min="1" step="1" placeholder="4">
+        <label for="m-effet">Effet spécial (optionnel — théorique, pas encore actif en jeu)</label>
+        <input type="text" id="m-effet" placeholder="Aucun pour l'instant">
+        <label for="m-ordre">Ordre d'affichage</label>
+        <input type="number" id="m-ordre" step="1" placeholder="1">
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderEnnemiMDA()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-mda"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modale Carte Battlogy ===== -->
+  <div class="modale-fond" id="modale-battlogy-fond" onclick="if(event.target===this) fermerModaleCarteBattlogy()">
+    <div class="modale-admin modale-admin-lg">
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-battlogy">Nouvelle carte</h2>
+        <button class="modale-fermer" onclick="fermerModaleCarteBattlogy()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <div class="champs-grille-3" style="grid-template-columns: 2fr 1fr;">
+          <div>
+            <label for="bt-id">Identifiant unique (texte, ex: archer)</label>
+            <input type="text" id="bt-id" placeholder="ex: archer">
+          </div>
+          <div>
+            <label for="bt-nom">Nom affiché</label>
+            <input type="text" id="bt-nom" placeholder="ex: Archer">
+          </div>
+        </div>
+        <label>Image</label>
+        <div class="img-picker-wrap" id="bt-picker-wrap">
+          <div class="img-picker-preview-wrap">
+            <img class="img-picker-preview" id="bt-image-preview" src="" alt="">
+            <span class="img-picker-nom-actuel" id="bt-image-nom">Aucune image</span>
+          </div>
+          <button type="button" class="btn btn-secondary" style="font-size:.82rem;padding:.35rem .8rem" onclick="ouvrirPickerImage('bt')">🖼 Choisir / importer une image</button>
+        </div>
+        <input type="hidden" id="bt-image">
+        <div class="msg-inline" id="bt-image-msg" style="margin-left:0"></div>
+
+        <div class="champs-grille-3" style="grid-template-columns: 1fr 1fr;">
+          <div>
+            <label for="bt-categorie">Catégorie</label>
+            <select id="bt-categorie">
+              <option value="troupe">Troupe (recrute une unité)</option>
+              <option value="sort">Sort (statue, effet instantané…)</option>
+              <option value="legende">Légende (emplacement spécial, 1 max par deck)</option>
+            </select>
+          </div>
+          <div>
+            <label for="bt-type-attaque">Type d'attaque</label>
+            <select id="bt-type-attaque">
+              <option value="melee">Mêlée</option>
+              <option value="distance">Distance</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="champs-grille-3">
+          <div>
+            <label for="bt-cout">Coût (or)</label>
+            <input type="number" id="bt-cout" min="0" step="1" placeholder="1">
+          </div>
+          <div>
+            <label for="bt-pv">PV</label>
+            <input type="number" id="bt-pv" min="0" step="1" placeholder="100">
+          </div>
+          <div>
+            <label for="bt-degats">Dégâts</label>
+            <input type="number" id="bt-degats" min="0" step="1" placeholder="10">
+          </div>
+        </div>
+        <div class="champs-grille-3">
+          <div>
+            <label for="bt-porte">Portée (px)</label>
+            <input type="number" id="bt-porte" min="0" step="1" placeholder="34">
+          </div>
+          <div>
+            <label for="bt-vitesse-attaque">Vitesse d'attaque (att/s)</label>
+            <input type="number" id="bt-vitesse-attaque" min="0" step="0.1" placeholder="1">
+          </div>
+          <div>
+            <label for="bt-vitesse-marche">Vitesse de marche (px/s)</label>
+            <input type="number" id="bt-vitesse-marche" min="0" step="1" placeholder="40">
+          </div>
+        </div>
+        <div class="champs-grille-3">
+          <div>
+            <label for="bt-activation">Temps d'activation (ms)</label>
+            <input type="number" id="bt-activation" min="0" step="1" placeholder="800">
+          </div>
+          <div>
+            <label for="bt-nombre">Nombre d'unités</label>
+            <input type="number" id="bt-nombre" min="1" step="1" placeholder="1">
+          </div>
+          <div>
+            <label for="bt-taille">Taille (multiplicateur)</label>
+            <input type="number" id="bt-taille" min="0.1" step="0.1" placeholder="1">
+          </div>
+        </div>
+
+        <label for="bt-ordre">Ordre d'affichage</label>
+        <input type="number" id="bt-ordre" step="1" placeholder="1">
+
+        <label for="bt-options">Options avancées (JSON, optionnel — réservé aux sorts)</label>
+        <textarea id="bt-options" rows="3" placeholder='ex: {"placementLibre":true,"effetInstantane":true,"zoneHex":2,"degatsChateauMult":0.4}'
+          style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.85rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:monospace;"></textarea>
+        <p class="note-verrouille" style="margin-top:.3rem;">Propriétés reconnues : placementLibre, immobile, effetInstantane, zoneHex, degatsChateauMult, repousse, zoneAttaque, zoneAttaqueHex. Pour une carte « Légende », les propriétés supplémentaires ne prennent effet que si un code correspondant a été ajouté dans battlogy.html (ex: auraSoinHex/auraSoinMontant pour le Roi Squelette, voir EFFETS_ARRIVEE) — ajouter une nouvelle légende avec un effet inédit nécessite toujours une intervention côté code.</p>
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderCarteBattlogy()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-battlogy"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modale Cartes utilisateur (Battlogy) ===== -->
+  <div class="modale-fond" id="modale-cartes-user-fond" onclick="if(event.target===this) fermerModaleCartesUtilisateur()">
+    <div class="modale-admin">
+      <div class="modale-admin-entete">
+        <h2>🃏 Cartes de <span id="cu-username"></span></h2>
+        <button class="modale-fermer" onclick="fermerModaleCartesUtilisateur()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <h3 style="font-size:.95rem; margin-bottom:.5rem;">Cartes débloquées</h3>
+        <div id="cu-liste-debloquees"><p class="note-verrouille">Chargement…</p></div>
+        <div class="row-actions" style="margin-top:1.25rem; flex-wrap:wrap;">
+          <select id="cu-select-carte" style="flex:1; min-width:160px;"></select>
+          <button class="btn-save" onclick="donnerCarteUtilisateur()">Donner</button>
+        </div>
+        <div class="msg-inline" id="msg-cartes-user" style="margin-top:.5rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modale Annonce ===== -->
+  <div class="modale-fond" id="modale-annonce-fond" onclick="if(event.target===this) fermerModaleAnnonce()">
+    <div class="modale-admin">
+      <div class="modale-admin-entete">
+        <h2 id="titre-modale-annonce">Nouvelle annonce</h2>
+        <button class="modale-fermer" onclick="fermerModaleAnnonce()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <input type="hidden" id="a-id">
+        <label for="a-titre">Titre</label>
+        <input type="text" id="a-titre" placeholder="ex: Maintenance prévue ce week-end">
+        <label for="a-contenu">Contenu</label>
+        <textarea id="a-contenu" rows="5" placeholder="Détails de l'annonce…"
+          style="width:100%; padding:.6rem .8rem; border:1px solid var(--couleur-bordure); border-radius:7px; font-size:.9rem; background:var(--couleur-fond); color:var(--couleur-texte); resize:vertical; font-family:inherit;"></textarea>
+        <p class="note-verrouille" id="a-meta" style="margin-top:.5rem;"></p>
+      </div>
+      <div class="modale-admin-pied">
+        <button class="btn btn-primary btn-full" onclick="sauvegarderAnnonce()">Enregistrer</button>
+        <div class="msg-inline" id="msg-modale-annonce"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modale picker image (partagée) ===== -->
+  <div class="modale-fond" id="modale-picker-fond" onclick="if(event.target===this) fermerPickerImage()">
+    <div class="modale-admin" style="max-width:520px">
+      <div class="modale-admin-entete">
+        <h2>Choisir une image</h2>
+        <button class="modale-fermer" onclick="fermerPickerImage()">✕</button>
+      </div>
+      <div class="modale-admin-corps">
+        <div class="img-picker-tabs">
+          <button class="img-picker-tab actif" id="picker-tab-upload" onclick="switchPickerTab('upload')">📤 Importer</button>
+          <button class="img-picker-tab" id="picker-tab-bib"    onclick="switchPickerTab('bib')">🗂 Bibliothèque</button>
+        </div>
+        <div class="img-picker-body">
+
+          <!-- Onglet upload -->
+          <div class="img-picker-panneau actif" id="picker-panneau-upload">
+            <div class="img-upload-zone" id="picker-upload-zone" onclick="document.getElementById('picker-file-input').click()"
+                 ondragover="event.preventDefault();this.classList.add('drag')"
+                 ondragleave="this.classList.remove('drag')"
+                 ondrop="pickerHandleDrop(event)">
+              <input type="file" id="picker-file-input" accept="image/*" onchange="pickerHandleFile(this.files[0])">
+              <div>Cliquez ou glissez-déposez une image ici</div>
+              <div style="font-size:.72rem;margin-top:.25rem">PNG, JPG, GIF, WEBP…</div>
+            </div>
+            <div class="img-upload-msg msg-inline" id="picker-upload-msg"></div>
+          </div>
+
+          <!-- Onglet bibliothèque -->
+          <div class="img-picker-panneau" id="picker-panneau-bib">
+            <input class="img-bib-search" type="text" id="picker-bib-search" placeholder="Rechercher…" oninput="filtrerBiblio()">
+            <div class="img-bib-grille" id="picker-bib-grille">
+              <div class="img-bib-vide">Chargement…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prévisualisation de la sélection en cours -->
+        <div class="img-picker-preview-wrap" style="margin-top:.75rem">
+          <img class="img-picker-preview" id="picker-preview" src="" alt="">
+          <span class="img-picker-nom-actuel" id="picker-nom-actuel">Aucune image sélectionnée</span>
+        </div>
+      </div>
+      <div class="modale-admin-pied">
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-primary" style="flex:1" onclick="validerPickerImage()" id="picker-btn-valider" disabled>Utiliser cette image</button>
+          <button class="btn btn-secondary" onclick="fermerPickerImage()">Annuler</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer-placeholder"></div>
+
+  <script type="module">
+    import { chargerHeader, chargerFooter, appliquerTheme, appliquerCouleurs, invaliderCacheTheme } from '../script/header.js'
+
+    // Protège contre les injections XSS
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+    import {
+      RARETES,
+      db, urlImage, uploadImageStorage,
+      adminListerCreatures, adminSauvegarderCreature, adminToggleActifCreature, adminSupprimerCreature,
+      adminListerLootBoxes, adminSauvegarderLootBox, adminToggleActifLootBox, adminSupprimerLootBox,
+      adminListerLiaisons, adminAjouterCreatureBox, adminRetirerCreatureBox
+    } from '../script/lootbox.js'
+    import {
+      adminListerAnnonces, adminSauvegarderAnnonce, adminSupprimerAnnonce
+    } from '../script/annonces.js'
+    import {
+      adminListerEnnemisMDA, adminSauvegarderEnnemiMDA, adminToggleActifEnnemiMDA, adminSupprimerEnnemiMDA
+    } from '../script/mda.js'
+    import {
+      adminListerCartes, adminSauvegarderCarte, adminToggleActifCarte, adminSupprimerCarte,
+      adminDonnerCarte, adminRetirerCarteUtilisateur, adminListerCartesUtilisateur
+    } from '../script/battlogy.js'
+
+    const STORAGE_BUCKET = 'pictures'
+
+    // ===== Picker image =====
+    // prefixe en cours ('c', 'lb', 'm') — détermine quel hidden input on cible
+    let _pickerPrefixe = null
+    let _pickerCheminSelectionne = null
+    let _biblioCache = []   // liste de tous les chemins BDD connus
+
+    window.ouvrirPickerImage = function(prefixe) {
+      _pickerPrefixe = prefixe
+      _pickerCheminSelectionne = document.getElementById(prefixe + '-image').value || null
+
+      // Reset UI
+      document.getElementById('picker-upload-msg').textContent = ''
+      document.getElementById('picker-file-input').value = ''
+      switchPickerTab('upload')
+
+      // Pré-sélection preview si déjà une image
+      _refreshPickerPreview(_pickerCheminSelectionne)
+
+      // Charger la bibliothèque en arrière-plan
+      chargerBibliotheque()
+
+      document.getElementById('modale-picker-fond').classList.add('ouverte')
+    }
+
+    window.fermerPickerImage = function() {
+      document.getElementById('modale-picker-fond').classList.remove('ouverte')
+      _pickerPrefixe = null
+      _pickerCheminSelectionne = null
+    }
+
+    window.switchPickerTab = function(tab) {
+      ;['upload','bib'].forEach(t => {
+        document.getElementById('picker-tab-' + t).classList.toggle('actif', t === tab)
+        document.getElementById('picker-panneau-' + t).classList.toggle('actif', t === tab)
+      })
+    }
+
+    function _refreshPickerPreview(chemin) {
+      const prev = document.getElementById('picker-preview')
+      const nom  = document.getElementById('picker-nom-actuel')
+      const btn  = document.getElementById('picker-btn-valider')
+      if (chemin) {
+        prev.src = urlImage(chemin)
+        prev.style.display = 'block'
+        // Extrait juste le nom de fichier pour l'affichage
+        nom.textContent = chemin.split('/').pop()
+        btn.disabled = false
+      } else {
+        prev.style.display = 'none'
+        nom.textContent = 'Aucune image sélectionnée'
+        btn.disabled = true
+      }
+      // Mettre à jour la sélection dans la grille
+      document.querySelectorAll('.img-bib-item').forEach(el => {
+        el.classList.toggle('selectionne', el.dataset.chemin === chemin)
+      })
+    }
+
+    window.validerPickerImage = function() {
+      if (!_pickerPrefixe || !_pickerCheminSelectionne) return
+      const p = _pickerPrefixe
+      document.getElementById(p + '-image').value = _pickerCheminSelectionne
+      const prev = document.getElementById(p + '-image-preview')
+      prev.src = urlImage(_pickerCheminSelectionne)
+      prev.style.display = 'block'
+      document.getElementById(p + '-image-nom').textContent = _pickerCheminSelectionne.split('/').pop()
+      fermerPickerImage()
+    }
+
+    // Upload depuis le picker
+    window.pickerHandleFile = async function(file) {
+      if (!file) return
+      const msgEl = document.getElementById('picker-upload-msg')
+      msgEl.textContent = 'Upload en cours…'
+      msgEl.className = 'img-upload-msg msg-inline'
+      const { ok, chemin } = await uploadImageStorage(file)
+      if (!ok) { msgEl.textContent = '✗ Erreur upload'; msgEl.className = 'img-upload-msg msg-inline err'; return }
+      msgEl.textContent = '✓ Image importée !'
+      msgEl.className = 'img-upload-msg msg-inline ok'
+      _pickerCheminSelectionne = chemin
+      _refreshPickerPreview(chemin)
+      // Ajouter à la bibliothèque locale et rafraîchir
+      if (!_biblioCache.includes(chemin)) { _biblioCache.push(chemin); _renderBiblio(_biblioCache) }
+    }
+
+    window.pickerHandleDrop = function(e) {
+      e.preventDefault()
+      document.getElementById('picker-upload-zone').classList.remove('drag')
+      const file = e.dataTransfer.files[0]
+      if (file) pickerHandleFile(file)
+    }
+
+    // Bibliothèque : liste tous les fichiers du bucket Supabase Storage
+    async function chargerBibliotheque() {
+      const grille = document.getElementById('picker-bib-grille')
+      grille.innerHTML = '<div class="img-bib-vide">Chargement…</div>'
+      try {
+        const { data, error } = await db.storage
+          .from(STORAGE_BUCKET)
+          .list('', { limit: 500, offset: 0, sortBy: { column: 'name', order: 'asc' } })
+        if (error) {
+          console.error('chargerBibliotheque error:', error)
+          grille.innerHTML = `<div class="img-bib-vide">Erreur bucket : ${error.message}</div>`
+          return
+        }
+        if (!data || data.length === 0) {
+          grille.innerHTML = '<div class="img-bib-vide">Aucune image dans la bibliothèque.</div>'
+          _biblioCache = []
+          return
+        }
+        // Filtrer les dossiers (.placeholder, etc.) — garder seulement les vrais fichiers
+        _biblioCache = data
+          .filter(f => f.id && !f.name.startsWith('.'))
+          .map(f => f.name)
+        _renderBiblio(_biblioCache)
+      } catch(e) {
+        console.error('chargerBibliotheque exception:', e)
+        grille.innerHTML = '<div class="img-bib-vide">Erreur : ' + e.message + '</div>'
+      }
+    }
+
+    function _renderBiblio(liste) {
+      const recherche = (document.getElementById('picker-bib-search')?.value ?? '').toLowerCase()
+      const filtree = recherche ? liste.filter(n => n.toLowerCase().includes(recherche)) : liste
+      const grille = document.getElementById('picker-bib-grille')
+      if (!filtree.length) { grille.innerHTML = '<div class="img-bib-vide">Aucune image trouvée.</div>'; return }
+      grille.innerHTML = filtree.map(chemin => `
+        <div class="img-bib-item ${chemin === _pickerCheminSelectionne ? 'selectionne' : ''}" data-chemin="${chemin}" onclick="selectionnerImageBib('${chemin}')">
+          <img src="${urlImage(chemin)}" alt="${chemin}" onerror="this.style.opacity=.2">
+          <span>${chemin.split('/').pop()}</span>
+        </div>`).join('')
+    }
+
+    window.filtrerBiblio = function() { _renderBiblio(_biblioCache) }
+
+    window.selectionnerImageBib = function(chemin) {
+      _pickerCheminSelectionne = chemin
+      _refreshPickerPreview(chemin)
+      _renderBiblio(_biblioCache)
+    }
+
+    const NIVEAUX_ORDRE = { commun: 0, plus: 1, admin: 2, super_admin: 3 }
+    const RARETES_ORDRE = { commun: 0, rare: 1, epique: 2, legendaire: 3, cosmique: 4, secret: 5 }
+
+    const PRESETS = {
+      clair:  { couleur_fond: '#f5f5f5', couleur_conteneur: '#ffffff', couleur_bordure: '#e5e7eb', couleur_bouton: '#2563eb' },
+      sombre: { couleur_fond: '#18181b', couleur_conteneur: '#27272a', couleur_bordure: '#3f3f46', couleur_bouton: '#3b82f6' }
+    }
+
+    window.appliquerPreset = function(nom) {
+      const p = PRESETS[nom]
+      document.getElementById('couleur-fond').value = p.couleur_fond
+      document.getElementById('couleur-conteneur').value = p.couleur_conteneur
+      document.getElementById('couleur-bordure').value = p.couleur_bordure
+      document.getElementById('couleur-bouton').value = p.couleur_bouton
+      appliquerCouleurs(p)
+    }
+
+    // monNiveau est déterminé côté serveur (BDD) et non depuis localStorage
+    let monNiveau = null
+    let monUserId = null
+
+    ;(async () => {
+      document.body.style.setProperty('visibility', 'visible', 'important')
+      appliquerTheme()
+      await chargerHeader('../')
+      await chargerFooter('../')
+
+      // Vérification côté serveur : on récupère le niveau depuis la BDD
+      // (le localStorage peut être falsifié par n'importe qui)
+      const { data: session } = await db.auth.getUser()
+      monUserId = session?.user?.id ?? null
+
+      if (monUserId) {
+        const { data: profil } = await db.from('profils')
+          .select('niveau')
+          .eq('user_id', monUserId)
+          .single()
+        monNiveau = profil?.niveau ?? null
+      }
+
+      if (monNiveau !== 'admin' && monNiveau !== 'super_admin') {
+        document.getElementById('acces-refuse').style.display = 'block'
+      } else {
+        document.getElementById('contenu').style.display = 'block'
+        await init()
+      }
+    })()
+
+    async function init() {
+      const badge = document.getElementById('badge-role')
+      if (monNiveau === 'super_admin') {
+        badge.textContent = 'Super Admin'
+        badge.classList.add('badge-super')
+        document.getElementById('onglet-theme').style.display = 'flex'
+        document.getElementById('onglet-creatures').style.display = 'flex'
+        document.getElementById('onglet-lootbox').style.display = 'flex'
+        document.getElementById('onglet-mda').style.display = 'flex'
+        document.getElementById('onglet-battlogy').style.display = 'flex'
+        chargerTheme()
+        chargerCreatures()
+        chargerLootBoxesAdmin()
+        chargerEnnemisMDA()
+        chargerCartesBattlogy()
+      }
+      chargerUtilisateurs()
+      chargerAnnoncesAdmin()
+      chargerMonPseudo()
+    }
+
+    window.ouvrirOnglet = function(nom) {
+      document.querySelectorAll('.onglet').forEach(b => b.classList.toggle('actif', b.dataset.onglet === nom))
+      document.querySelectorAll('.onglet-panneau').forEach(p => p.classList.toggle('actif', p.dataset.panneau === nom))
+    }
+
+    function tagClassPour(niveau) {
+      if (niveau === 'super_admin') return 'tag-super_admin'
+      if (niveau === 'admin') return 'tag-admin'
+      if (niveau === 'plus') return 'tag-plus'
+      return 'tag-commun'
+    }
+
+    function permissions(cible) {
+      const estMoi = cible.user_id === monUserId
+      if (estMoi) return { modifiable: false, options: [] }
+      if (monNiveau === 'admin') {
+        if (cible.niveau === 'commun' || cible.niveau === 'plus') return { modifiable: true, options: ['commun', 'plus'] }
+        return { modifiable: false, options: [] }
+      }
+      if (monNiveau === 'super_admin') {
+        if (cible.niveau === 'super_admin') return { modifiable: false, options: [] }
+        return { modifiable: true, options: ['commun', 'plus', 'admin', 'super_admin'] }
+      }
+      return { modifiable: false, options: [] }
+    }
+
+    // ===== Utilisateurs =====
+    let utilisateursCache = []
+    let badgesParUser = {}
+
+    async function chargerUtilisateurs() {
+      const { data, error } = await db.from('profils_avec_dates').select('*').order('username')
+      if (error) { console.error('chargerUtilisateurs :', error); return }
+      utilisateursCache = data
+
+      const { data: bdg } = await db.from('badges_utilisateurs').select('user_id')
+      badgesParUser = {}
+      bdg?.forEach(b => { badgesParUser[b.user_id] = (badgesParUser[b.user_id] ?? 0) + 1 })
+
+      appliquerFiltresUsers()
+    }
+
+    window.appliquerFiltresUsers = function() {
+      const recherche = document.getElementById('u-filtre-nom').value.trim().toLowerCase()
+      const niveau    = document.getElementById('u-filtre-niveau').value
+      const tri       = document.getElementById('u-tri').value
+
+      let data = utilisateursCache.filter(u => {
+        if (recherche && !u.username.toLowerCase().includes(recherche)) return false
+        if (niveau && u.niveau !== niveau) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'username') { va = a.username.toLowerCase(); vb = b.username.toLowerCase() }
+        else if (champ === 'niveau') { va = NIVEAUX_ORDRE[a.niveau] ?? 0; vb = NIVEAUX_ORDRE[b.niveau] ?? 0 }
+        else if (champ === 'badges') { va = badgesParUser[a.user_id] ?? 0; vb = badgesParUser[b.user_id] ?? 0 }
+        else if (champ === 'date_inscription') { va = a.date_inscription ? new Date(a.date_inscription).getTime() : 0; vb = b.date_inscription ? new Date(b.date_inscription).getTime() : 0 }
+        else if (champ === 'derniere_connexion') { va = a.derniere_connexion ? new Date(a.derniere_connexion).getTime() : 0; vb = b.derniere_connexion ? new Date(b.derniere_connexion).getTime() : 0 }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('u-compteur').textContent = data.length + ' / ' + utilisateursCache.length + ' utilisateur(s)'
+      afficherUtilisateurs(data)
+    }
+
+    function afficherUtilisateurs(data) {
+      const tbody = document.getElementById('tbody')
+      tbody.innerHTML = data.map(u => {
+        const tagClass = tagClassPour(u.niveau)
+        const perm = permissions(u)
+        const nbBadges = badgesParUser[u.user_id] ?? 0
+        const cellSelect = perm.modifiable
+          ? `<select id="sel-${u.id}">${perm.options.map(o => `<option value="${o}" ${u.niveau === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`
+          : `<span class="note-verrouille">— non modifiable —</span>`
+        const cellAction = perm.modifiable
+          ? `<div class="row-actions">
+               <button class="btn-save" onclick="sauvegarder('${u.id}')">Sauvegarder</button>
+               <button class="btn-delete" onclick="supprimer('${esc(u.id)}', '${esc(u.username)}')">Supprimer</button>
+               <span class="msg-inline" id="msg-${u.id}"></span>
+             </div>`
+          : ''
+        return `<tr>
+          <td>${esc(u.username)}</td>
+          <td><span class="tag ${tagClass}">${u.niveau}</span></td>
+          <td>${nbBadges > 0 ? '🏅 ' + nbBadges : '<span class="note-verrouille">0</span>'}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${formaterDate(u.date_inscription)}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${u.derniere_connexion ? formaterDate(u.derniere_connexion) : '<span class="note-verrouille">Jamais</span>'}</td>
+          <td>${cellSelect}</td>
+          <td><button class="btn-save" onclick="ouvrirModaleCartesUtilisateur('${esc(u.user_id)}', '${esc(u.username)}')">🃏 Gérer</button></td>
+          <td>${cellAction}</td>
+        </tr>`
+      }).join('') || '<tr><td colspan="8" class="note-verrouille">Aucun utilisateur trouvé.</td></tr>'
+    }
+
+    window.resetFiltresUsers = function() {
+      document.getElementById('u-filtre-nom').value = ''
+      document.getElementById('u-filtre-niveau').value = ''
+      document.getElementById('u-tri').value = 'username-asc'
+      appliquerFiltresUsers()
+    }
+
+    window.sauvegarder = async function(id) {
+      const nouveauNiveau = document.getElementById('sel-' + id).value
+      const msgEl = document.getElementById('msg-' + id)
+      const { error } = await db.from('profils').update({ niveau: nouveauNiveau }).eq('id', id)
+      if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
+      else { msgEl.textContent = '✓ Sauvegardé'; msgEl.className = 'msg-inline ok'; setTimeout(() => chargerUtilisateurs(), 800) }
+    }
+
+    window.supprimer = async function(id, username) {
+      if (!confirm(`Supprimer définitivement le compte "${username}" ? Cette action est irréversible.`)) return
+      const msgEl = document.getElementById('msg-' + id)
+      const { error } = await db.from('profils').delete().eq('id', id)
+      if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
+      else { chargerUtilisateurs() }
+    }
+
+    // ===== Thème =====
+    async function chargerTheme() {
+      const { data, error } = await db.from('theme')
+        .select('couleur_fond, couleur_conteneur, couleur_bordure, couleur_bouton')
+        .eq('id', 1).single()
+      if (error || !data) return
+      document.getElementById('couleur-fond').value = data.couleur_fond
+      document.getElementById('couleur-conteneur').value = data.couleur_conteneur
+      document.getElementById('couleur-bordure').value = data.couleur_bordure
+      document.getElementById('couleur-bouton').value = data.couleur_bouton
+    }
+
+    window.sauvegarderTheme = async function() {
+      const valeurs = {
+        couleur_fond: document.getElementById('couleur-fond').value,
+        couleur_conteneur: document.getElementById('couleur-conteneur').value,
+        couleur_bordure: document.getElementById('couleur-bordure').value,
+        couleur_bouton: document.getElementById('couleur-bouton').value
+      }
+      const msgEl = document.getElementById('msg-theme')
+      const { error } = await db.from('theme').update(valeurs).eq('id', 1)
+      if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err' }
+      else {
+        msgEl.textContent = '✓ Thème appliqué'; msgEl.className = 'msg-inline ok'
+        appliquerCouleurs(valeurs)
+        invaliderCacheTheme()
+        localStorage.setItem('theme_couleurs', JSON.stringify(valeurs))
+      }
+    }
+
+    // ===== Créatures =====
+    let creaturesCache = []
+    let creatureEnEdition = null
+
+    async function chargerCreatures() {
+      creaturesCache = await adminListerCreatures()
+      appliquerFiltresCreatures()
+    }
+
+    window.appliquerFiltresCreatures = function() {
+      const recherche = document.getElementById('c-filtre-nom').value.trim().toLowerCase()
+      const rarete    = document.getElementById('c-filtre-rarete').value
+      const statut    = document.getElementById('c-filtre-statut').value
+      const tri       = document.getElementById('c-tri').value
+
+      let data = creaturesCache.filter(c => {
+        if (recherche && !c.nom.toLowerCase().includes(recherche)) return false
+        if (rarete && c.rarete !== rarete) return false
+        if (statut === 'actif' && !c.actif) return false
+        if (statut === 'inactif' && c.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'rarete') { va = RARETES_ORDRE[a.rarete] ?? 0; vb = RARETES_ORDRE[b.rarete] ?? 0 }
+        else if (champ === 'multiplicateur') { va = Number(a.multiplicateur); vb = Number(b.multiplicateur) }
+        else if (champ === 'prix_vente') { va = Number(a.prix_vente); vb = Number(b.prix_vente) }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('c-compteur').textContent = data.length + ' / ' + creaturesCache.length + ' créature(s)'
+      const tbody = document.getElementById('tbody-creatures')
+      tbody.innerHTML = data.map(c => {
+        const infosRarete = RARETES[c.rarete] ?? { label: c.rarete, couleur: '#9ca3af' }
+        return `<tr>
+          <td><img class="img-mini" src="${urlImage(esc(c.image))}" alt="${esc(c.nom)}" onerror="this.style.opacity=0.2"></td>
+          <td>${esc(c.nom)}</td>
+          <td><span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span></td>
+          <td>x${Number(c.multiplicateur).toFixed(2)}</td>
+          <td>${Number(c.prix_vente).toLocaleString('fr')}</td>
+          <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn-save" onclick="ouvrirFormCreature('${c.id}')">Modifier</button>
+              <button class="btn-preset" onclick="toggleActifCreature('${c.id}', ${c.actif})">${c.actif ? 'Désactiver' : 'Activer'}</button>
+              <button class="btn-delete" onclick="supprimerCreature('${esc(c.id)}', '${esc(c.nom)}')">Supprimer</button>
+            </div>
+          </td>
+        </tr>`
+      }).join('') || '<tr><td colspan="7" class="note-verrouille">Aucune créature trouvée.</td></tr>'
+    }
+
+    window.resetFiltresCreatures = function() {
+      document.getElementById('c-filtre-nom').value = ''
+      document.getElementById('c-filtre-rarete').value = ''
+      document.getElementById('c-filtre-statut').value = ''
+      document.getElementById('c-tri').value = 'nom-asc'
+      appliquerFiltresCreatures()
+    }
+
+    window.ouvrirFormCreature = function(id) {
+      creatureEnEdition = id
+      const c = id ? creaturesCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-creature').textContent = id ? 'Modifier la créature' : 'Nouvelle créature'
+      document.getElementById('c-id').value = c?.id ?? ''
+      document.getElementById('c-id').disabled = !!id
+      document.getElementById('c-nom').value = c?.nom ?? ''
+      document.getElementById('c-rarete').value = c?.rarete ?? 'commun'
+      document.getElementById('c-multiplicateur').value = c?.multiplicateur ?? '1.10'
+      document.getElementById('c-image').value = c?.image ?? ''
+      document.getElementById('c-image-msg').textContent = ''
+      const cprev = document.getElementById('c-image-preview')
+      const cnom  = document.getElementById('c-image-nom')
+      if (c?.image) { cprev.src = urlImage(c.image); cprev.style.display = 'block'; cnom.textContent = c.image.split('/').pop() }
+      else { cprev.style.display = 'none'; cnom.textContent = 'Aucune image' }
+      document.getElementById('c-prix-vente').value = c?.prix_vente ?? '0'
+      document.getElementById('msg-modale-creature').textContent = ''
+      document.getElementById('modale-creature-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleCreature = function() {
+      document.getElementById('modale-creature-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderCreature = async function() {
+      const id = document.getElementById('c-id').value.trim()
+      const nom = document.getElementById('c-nom').value.trim()
+      const rarete = document.getElementById('c-rarete').value
+      const multiplicateur = parseFloat(document.getElementById('c-multiplicateur').value)
+      const image = document.getElementById('c-image').value.trim()
+      const prix_vente = parseInt(document.getElementById('c-prix-vente').value) || 0
+      const msgEl = document.getElementById('msg-modale-creature')
+      if (!id || !nom || !image || isNaN(multiplicateur)) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (y compris l\'image).'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      const { ok, error } = await adminSauvegarderCreature({ id, nom, rarete, multiplicateur, image, prix_vente, actif: true })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerCreatures()
+      setTimeout(() => fermerModaleCreature(), 500)
+    }
+
+    window.toggleActifCreature = async function(id, actifActuel) {
+      await adminToggleActifCreature(id, !actifActuel)
+      await chargerCreatures()
+    }
+
+    window.supprimerCreature = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement la créature "${nom}" ? Elle disparaîtra aussi de toutes les loot box et des collections des joueurs. Cette action est irréversible.`)) return
+      await adminSupprimerCreature(id)
+      await chargerCreatures()
+    }
+
+    // ===== Loot Box =====
+    let lootBoxesCache = []
+    let lootBoxEnEdition = null
+
+    async function chargerLootBoxesAdmin() {
+      lootBoxesCache = await adminListerLootBoxes()
+      appliquerFiltresLootBoxes()
+    }
+
+    window.appliquerFiltresLootBoxes = function() {
+      const recherche = document.getElementById('lb-filtre-nom').value.trim().toLowerCase()
+      const statut    = document.getElementById('lb-filtre-statut').value
+      const tri       = document.getElementById('lb-tri').value
+
+      let data = lootBoxesCache.filter(b => {
+        if (recherche && !b.nom.toLowerCase().includes(recherche)) return false
+        if (statut === 'actif' && !b.actif) return false
+        if (statut === 'inactif' && b.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'prix') { va = Number(a.prix); vb = Number(b.prix) }
+        else if (champ === 'ordre') { va = Number(a.ordre); vb = Number(b.ordre) }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('lb-compteur').textContent = data.length + ' / ' + lootBoxesCache.length + ' loot box'
+      const tbody = document.getElementById('tbody-lootboxes')
+      tbody.innerHTML = data.map(b => `<tr>
+        <td><img class="img-mini" src="${urlImage(esc(b.image))}" alt="${esc(b.nom)}" onerror="this.style.opacity=0.2"></td>
+        <td>${esc(b.nom)}</td>
+        <td>${Number(b.prix).toLocaleString('fr')}</td>
+        <td>${b.ordre}</td>
+        <td>${b.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormLootBox('${b.id}')">Modifier</button>
+            <button class="btn-preset" onclick="toggleActifLootBox('${b.id}', ${b.actif})">${b.actif ? 'Désactiver' : 'Activer'}</button>
+            <button class="btn-delete" onclick="supprimerLootBox('${esc(b.id)}', '${esc(b.nom)}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="6" class="note-verrouille">Aucune loot box trouvée.</td></tr>'
+    }
+
+    window.resetFiltresLootBoxes = function() {
+      document.getElementById('lb-filtre-nom').value = ''
+      document.getElementById('lb-filtre-statut').value = ''
+      document.getElementById('lb-tri').value = 'ordre-asc'
+      appliquerFiltresLootBoxes()
+    }
+
+    window.ouvrirFormLootBox = async function(id) {
+      lootBoxEnEdition = id
+      const b = id ? lootBoxesCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-lootbox').textContent = id ? 'Modifier la loot box' : 'Nouvelle loot box'
+      document.getElementById('lb-id').value = b?.id ?? ''
+      document.getElementById('lb-id').disabled = !!id
+      document.getElementById('lb-nom').value = b?.nom ?? ''
+      document.getElementById('lb-prix').value = b?.prix ?? '400000'
+      document.getElementById('lb-image').value = b?.image ?? ''
+      document.getElementById('lb-image-msg').textContent = ''
+      const lbprev = document.getElementById('lb-image-preview')
+      const lbnom  = document.getElementById('lb-image-nom')
+      if (b?.image) { lbprev.src = urlImage(b.image); lbprev.style.display = 'block'; lbnom.textContent = b.image.split('/').pop() }
+      else { lbprev.style.display = 'none'; lbnom.textContent = 'Aucune image' }
+      document.getElementById('lb-ordre').value = b?.ordre ?? (lootBoxesCache.length + 1)
+      document.getElementById('msg-modale-lootbox').textContent = ''
+      const compoEl = document.getElementById('composition-lootbox')
+      if (id) {
+        compoEl.style.display = 'block'
+        await rafraichirComposition(id)
+        remplirSelectCreaturesDispo(id)
+      } else {
+        compoEl.style.display = 'none'
+      }
+      document.getElementById('modale-lootbox-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleLootBox = function() {
+      document.getElementById('modale-lootbox-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderLootBox = async function() {
+      const id = document.getElementById('lb-id').value.trim()
+      const nom = document.getElementById('lb-nom').value.trim()
+      const prix = parseInt(document.getElementById('lb-prix').value)
+      const image = document.getElementById('lb-image').value.trim()
+      const ordre = parseInt(document.getElementById('lb-ordre').value) || 0
+      const msgEl = document.getElementById('msg-modale-lootbox')
+      if (!id || !nom || !image || isNaN(prix)) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (y compris l\'image).'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      const nouvelleCreation = !lootBoxEnEdition
+      const { ok, error } = await adminSauvegarderLootBox({ id, nom, prix, image, ordre, actif: true })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerLootBoxesAdmin()
+      if (nouvelleCreation) setTimeout(() => ouvrirFormLootBox(id), 400)
+    }
+
+    window.toggleActifLootBox = async function(id, actifActuel) {
+      await adminToggleActifLootBox(id, !actifActuel)
+      await chargerLootBoxesAdmin()
+    }
+
+    window.supprimerLootBox = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement la loot box "${nom}" ? Cette action est irréversible.`)) return
+      await adminSupprimerLootBox(id)
+      await chargerLootBoxesAdmin()
+    }
+
+    async function rafraichirComposition(lootBoxId) {
+      const liaisons = await adminListerLiaisons(lootBoxId)
+      const liste = document.getElementById('liste-composition')
+      liste.innerHTML = liaisons.map(l => {
+        const infosRarete = RARETES[l.creatures?.rarete] ?? { label: l.creatures?.rarete, couleur: '#9ca3af' }
+        return `<div class="ligne-composition">
+          <div class="infos">
+            <img class="img-mini" src="${urlImage(esc(l.creatures?.image ?? ''))}" alt="" onerror="this.style.opacity=0.2">
+            <span>${esc(l.creatures?.nom ?? l.creature_id)}</span>
+            <span class="tag-rarete" style="background:${infosRarete.couleur}; color:${infosRarete.texte}">${infosRarete.label}</span>
+            <span class="note-verrouille">poids ${l.poids}</span>
+          </div>
+          <button class="btn-delete" onclick="retirerCreatureDeLaBox('${lootBoxId}', '${l.creature_id}')">Retirer</button>
+        </div>`
+      }).join('') || '<p class="note-verrouille">Aucune créature dans cette boîte.</p>'
+    }
+
+    function remplirSelectCreaturesDispo(lootBoxId) {
+      const select = document.getElementById('ajout-creature-select')
+      select.innerHTML = creaturesCache
+        .filter(c => c.actif)
+        .map(c => `<option value="${esc(c.id)}">${esc(c.nom)} (${RARETES[c.rarete]?.label ?? c.rarete})</option>`)
+        .join('')
+    }
+
+    window.ajouterCreatureALaBox = async function() {
+      const creatureId = document.getElementById('ajout-creature-select').value
+      const poids = parseFloat(document.getElementById('ajout-creature-poids').value) || 1
+      if (!creatureId || !lootBoxEnEdition) return
+      await adminAjouterCreatureBox(lootBoxEnEdition, creatureId, poids)
+      await rafraichirComposition(lootBoxEnEdition)
+    }
+
+    window.retirerCreatureDeLaBox = async function(lootBoxId, creatureId) {
+      await adminRetirerCreatureBox(lootBoxId, creatureId)
+      await rafraichirComposition(lootBoxId)
+    }
+
+    // ===== Ennemis MDA =====
+    let ennemisMDACache = []
+    let ennemiMDAEnEdition = null
+
+    async function chargerEnnemisMDA() {
+      ennemisMDACache = await adminListerEnnemisMDA()
+      appliquerFiltresEnnemisMDA()
+    }
+
+    window.appliquerFiltresEnnemisMDA = function() {
+      const recherche = document.getElementById('m-filtre-nom').value.trim().toLowerCase()
+      const statut    = document.getElementById('m-filtre-statut').value
+      const tri       = document.getElementById('m-tri').value
+
+      let data = ennemisMDACache.filter(m => {
+        if (recherche && !m.nom.toLowerCase().includes(recherche)) return false
+        if (statut === 'actif' && !m.actif) return false
+        if (statut === 'inactif' && m.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'ordre') { va = Number(a.ordre); vb = Number(b.ordre) }
+        else if (champ === 'pv') { va = Number(a.pv); vb = Number(b.pv) }
+        else if (champ === 'degats_attaque') { va = Number(a.degats_attaque); vb = Number(b.degats_attaque) }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('m-compteur').textContent = data.length + ' / ' + ennemisMDACache.length + ' ennemi(s)'
+      const tbody = document.getElementById('tbody-mda')
+      tbody.innerHTML = data.map(m => `<tr>
+        <td><img class="img-mini" src="${urlImage(esc(m.image))}" alt="${esc(m.nom)}" onerror="this.style.opacity=0.2"></td>
+        <td>${esc(m.nom)}</td>
+        <td>${Number(m.pv).toLocaleString('fr')}</td>
+        <td>${Number(m.degats_attaque).toLocaleString('fr')}</td>
+        <td>${m.delai_attaque}</td>
+        <td>${m.effet_special ? esc(m.effet_special) : '<span class="note-verrouille">Aucun</span>'}</td>
+        <td>${m.actif ? '<span class="msg-inline ok">Actif</span>' : '<span class="msg-inline err">Désactivé</span>'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormEnnemiMDA('${m.id}')">Modifier</button>
+            <button class="btn-preset" onclick="toggleActifEnnemiMDA('${m.id}', ${m.actif})">${m.actif ? 'Désactiver' : 'Activer'}</button>
+            <button class="btn-delete" onclick="supprimerEnnemiMDA('${esc(m.id)}', '${esc(m.nom)}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="8" class="note-verrouille">Aucun ennemi trouvé.</td></tr>'
+    }
+
+    window.resetFiltresEnnemisMDA = function() {
+      document.getElementById('m-filtre-nom').value = ''
+      document.getElementById('m-filtre-statut').value = ''
+      document.getElementById('m-tri').value = 'ordre-asc'
+      appliquerFiltresEnnemisMDA()
+    }
+
+    window.ouvrirFormEnnemiMDA = function(id) {
+      ennemiMDAEnEdition = id
+      const m = id ? ennemisMDACache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-mda').textContent = id ? "Modifier l'ennemi" : 'Nouvel ennemi'
+      document.getElementById('m-id').value = m?.id ?? ''
+      document.getElementById('m-id').disabled = !!id
+      document.getElementById('m-nom').value = m?.nom ?? ''
+      document.getElementById('m-image').value = m?.image ?? ''
+      document.getElementById('m-image-msg').textContent = ''
+      const mprev = document.getElementById('m-image-preview')
+      const mnom  = document.getElementById('m-image-nom')
+      if (m?.image) { mprev.src = urlImage(m.image); mprev.style.display = 'block'; mnom.textContent = m.image.split('/').pop() }
+      else { mprev.style.display = 'none'; mnom.textContent = 'Aucune image' }
+      document.getElementById('m-pv').value = m?.pv ?? '10'
+      document.getElementById('m-degats').value = m?.degats_attaque ?? '1'
+      document.getElementById('m-delai').value = m?.delai_attaque ?? '4'
+      document.getElementById('m-effet').value = m?.effet_special ?? ''
+      document.getElementById('m-ordre').value = m?.ordre ?? (ennemisMDACache.length + 1)
+      document.getElementById('msg-modale-mda').textContent = ''
+      document.getElementById('modale-mda-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleEnnemiMDA = function() {
+      document.getElementById('modale-mda-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderEnnemiMDA = async function() {
+      const id = document.getElementById('m-id').value.trim()
+      const nom = document.getElementById('m-nom').value.trim()
+      const image = document.getElementById('m-image').value.trim()
+      const pv = parseInt(document.getElementById('m-pv').value)
+      const degats_attaque = parseInt(document.getElementById('m-degats').value)
+      const delai_attaque = parseInt(document.getElementById('m-delai').value)
+      const effet_special = document.getElementById('m-effet').value.trim() || null
+      const ordre = parseInt(document.getElementById('m-ordre').value) || 0
+      const msgEl = document.getElementById('msg-modale-mda')
+      if (!id || !nom || !image || isNaN(pv) || isNaN(degats_attaque) || isNaN(delai_attaque) || pv < 1 || delai_attaque < 1) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires (PV ≥ 1, délai ≥ 1, image requise).'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      const { ok, error } = await adminSauvegarderEnnemiMDA({ id, nom, image, pv, degats_attaque, delai_attaque, effet_special, ordre, actif: true })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerEnnemisMDA()
+      setTimeout(() => fermerModaleEnnemiMDA(), 500)
+    }
+
+    window.toggleActifEnnemiMDA = async function(id, actifActuel) {
+      await adminToggleActifEnnemiMDA(id, !actifActuel)
+      await chargerEnnemisMDA()
+    }
+
+    window.supprimerEnnemiMDA = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement l'ennemi "${nom}" ? Cette action est irréversible.`)) return
+      await adminSupprimerEnnemiMDA(id)
+      await chargerEnnemisMDA()
+    }
+
+    // ===== Cartes Battlogy =====
+    let cartesBattlogyCache = []
+    let carteBattlogyEnEdition = null
+
+    async function chargerCartesBattlogy() {
+      cartesBattlogyCache = await adminListerCartes()
+      appliquerFiltresCartesBattlogy()
+    }
+
+    window.appliquerFiltresCartesBattlogy = function() {
+      const recherche  = document.getElementById('bt-filtre-nom').value.trim().toLowerCase()
+      const categorie  = document.getElementById('bt-filtre-categorie').value
+      const statut     = document.getElementById('bt-filtre-statut').value
+      const tri        = document.getElementById('bt-tri').value
+
+      let data = cartesBattlogyCache.filter(c => {
+        if (recherche && !c.nom.toLowerCase().includes(recherche)) return false
+        if (categorie && c.categorie !== categorie) return false
+        if (statut === 'actif' && !c.actif) return false
+        if (statut === 'inactif' && c.actif) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'nom') { va = a.nom.toLowerCase(); vb = b.nom.toLowerCase() }
+        else if (champ === 'cout') { va = Number(a.cout); vb = Number(b.cout) }
+        else { va = a.ordre ?? 0; vb = b.ordre ?? 0 }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('bt-compteur').textContent = data.length + ' / ' + cartesBattlogyCache.length + ' carte(s)'
+      const tbody = document.getElementById('tbody-battlogy')
+      tbody.innerHTML = data.map(c => `<tr>
+        <td>${c.image ? `<img class="img-mini" src="${urlImage(esc(c.image))}" alt="${esc(c.nom)}" onerror="this.style.opacity=0.2">` : '<span class="note-verrouille">—</span>'}</td>
+        <td>${esc(c.nom)}</td>
+        <td>${c.cout}</td>
+        <td>${c.pv}</td>
+        <td>${c.degats}</td>
+        <td><span class="tag" style="background:${c.categorie === 'legende' ? '#d4af3733' : 'var(--couleur-bordure)'}">${c.categorie === 'legende' ? 'Légende' : c.categorie === 'sort' ? 'Sort' : 'Troupe'}</span></td>
+        <td>${c.actif ? '<span class="msg-inline ok">Active</span>' : '<span class="msg-inline err">Désactivée</span>'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormCarteBattlogy('${c.id}')">Modifier</button>
+            <button class="btn-preset" onclick="toggleActifCarteBattlogy('${c.id}', ${c.actif})">${c.actif ? 'Désactiver' : 'Activer'}</button>
+            <button class="btn-delete" onclick="supprimerCarteBattlogy('${esc(c.id)}', '${esc(c.nom)}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="8" class="note-verrouille">Aucune carte trouvée.</td></tr>'
+    }
+
+    window.resetFiltresCartesBattlogy = function() {
+      document.getElementById('bt-filtre-nom').value = ''
+      document.getElementById('bt-filtre-categorie').value = ''
+      document.getElementById('bt-filtre-statut').value = ''
+      document.getElementById('bt-tri').value = 'ordre-asc'
+      appliquerFiltresCartesBattlogy()
+    }
+
+    window.ouvrirFormCarteBattlogy = function(id) {
+      carteBattlogyEnEdition = id
+      const c = id ? cartesBattlogyCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-battlogy').textContent = id ? 'Modifier la carte' : 'Nouvelle carte'
+      document.getElementById('bt-id').value = c?.id ?? ''
+      document.getElementById('bt-id').disabled = !!id
+      document.getElementById('bt-nom').value = c?.nom ?? ''
+      document.getElementById('bt-image').value = c?.image ?? ''
+      document.getElementById('bt-image-msg').textContent = ''
+      const btprev = document.getElementById('bt-image-preview')
+      const btnom  = document.getElementById('bt-image-nom')
+      if (c?.image) { btprev.src = urlImage(c.image); btprev.style.display = 'block'; btnom.textContent = c.image.split('/').pop() }
+      else { btprev.style.display = 'none'; btnom.textContent = 'Aucune image' }
+      document.getElementById('bt-categorie').value = c?.categorie ?? 'troupe'
+      document.getElementById('bt-type-attaque').value = c?.type_attaque ?? 'melee'
+      document.getElementById('bt-cout').value = c?.cout ?? '1'
+      document.getElementById('bt-pv').value = c?.pv ?? '0'
+      document.getElementById('bt-degats').value = c?.degats ?? '0'
+      document.getElementById('bt-porte').value = c?.porte ?? '0'
+      document.getElementById('bt-vitesse-attaque').value = c?.vitesse_attaque ?? '1'
+      document.getElementById('bt-vitesse-marche').value = c?.vitesse_marche ?? '0'
+      document.getElementById('bt-activation').value = c?.temps_activation ?? '0'
+      document.getElementById('bt-nombre').value = c?.nombre ?? '1'
+      document.getElementById('bt-taille').value = c?.taille ?? '1'
+      document.getElementById('bt-ordre').value = c?.ordre ?? (cartesBattlogyCache.length + 1)
+      document.getElementById('bt-options').value = c?.options ? JSON.stringify(c.options) : ''
+      document.getElementById('msg-modale-battlogy').textContent = ''
+      document.getElementById('modale-battlogy-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleCarteBattlogy = function() {
+      document.getElementById('modale-battlogy-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderCarteBattlogy = async function() {
+      const id = document.getElementById('bt-id').value.trim()
+      const nom = document.getElementById('bt-nom').value.trim()
+      const image = document.getElementById('bt-image').value.trim() || null
+      const categorie = document.getElementById('bt-categorie').value
+      const type_attaque = document.getElementById('bt-type-attaque').value
+      const cout = parseInt(document.getElementById('bt-cout').value)
+      const pv = parseInt(document.getElementById('bt-pv').value)
+      const degats = parseInt(document.getElementById('bt-degats').value)
+      const porte = parseInt(document.getElementById('bt-porte').value)
+      const vitesse_attaque = parseFloat(document.getElementById('bt-vitesse-attaque').value)
+      const vitesse_marche = parseInt(document.getElementById('bt-vitesse-marche').value)
+      const temps_activation = parseInt(document.getElementById('bt-activation').value)
+      const nombre = parseInt(document.getElementById('bt-nombre').value)
+      const taille = parseFloat(document.getElementById('bt-taille').value)
+      const ordre = parseInt(document.getElementById('bt-ordre').value) || 0
+      const optionsTexte = document.getElementById('bt-options').value.trim()
+      const msgEl = document.getElementById('msg-modale-battlogy')
+
+      if (!id || !nom || isNaN(cout) || isNaN(pv) || isNaN(degats) || isNaN(porte)
+          || isNaN(vitesse_attaque) || isNaN(vitesse_marche) || isNaN(temps_activation)
+          || isNaN(nombre) || isNaN(taille)) {
+        msgEl.textContent = '✗ Veuillez remplir tous les champs obligatoires.'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+
+      let options = {}
+      if (optionsTexte) {
+        try { options = JSON.parse(optionsTexte) }
+        catch (e) { msgEl.textContent = '✗ JSON invalide dans les options avancées.'; msgEl.className = 'msg-inline err'; return }
+      }
+
+      const { ok, error } = await adminSauvegarderCarte({
+        id, nom, image, categorie, type_attaque, cout, pv, degats, porte,
+        vitesse_attaque, vitesse_marche, temps_activation, nombre, taille,
+        options, ordre, actif: true
+      })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerCartesBattlogy()
+      setTimeout(() => fermerModaleCarteBattlogy(), 500)
+    }
+
+    window.toggleActifCarteBattlogy = async function(id, actifActuel) {
+      await adminToggleActifCarte(id, !actifActuel)
+      await chargerCartesBattlogy()
+    }
+
+    window.supprimerCarteBattlogy = async function(id, nom) {
+      if (!confirm(`Supprimer définitivement la carte "${nom}" ? Cette action est irréversible.`)) return
+      await adminSupprimerCarte(id)
+      await chargerCartesBattlogy()
+    }
+
+    // ===== Cartes d'un utilisateur (Battlogy) — donner / retirer =====
+    // Réutilise cartesBattlogyCache si déjà chargé (super_admin), sinon
+    // charge une copie légère juste pour les noms (lecture ouverte à tous,
+    // voir la note RLS dans battlogy.js).
+    let toutesCartesNomsCache = []
+    let cuUserId = null
+    let cuCartesDebloquees = []
+
+    async function chargerToutesCartesNoms() {
+      toutesCartesNomsCache = cartesBattlogyCache.length ? cartesBattlogyCache : await adminListerCartes()
+    }
+
+    window.ouvrirModaleCartesUtilisateur = async function(userId, username) {
+      cuUserId = userId
+      document.getElementById('cu-username').textContent = username
+      document.getElementById('msg-cartes-user').textContent = ''
+      document.getElementById('cu-liste-debloquees').innerHTML = '<p class="note-verrouille">Chargement…</p>'
+      document.getElementById('modale-cartes-user-fond').classList.add('ouverte')
+      if (!toutesCartesNomsCache.length) await chargerToutesCartesNoms()
+      await rafraichirCartesUtilisateur()
+    }
+
+    window.fermerModaleCartesUtilisateur = function() {
+      document.getElementById('modale-cartes-user-fond').classList.remove('ouverte')
+      cuUserId = null
+    }
+
+    async function rafraichirCartesUtilisateur() {
+      cuCartesDebloquees = await adminListerCartesUtilisateur(cuUserId)
+      const nomsParId = {}
+      toutesCartesNomsCache.forEach(c => { nomsParId[c.id] = c.nom })
+
+      const liste = document.getElementById('cu-liste-debloquees')
+      liste.innerHTML = cuCartesDebloquees.map(l => `
+        <div class="ligne-composition">
+          <div class="infos"><span>${esc(nomsParId[l.carte_id] ?? l.carte_id)}</span></div>
+          <button class="btn-delete" onclick="retirerCarteUtilisateur('${esc(l.carte_id)}')">Retirer</button>
+        </div>`).join('') || '<p class="note-verrouille">Aucune carte débloquée.</p>'
+
+      const idsDebloques = new Set(cuCartesDebloquees.map(l => l.carte_id))
+      const select = document.getElementById('cu-select-carte')
+      const dispo = toutesCartesNomsCache.filter(c => !idsDebloques.has(c.id))
+      select.innerHTML = dispo.length
+        ? dispo.map(c => `<option value="${esc(c.id)}">${esc(c.nom)}</option>`).join('')
+        : '<option value="">— Toutes les cartes sont déjà débloquées —</option>'
+    }
+
+    window.donnerCarteUtilisateur = async function() {
+      const carteId = document.getElementById('cu-select-carte').value
+      const msgEl = document.getElementById('msg-cartes-user')
+      if (!carteId) { msgEl.textContent = 'Aucune carte à donner.'; msgEl.className = 'msg-inline err'; return }
+      const { ok, error } = await adminDonnerCarte(cuUserId, carteId)
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Carte donnée'; msgEl.className = 'msg-inline ok'
+      await rafraichirCartesUtilisateur()
+    }
+
+    window.retirerCarteUtilisateur = async function(carteId) {
+      if (!confirm('Retirer cette carte au joueur ?')) return
+      await adminRetirerCarteUtilisateur(cuUserId, carteId)
+      await rafraichirCartesUtilisateur()
+    }
+
+    // ===== Annonces =====
+    let annoncesCache = []
+    let annonceEnEdition = null
+    let monPseudo = ''
+
+    async function chargerMonPseudo() {
+      if (!monUserId) return
+      const { data, error } = await db.from('profils').select('pseudo').eq('user_id', monUserId).single()
+      if (error || !data) return
+      monPseudo = data.pseudo ?? ''
+      document.getElementById('mon-pseudo').value = monPseudo
+    }
+
+    window.sauvegarderMonPseudo = async function() {
+      const valeur = document.getElementById('mon-pseudo').value.trim()
+      const msgEl = document.getElementById('msg-pseudo')
+      // null plutôt que chaîne vide : on revient au nom de compte si rien n'est précisé
+      const { error } = await db.from('profils').update({ pseudo: valeur || null }).eq('user_id', monUserId)
+      if (error) { msgEl.textContent = '✗ Erreur'; msgEl.className = 'msg-inline err'; return }
+      monPseudo = valeur
+      msgEl.textContent = '✓ Pseudo enregistré'; msgEl.className = 'msg-inline ok'
+    }
+
+    async function chargerAnnoncesAdmin() {
+      annoncesCache = await adminListerAnnonces()
+      appliquerFiltresAnnonces()
+    }
+
+    function formaterDate(iso) {
+      if (!iso) return '—'
+      return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    }
+
+    window.appliquerFiltresAnnonces = function() {
+      const recherche = document.getElementById('a-filtre-titre').value.trim().toLowerCase()
+      const tri       = document.getElementById('a-tri').value
+
+      let data = annoncesCache.filter(a => {
+        if (recherche && !a.titre.toLowerCase().includes(recherche)) return false
+        return true
+      })
+
+      const [champ, dir] = tri.split('-')
+      data.sort((a, b) => {
+        let va, vb
+        if (champ === 'titre') { va = a.titre.toLowerCase(); vb = b.titre.toLowerCase() }
+        else if (champ === 'date_creation') { va = new Date(a.date_creation).getTime(); vb = new Date(b.date_creation).getTime() }
+        else { va = new Date(a.date_publication).getTime(); vb = new Date(b.date_publication).getTime() }
+        return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0)
+      })
+
+      document.getElementById('a-compteur').textContent = data.length + ' / ' + annoncesCache.length + ' annonce(s)'
+      const tbody = document.getElementById('tbody-annonces')
+      tbody.innerHTML = data.map(a => `<tr>
+        <td>${esc(a.titre)}</td>
+        <td>${esc(a.auteur_username)}</td>
+        <td>${formaterDate(a.date_creation)}</td>
+        <td>${formaterDate(a.date_publication)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-save" onclick="ouvrirFormAnnonce('${a.id}')">Modifier</button>
+            <button class="btn-delete" onclick="supprimerAnnonce('${a.id}', '${a.titre.replace(/'/g, "\\'")}')">Supprimer</button>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="5" class="note-verrouille">Aucune annonce pour le moment.</td></tr>'
+    }
+
+    window.resetFiltresAnnonces = function() {
+      document.getElementById('a-filtre-titre').value = ''
+      document.getElementById('a-tri').value = 'date_publication-desc'
+      appliquerFiltresAnnonces()
+    }
+
+    window.ouvrirFormAnnonce = function(id) {
+      annonceEnEdition = id
+      const a = id ? annoncesCache.find(x => x.id === id) : null
+      document.getElementById('titre-modale-annonce').textContent = id ? "Modifier l'annonce" : 'Nouvelle annonce'
+      document.getElementById('a-id').value = a?.id ?? ''
+      document.getElementById('a-titre').value = a?.titre ?? ''
+      document.getElementById('a-contenu').value = a?.contenu ?? ''
+      document.getElementById('a-meta').textContent = a
+        ? `Créée le ${formaterDate(a.date_creation)} par ${esc(a.auteur_username)} — dernière publication le ${formaterDate(a.date_publication)}`
+        : 'La date de création et de publication seront enregistrées automatiquement.'
+      document.getElementById('msg-modale-annonce').textContent = ''
+      document.getElementById('modale-annonce-fond').classList.add('ouverte')
+    }
+
+    window.fermerModaleAnnonce = function() {
+      document.getElementById('modale-annonce-fond').classList.remove('ouverte')
+    }
+
+    window.sauvegarderAnnonce = async function() {
+      const id = document.getElementById('a-id').value.trim() || null
+      const titre = document.getElementById('a-titre').value.trim()
+      const contenu = document.getElementById('a-contenu').value.trim()
+      const msgEl = document.getElementById('msg-modale-annonce')
+      if (!titre || !contenu) {
+        msgEl.textContent = '✗ Veuillez remplir le titre et le contenu.'
+        msgEl.className = 'msg-inline err'
+        return
+      }
+      const auteur_username = monPseudo || localStorage.getItem('username') || '?'
+      const { ok, error } = await adminSauvegarderAnnonce({ id, titre, contenu, auteur_username })
+      if (!ok) { msgEl.textContent = '✗ Erreur : ' + (error?.message ?? ''); msgEl.className = 'msg-inline err'; return }
+      msgEl.textContent = '✓ Enregistré'; msgEl.className = 'msg-inline ok'
+      await chargerAnnoncesAdmin()
+      setTimeout(() => fermerModaleAnnonce(), 500)
+    }
+
+    window.supprimerAnnonce = async function(id, titre) {
+      if (!confirm(`Supprimer définitivement l'annonce "${titre}" ? Cette action est irréversible.`)) return
+      await adminSupprimerAnnonce(id)
+      await chargerAnnoncesAdmin()
+    }
+  </script>
+</body>
+</html>
